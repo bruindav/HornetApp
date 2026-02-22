@@ -1,0 +1,17 @@
+Ik dat je voor mij een app maakt  voor android waarmee ik het volgende kan 
+- kiezen van een plaats in Nederland 
+- daarna tonen van een open street map waarin deze plaats getoond wordt 
+- kunnen tekenen van gebieden (polygonen) binnen deze kaart en deze kunnen opslaan en later weer opvragen 
+- elke gebied een een label en een kleur kunnen geven 
+- op de kaart iconen kunnen plaatsen die een bepaalde betekenis hebben
+	- icoon hoornaar =>  hoornaar waargenomen (met mogeljkeheid getal erbij te zetten voor aantal waarnemingen)
+        - icoon nest  =>>  nest waargenomen 
+        - icoon nest geruimd  nest waargenomen 
+        - icoon lokpot  => lokpot geplaatst 
+Vanuit icoon lokpot lijnen kunnen tekenen voor vliegrichting 
+elke lijn een kleur kunnen geven 
+Elke lijn een getal voor afstand kunnen geven die de mogelijke afstand tot een nest weergeeft 
+Wanneer lijn een afstand tot nest heeft dan aan einde van de lijn een cirkel vormige lijn tekenen die de mogelijke lokatie van nest weergeeft 
+Deze cirkel vormige lijn is overal dezelfde afstand tot de lokpot 
+
+De app mag eerst een webapp zijn en wil ik later kunnen omzetten tot een installeerbare app
