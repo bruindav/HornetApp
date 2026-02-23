@@ -203,7 +203,7 @@ document.getElementById('import-file').addEventListener('change', e=>{ const f=e
 
 document.getElementById('btn-selftest').addEventListener('click', async()=>{ try{ await geocodePhoton('Utrecht'); setStatus(statusGeo,'Photon OK','ok'); }catch{ setStatus(statusGeo,'Photon NOK','err'); } const key=document.getElementById('mapsco-key').value.trim(); try{ await geocodeMapsCo('Utrecht',key); setStatus(statusGeo,'Maps.co OK','ok'); }catch{ setStatus(statusGeo,'Maps.co NOK','err'); } });
 
-const ENABLE_FIRESTORE=false; function initFirestoreIfEnabled(){ if(!ENABLE_FIRESTORE) return; /*
+const ENABLE_FIRESTORE=true; function initFirestoreIfEnabled(){ if(!ENABLE_FIRESTORE) return; /*
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
   import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
   const firebaseConfig = { };
