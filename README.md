@@ -1,5 +1,5 @@
 
-# Hornet Mapper NL — 6.0.9j-R2
+# Hornet Mapper NL — 6.0.10
 
 ## Wat is nieuw t.o.v. 6.0.9i
 - Unified **contextmenu** voor polygonen + icoonacties
