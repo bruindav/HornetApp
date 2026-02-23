@@ -450,3 +450,373 @@ function setSightLineColor(line,color,save=false){
 }
 function deleteSightLine(line, fromMenu=false){
   const id = line._meta?.id;
+  if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
+  if(line._sector){ const sid=line._sector._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(line._sector); line._sector=null; }
+  if(line.getTooltip()) line.unbindTooltip();
+  linesGroup.removeLayer(line); allLines = allLines.filter(l=>l!==line);
+  if(fromMenu && id){ deleteLineFromCloud(id); }
+}
+function createSectorLayer({id, pot,distance,color='#ffcc00',bearing,rInner,rOuter,angleLeft=45,angleRight=45,steps=36,flightId}){
+  const center=L.latLng(pot.lat,pot.lng); const start=bearing-angleLeft; const end=bearing+angleRight;
+  const outer=arcPoints(center,rOuter,start,end,steps);
+  const inner=arcPoints(center,rInner,end,start,steps);
+  const ring=[...outer,...inner];
+  const poly=L.polygon(ring,{color,weight:1,dashArray:'6 6',fillColor:color,fillOpacity:0.25});
+  poly._meta={ id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
+  return poly;
+}
+function attachSightLineInteractivity(line){
+  const meta=line._meta||{}; if(meta.type!=='flight') return;
+  const pot=L.latLng(meta.pot.lat,meta.pot.lng);
+  const end=line.getLatLngs()[1];
+  line.on('contextmenu',e=>{
+    e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
+    if(shouldDebounce()) return; openLineContextMenu(line, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
+  });
+  if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
+  const handle=L.marker(end,{icon:makeHandleIcon(),draggable:true,zIndexOffset:1500}).addTo(handlesGroup);
+  line._handle=handle;
+  handle.on('contextmenu',e=>{
+    e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
+    if(shouldDebounce()) return; openLineContextMenu(line, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
+  });
+  handle.on('drag',()=>{
+    const raw=handle.getLatLng();
+    const brg=bearingBetween(pot,raw); const dist=Math.max(1,Math.round(pot.distanceTo(raw)));
+    const constrained=destinationPoint(pot,dist,brg);
+    handle.setLatLng(constrained); line.setLatLngs([pot,constrained]);
+    line._meta.bearing=brg; line._meta.distance=dist;
+    if(line.getTooltip()) line.setTooltipContent(`${dist} m`);
+    if(line._sector){ circlesGroup.removeLayer(line._sector); line._sector=null; }
+    const rInner=Math.max(1,dist-25), rOuter=dist+25;
+    const sector=createSectorLayer({
+      id: line._sector? line._sector._meta?.id : genId('sect'),
+      pot: meta.pot, distance:dist, color:line._meta.color||'#ffcc00',
+      bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId: meta.id
+    }).addTo(circlesGroup);
+    registerSector(sector); line._sector=sector; sector._line=line;
+    persistLine(line); persistSector(sector);
+  });
+}
+function startSightLine(lokpotMarker){
+  const potLatLng=lokpotMarker.getLatLng();
+  let dist = prompt('Afstand tot nest (meter):','200'); if(dist===null) return;
+  dist=Math.max(1, parseInt(dist,10) || 1);
+  const defaultColor = '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+  const tempGuide=L.polyline([potLatLng,potLatLng],{color:defaultColor,weight:2,dashArray:'4 4'}).addTo(map);
+  const onMove=(e)=>{ tempGuide.setLatLngs([potLatLng,e.latlng]); };
+  const onClick=(e)=>{
+    map.off('mousemove', onMove); map.off('click', onClick); tempGuide.remove();
+    const clicked=e.latlng; const brg=bearingBetween(potLatLng, clicked);
+    const endLatLng=destinationPoint(potLatLng, dist, brg);
+    const id=genId('flight');
+    const line=L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:3}).addTo(linesGroup);
+    line._meta={ id, type:'flight',
+      pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
+      potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg
+    };
+    registerLine(line);
+    line.bindTooltip(`${dist} m`,{permanent:true,direction:'center',className:'line-label'});
+    const rInner=Math.max(1,dist-25), rOuter=dist+25;
+    const sector=createSectorLayer({
+      id: genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
+      distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+    }).addTo(circlesGroup);
+    registerSector(sector); line._sector=sector; sector._line=line;
+    attachSightLineInteractivity(line);
+    persistLine(line); persistSector(sector);
+  };
+  map.on('mousemove', onMove); map.on('click', onClick);
+}
+function persistLine(line){
+  const m=line._meta||{}, ll=line.getLatLngs();
+  const doc = {
+    id:m.id, type:'flight',
+    pot:m.pot||null, potId:m.potId||null,
+    distance:m.distance||0, color:m.color||'#ffcc00', bearing:m.bearing||0,
+    latlngs: ll.map(p=>({lat:p.lat,lng:p.lng}))
+  };
+  saveLineToCloud(doc);
+}
+function persistSector(sector){
+  const m=sector._meta||{};
+  const doc = { id:m.id, type:'sector', pot:m.pot||null, distance:m.distance||0,
+    color:m.color||'#ffcc00', bearing:m.bearing||0, rInner:m.rInner||0, rOuter:m.rOuter||0,
+    angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null
+  };
+  saveSectorToCloud(doc);
+}
+function removePotAssociations(potId){
+  const toRemoveLines=[]; allLines.forEach(l=>{ const m=l._meta||{}; if(m.potId===potId) toRemoveLines.push(l); });
+  toRemoveLines.forEach(l=>{ const id=l._meta?.id; if(id){ deleteLineFromCloud(id); } deleteSightLine(l,false); });
+  const toRemoveSectors=[]; allSectors.forEach(c=>{ const m=c._meta||{}; if(m.type==='sector'&&(m.pot?.id===potId||m.potId===potId)) toRemoveSectors.push(c); });
+  toRemoveSectors.forEach(c=>{ const sid=c._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(c); });
+}
+
+// ======================= Polygons =======================
+function polygonCentroid(layer){
+  try{
+    const latlngs = layer.getLatLngs();
+    const ring = Array.isArray(latlngs[0])? (Array.isArray(latlngs[0][0])?latlngs[0][0]:latlngs[0]) : latlngs;
+    if(!ring || ring.length<3) return layer.getBounds().getCenter();
+    let area=0,cx=0,cy=0;
+    for(let i=0,j=ring.length-1;i<ring.length;j=i++){
+      const x0=ring[j].lng,y0=ring[j].lat,x1=ring[i].lng,y1=ring[i].lat; const f=x0*y1-x1*y0;
+      area+=f; cx+=(x0+x1)*f; cy+=(y0+y1)*f;
+    }
+    area*=0.5; if(Math.abs(area)<1e-12) return layer.getBounds().getCenter();
+    cx/=(6*area); cy/=(6*area); return L.latLng(cy,cx);
+  }catch{ return layer.getBounds().getCenter(); }
+}
+function refreshPolygonLabel(layer){
+  const lbl=layer._props?.label||''; const col=layer._props?.color||'#0aa879';
+  if(lbl){
+    const pos = polygonCentroid(layer);
+    if(!layer._labelTooltip){
+      layer._labelTooltip = L.tooltip({permanent:true,direction:'center',className:'poly-label'}).setContent(lbl).setLatLng(pos);
+      layer._labelTooltip.addTo(map);
+    } else {
+      layer._labelTooltip.setContent(lbl).setLatLng(pos);
+    }
+    const el = layer._labelTooltip.getElement(); if(el) el.style.borderColor = col;
+  } else {
+    if(layer._labelTooltip){ map.removeLayer(layer._labelTooltip); layer._labelTooltip=null; }
+  }
+}
+function initPolygon(layer){
+  layer._props = layer._props || { id: genId('poly'), label:'', color:'#0aa879' };
+  const col = layer._props.color||'#0aa879';
+  layer.setStyle({ color: col, fillColor: col, fillOpacity: .2, weight: 2 });
+  refreshPolygonLabel(layer);
+  const open = (ev)=>{
+    ev.originalEvent?.preventDefault(); ev.originalEvent?.stopPropagation();
+    if(shouldDebounce()) return;
+    openUnifiedContextMenu({ x:ev.originalEvent?.clientX||0, y:ev.originalEvent?.clientY||0, latlng:ev.latlng, polygonLayer: layer });
+  };
+  layer.on('contextmenu', open); layer.on('click', open);
+}
+function persistPolygon(layer){
+  const id = layer._props?.id || genId('poly'); layer._props.id = id;
+  const latlngs = layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}));
+  const doc = { id, label:layer._props.label||'', color:layer._props.color||'#0aa879', latlngs };
+  savePolygonToCloud(doc);
+}
+
+// ======================= Unified contextmenu =======================
+function openUnifiedContextMenu(opts){
+  closeContextMenu();
+  const el=document.createElement('div'); el.className='ctx-menu';
+  let html='';
+  if(opts.polygonLayer){
+    html += `<h4>Polygoon</h4>
+      <button data-act="poly_label">✏️ Label wijzigen</button>
+      <button data-act="poly_color">🎨 Kleur wijzigen</button>
+      <button data-act="poly_edit">✍️ Vorm bewerken aan/uit</button>
+      <button data-act="poly_delete">🗑️ Verwijderen</button>
+      <hr/>`;
+  }
+  html += `<h4>Nieuw icoon</h4>
+    <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
+    <button data-act="mk" data-type="nest">🪹 Nest</button>
+    <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
+    <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+  el.innerHTML=html;
+
+  el.addEventListener('click', ev=>{
+    const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
+    closeContextMenu();
+    setTimeout(()=>{
+      if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); return; }
+      if(!opts.polygonLayer) return;
+      if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
+      else if(act==='poly_color'){ const col=prompt('Kleur (CSS/hex, bv. #ffcc00):', opts.polygonLayer._props?.color||'#0aa879'); if(col===null) return; opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
+      else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
+      else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } polygonsGroup.removeLayer(opts.polygonLayer); }
+    },0);
+  });
+
+  document.body.appendChild(el); contextMenuEl=el; positionMenu(el, opts.x||0, opts.y||0);
+  document.addEventListener('keydown', escClose); document.addEventListener('click', closeContextMenuOnce, true);
+}
+
+// ======================= Filters =======================
+function getActiveFilters(){ return {
+  hoornaar: !!$('f_type_hoornaar')?.checked,
+  nest: !!$('f_type_nest')?.checked,
+  nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
+  lokpot: !!$('f_type_lokpot')?.checked,
+  pending: !!$('f_type_pending')?.checked,
+  dateBefore: $('f_date_before')?.value || ''
+};}
+function applyFilters(){
+  const f=getActiveFilters();
+  allMarkers.forEach(m=>{
+    const meta=m._meta||{}; let show=!!f[meta.type];
+    if(f.dateBefore && meta.date){ if(meta.date < f.dateBefore) show=false; }
+    if(show) markersGroup.addLayer(m); else markersGroup.removeLayer(m);
+  });
+  const visiblePotIds=new Set();
+  allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
+  allLines.forEach(line=>{
+    const meta=line._meta||{}; const should = visiblePotIds.has(meta.potId);
+    const onMap = linesGroup.hasLayer(line);
+    if(should && !onMap) linesGroup.addLayer(line);
+    if(!should && onMap) linesGroup.removeLayer(line);
+    if(line._handle){
+      const showH = should; const inH = handlesGroup.hasLayer(line._handle);
+      if(showH && !inH) handlesGroup.addLayer(line._handle);
+      if(!showH && inH) handlesGroup.removeLayer(line._handle);
+    }
+    if(line._sector){
+      const showS = should; const inS = circlesGroup.hasLayer(line._sector);
+      if(showS && !inS) circlesGroup.addLayer(line._sector);
+      if(!showS && inS) circlesGroup.removeLayer(line._sector);
+    }
+  });
+}
+
+// ======================= Cloud → kaart (realtime) =======================
+function upsertMarkerFromCloud(doc){
+  // zoek bestaande marker
+  let m = allMarkers.find(x=>x._meta?.id===doc.id);
+  if(!m){
+    m = L.marker([doc.lat, doc.lng], { icon: (()=>{
+      if(doc.type==='hoornaar') return ICONS.hoornaar(doc.aantal);
+      if(doc.type==='nest') return ICONS.nest();
+      if(doc.type==='nest_geruimd') return ICONS.nest_geruimd();
+      if(doc.type==='lokpot') return ICONS.lokpot();
+      return ICONS.pending();
+    })() });
+    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null };
+    m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
+    allMarkers.push(m); markersGroup.addLayer(m);
+  } else {
+    m.setLatLng([doc.lat, doc.lng]);
+    m._meta.type = doc.type;
+    m._meta.potId = doc.potId||null;
+    m._meta.date = doc.date||null;
+    m._meta.by   = doc.by||null;
+    m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
+    if(doc.type==='hoornaar') m.setIcon(ICONS.hoornaar(m._meta.aantal));
+    if(doc.type==='nest') m.setIcon(ICONS.nest());
+    if(doc.type==='nest_geruimd') m.setIcon(ICONS.nest_geruimd());
+    if(doc.type==='lokpot') m.setIcon(ICONS.lokpot());
+  }
+  attachMarkerPopup(m);
+  applyFilters();
+}
+function deleteMarkerFromCloudLocal(id){
+  const m = allMarkers.find(x=>x._meta?.id===id);
+  if(m){ deleteMarkerAndAssociations(m); }
+}
+
+function upsertLineFromCloud(doc){
+  let l = allLines.find(x=>x._meta?.id===doc.id);
+  const latlngs = (doc.latlngs||[]).map(p=>L.latLng(p.lat,p.lng));
+  if(!l){
+    l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:3}).addTo(linesGroup);
+    l._meta = { ...doc };
+    registerLine(l);
+    l.bindTooltip(`${doc.distance||0} m`,{permanent:true,direction:'center',className:'line-label'});
+    attachSightLineInteractivity(l);
+  } else {
+    l.setLatLngs(latlngs);
+    l._meta = { ...l._meta, ...doc };
+    if(l.getTooltip()) l.setTooltipContent(`${doc.distance||0} m`);
+  }
+  applyFilters();
+}
+function deleteLineFromCloudLocal(id){
+  const l = allLines.find(x=>x._meta?.id===id);
+  if(l) deleteSightLine(l,false);
+}
+
+function upsertSectorFromCloud(doc){
+  const line = allLines.find(l=>l._meta?.id===doc.flightId);
+  if(line && line._sector){ circlesGroup.removeLayer(line._sector); }
+  const sector = createSectorLayer({
+    id: doc.id, pot: doc.pot, distance: doc.distance, color: doc.color, bearing: doc.bearing,
+    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft, angleRight: doc.angleRight, steps: doc.steps, flightId: doc.flightId
+  }).addTo(circlesGroup);
+  registerSector(sector);
+  if(line){ line._sector = sector; sector._line = line; }
+  applyFilters();
+}
+function deleteSectorFromCloudLocal(id){
+  const s = allSectors.find(x=>x._meta?.id===id);
+  if(s){ circlesGroup.removeLayer(s); }
+}
+
+function upsertPolygonFromCloud(doc){
+  let p = polygonsGroup.getLayers().find(x=>x._props?.id===doc.id);
+  if(p){ polygonsGroup.removeLayer(p); }
+  const latlngs = (doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng));
+  const lp = L.polygon(latlngs).addTo(polygonsGroup);
+  lp._props = { id: doc.id, label: doc.label||'', color: doc.color||'#0aa879' };
+  initPolygon(lp);
+}
+function deletePolygonFromCloudLocal(id){
+  const p = polygonsGroup.getLayers().find(x=>x._props?.id===id);
+  if(p){ polygonsGroup.removeLayer(p); }
+}
+
+// ======================= Scope & opstart =======================
+const LS_SCOPE = "hornet_scope_v610"; // {year, group}
+const DEFAULT_YEAR  = String(new Date().getFullYear());
+const DEFAULT_GROUP = "Hoornaar_Zeist";
+function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
+function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
+
+function activateScope(year, group, reload=false){
+  const { base } = setActiveScope(year, group);
+  writeScope(year, group);
+
+  // Realtime listeners
+  listenToCloudChanges({
+    onMarkerUpdate:   upsertMarkerFromCloud,
+    onMarkerDelete:   deleteMarkerFromCloudLocal,
+    onLineUpdate:     upsertLineFromCloud,
+    onLineDelete:     deleteLineFromCloudLocal,
+    onSectorUpdate:   upsertSectorFromCloud,
+    onSectorDelete:   deleteSectorFromCloudLocal,
+    onPolygonUpdate:  upsertPolygonFromCloud,
+    onPolygonDelete:  deletePolygonFromCloudLocal
+  });
+
+  if(reload){
+    markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
+    allMarkers=[]; allLines=[]; allSectors=[];
+  }
+  setStatus(statusSW, `Scope: ${base}`, 'ok');
+}
+
+// ======================= DOMContentLoaded: alles starten =======================
+function boot(){
+  initMap();
+  initUIBindings();
+
+  const selYear  = $('sel-year');
+  const selGroup = $('sel-group');
+  const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
+
+  if(selYear && ![...selYear.options].some(o=>o.value===saved.year)){
+    selYear.insertAdjacentHTML('afterbegin', `<option value="${saved.year}">${saved.year}</option>`);
+  }
+  if(selYear)  selYear.value  = saved.year;
+  if(selGroup) selGroup.value = saved.group;
+
+  on(req('apply-scope'), 'click', ()=>{
+    const y = selYear?.value  || DEFAULT_YEAR;
+    const g = selGroup?.value || DEFAULT_GROUP;
+    activateScope(y, g, /*reload=*/true);
+  });
+
+  activateScope(saved.year, saved.group, /*reload=*/true);
+  applyFilters();
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
