@@ -1,11 +1,8 @@
-// sync-engine.js — Hornet Mapper NL v6.1.0 (Hybrid realtime sync)
+// sync-engine.js — Hornet Mapper NL v6.1.0 (hybride realtime sync)
 // ---------------------------------------------------------------
-// Vereist: firebase.js
-// ---------------------------------------------------------------
+// LET OP: Dit bestand mag slechts ÉÉN Firestore-import hebben!
 
-import {
-  db
-} from "./firebase.js";
+import { db } from "./firebase.js";
 
 import {
   collection,
@@ -16,192 +13,185 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-
-// ---------------------------------------------------------------
-// Configuratie — dynamische scope (jaar + groep)
-// ---------------------------------------------------------------
-import { collection, doc, setDoc, deleteDoc, onSnapshot, serverTimestamp }
-  from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+//
+// -------------- DYNAMISCHE SCOPE (jaar + groep) ----------------
+//
 
 export let ACTIVE_YEAR  = "2026";
 export let ACTIVE_GROUP = "Hoornaar_Zeist";
 
-let colMarkers, colLines, colSectors, colPolys;
+let colMarkers = null;
+let colLines   = null;
+let colSectors = null;
+let colPolys   = null;
 
 export function setActiveScope(year, group) {
   ACTIVE_YEAR  = year;
   ACTIVE_GROUP = group;
+
   const base = `maps/${ACTIVE_YEAR}/${ACTIVE_GROUP}`;
+
   colMarkers = collection(db, `${base}/markers`);
   colLines   = collection(db, `${base}/lines`);
   colSectors = collection(db, `${base}/sectors`);
   colPolys   = collection(db, `${base}/polygons`);
+
   return { year: ACTIVE_YEAR, group: ACTIVE_GROUP, base };
 }
 
-// eerste init (default)
+// Init default scope:
 setActiveScope(ACTIVE_YEAR, ACTIVE_GROUP);
 
+//
+// ----------------------- OFFLINE QUEUE ------------------------
+//
 
-// ---------------------------------------------------------------
-// Offline write queue
-// ---------------------------------------------------------------
 let writeQueue = [];
-let online = true;
+let online = navigator.onLine;
 
-window.addEventListener("online",  () => { online = true;  flushQueue(); });
-window.addEventListener("offline", () => { online = false; });
+window.addEventListener("online", () => {
+  online = true;
+  flushQueue();
+});
+window.addEventListener("offline", () => {
+  online = false;
+});
 
 async function flushQueue() {
   if (!online) return;
-  const queue = [...writeQueue];
+  const pending = [...writeQueue];
   writeQueue = [];
-  for (let job of queue) {
+
+  for (const job of pending) {
     try {
-      if (job.type === "set") await setDoc(job.ref, job.data);
-      if (job.type === "del") await deleteDoc(job.ref);
+      if (job.type === "set") {
+        await setDoc(job.ref, job.data);
+      } else {
+        await deleteDoc(job.ref);
+      }
     } catch (err) {
-      console.warn("Kon Firestore write niet uitvoeren, opnieuw in queue:", err);
+      console.warn("Firestore write mislukt, opnieuw in queue:", err);
       writeQueue.push(job);
     }
   }
 }
 
-// Helper voor veilige writes
-async function safeSetDoc(ref, data) {
+function safeSet(ref, data) {
   if (online) {
-    try { return await setDoc(ref, data); }
-    catch (e) {
-      console.warn("SetDoc fout — toegevoegd aan queue:", e);
+    return setDoc(ref, data).catch(err => {
+      console.warn("SetDoc fout → queue:", err);
       writeQueue.push({ type: "set", ref, data });
-    }
+    });
   } else {
     writeQueue.push({ type: "set", ref, data });
   }
 }
 
-// Helper voor deletes
-async function safeDeleteDoc(ref) {
+function safeDelete(ref) {
   if (online) {
-    try { return await deleteDoc(ref); }
-    catch (e) {
-      console.warn("DeleteDoc fout — queue:", e);
+    return deleteDoc(ref).catch(err => {
+      console.warn("DeleteDoc fout → queue:", err);
       writeQueue.push({ type: "del", ref });
-    }
+    });
   } else {
     writeQueue.push({ type: "del", ref });
   }
 }
 
-// ---------------------------------------------------------------
-//  WRITES — worden door app.js gebruikt
-// ---------------------------------------------------------------
+//
+// ------------------- CLOUD WRITE API --------------------------
+//
 
-// Marker opslaan of updaten
-export function saveMarkerToCloud(markerObj) {
-  markerObj.updatedAt = serverTimestamp();
-  const ref = doc(colMarkers, markerObj.id);
-  return safeSetDoc(ref, markerObj);
+export function saveMarkerToCloud(obj) {
+  obj.updatedAt = serverTimestamp();
+  return safeSet(doc(colMarkers, obj.id), obj);
 }
 
-// Marker verwijderen
-export function deleteMarkerFromCloud(markerId) {
-  return safeDeleteDoc(doc(colMarkers, markerId));
+export function deleteMarkerFromCloud(id) {
+  return safeDelete(doc(colMarkers, id));
 }
 
-// Line opslaan
-export function saveLineToCloud(lineObj) {
-  lineObj.updatedAt = serverTimestamp();
-  const ref = doc(colLines, lineObj.id);
-  return safeSetDoc(ref, lineObj);
+export function saveLineToCloud(obj) {
+  obj.updatedAt = serverTimestamp();
+  return safeSet(doc(colLines, obj.id), obj);
 }
 
-// Line verwijderen
-export function deleteLineFromCloud(lineId) {
-  return safeDeleteDoc(doc(colLines, lineId));
+export function deleteLineFromCloud(id) {
+  return safeDelete(doc(colLines, id));
 }
 
-// Sector opslaan
-export function saveSectorToCloud(sectorObj) {
-  sectorObj.updatedAt = serverTimestamp();
-  const ref = doc(colSectors, sectorObj.id);
-  return safeSetDoc(ref, sectorObj);
+export function saveSectorToCloud(obj) {
+  obj.updatedAt = serverTimestamp();
+  return safeSet(doc(colSectors, obj.id), obj);
 }
 
-// Sector verwijderen
-export function deleteSectorFromCloud(sectorId) {
-  return safeDeleteDoc(doc(colSectors, sectorId));
+export function deleteSectorFromCloud(id) {
+  return safeDelete(doc(colSectors, id));
 }
 
-// Polygon opslaan (met shape)
-export function savePolygonToCloud(polyObj) {
-  polyObj.updatedAt = serverTimestamp();
-  const ref = doc(colPolys, polyObj.id);
-  return safeSetDoc(ref, polyObj);
+export function savePolygonToCloud(obj) {
+  obj.updatedAt = serverTimestamp();
+  return safeSet(doc(colPolys, obj.id), obj);
 }
 
-// Polygon verwijderen
-export function deletePolygonFromCloud(polyId) {
-  return safeDeleteDoc(doc(colPolys, polyId));
+export function deletePolygonFromCloud(id) {
+  return safeDelete(doc(colPolys, id));
 }
 
-// ---------------------------------------------------------------
-//  READ / LISTENERS — pushen realtime updates naar app.js
-// ---------------------------------------------------------------
+//
+// ---------------- CLOUD LISTENERS (REALTIME) ------------------
+//
+
 export function listenToCloudChanges(callbacks) {
 
-  // -------- MARKERS --------
-  onSnapshot(colMarkers, (snap) => {
-    snap.docChanges().forEach((ch) => {
-      const data = ch.doc.data();
-      if (!data) return;
-      if (ch.type === "added" || ch.type === "modified") {
-        callbacks.onMarkerUpdate && callbacks.onMarkerUpdate(data);
-      }
-      if (ch.type === "removed") {
-        callbacks.onMarkerDelete && callbacks.onMarkerDelete(data.id);
-      }
-    });
-  });
-
-  // -------- LINES --------
-  onSnapshot(colLines, (snap) => {
-    snap.docChanges().forEach((ch) => {
-      const data = ch.doc.data();
-      if (!data) return;
-      if (ch.type === "added" || ch.type === "modified") {
-        callbacks.onLineUpdate && callbacks.onLineUpdate(data);
-      }
-      if (ch.type === "removed") {
-        callbacks.onLineDelete && callbacks.onLineDelete(data.id);
+  // MARKERS
+  onSnapshot(colMarkers, snap => {
+    snap.docChanges().forEach(change => {
+      const d = change.doc.data();
+      if (!d) return;
+      if (change.type === "added" || change.type === "modified") {
+        callbacks.onMarkerUpdate?.(d);
+      } else {
+        callbacks.onMarkerDelete?.(d.id);
       }
     });
   });
 
-  // -------- SECTORS --------
-  onSnapshot(colSectors, (snap) => {
-    snap.docChanges().forEach((ch) => {
-      const data = ch.doc.data();
-      if (!data) return;
-      if (ch.type === "added" || ch.type === "modified") {
-        callbacks.onSectorUpdate && callbacks.onSectorUpdate(data);
-      }
-      if (ch.type === "removed") {
-        callbacks.onSectorDelete && callbacks.onSectorDelete(data.id);
+  // LINES
+  onSnapshot(colLines, snap => {
+    snap.docChanges().forEach(change => {
+      const d = change.doc.data();
+      if (!d) return;
+      if (change.type === "added" || change.type === "modified") {
+        callbacks.onLineUpdate?.(d);
+      } else {
+        callbacks.onLineDelete?.(d.id);
       }
     });
   });
 
-  // -------- POLYGONS --------
-  onSnapshot(colPolys, (snap) => {
-    snap.docChanges().forEach((ch) => {
-      const data = ch.doc.data();
-      if (!data) return;
-      if (ch.type === "added" || ch.type === "modified") {
-        callbacks.onPolygonUpdate && callbacks.onPolygonUpdate(data);
+  // SECTORS
+  onSnapshot(colSectors, snap => {
+    snap.docChanges().forEach(change => {
+      const d = change.doc.data();
+      if (!d) return;
+      if (change.type === "added" || change.type === "modified") {
+        callbacks.onSectorUpdate?.(d);
+      } else {
+        callbacks.onSectorDelete?.(d.id);
       }
-      if (ch.type === "removed") {
-        callbacks.onPolygonDelete && callbacks.onPolygonDelete(data.id);
+    });
+  });
+
+  // POLYGONS
+  onSnapshot(colPolys, snap => {
+    snap.docChanges().forEach(change => {
+      const d = change.doc.data();
+      if (!d) return;
+      if (change.type === "added" || change.type === "modified") {
+        callbacks.onPolygonUpdate?.(d);
+      } else {
+        callbacks.onPolygonDelete?.(d.id);
       }
     });
   });
