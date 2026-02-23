@@ -143,5 +143,44 @@
   }
 </script>
 
+<!-- Floating search button (🔍) -->
+<button id="floating-search-btn" title="Zoeken">🔍</button>
+
+<!-- Search overlay -->
+<div id="search-overlay" aria-hidden="true">
+  <div id="search-box">
+    <input id="place-input" type="text" placeholder="Zoek plaats..." />
+    <button id="search-btn" type="button">Zoek</button>
+    <button id="search-close" type="button" title="Sluiten">✕</button>
+  </div>
+</div>
+
+<!-- Modal voor icoon-eigenschappen (zorg dat deze IDs bestaan voor app.js) -->
+<div id="prop-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="prop-title">
+  <div class="modal-card">
+    <h3 id="prop-title">Eigenschappen</h3>
+
+    <div class="form-row">
+      <label>Datum</label>
+      <input id="pm-date" type="date" />
+    </div>
+
+    <div class="form-row">
+      <label>Door wie</label>
+      <input id="pm-by" type="text" placeholder="Naam" />
+    </div>
+
+    <div class="form-row only-hoornaar">
+      <label>Aantal</label>
+      <input id="pm-amount" type="number" min="1" placeholder="(optioneel)" />
+    </div>
+
+    <div class="actions">
+      <button id="pm-cancel" class="btn-secondary" type="button">Annuleren</button>
+      <button id="pm-save" class="btn-primary"   type="button">Opslaan</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
