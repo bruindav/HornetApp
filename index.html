@@ -1,21 +1,31 @@
-
 <!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hornet Mapper NL — 6.0.9j-R2</title>
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='100%' height='100%' fill='%230aa879'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='90'>🐝</text></svg>">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-  <link rel="stylesheet" href="./app.css?v=609j-r2" />
-  <link rel="manifest" href="./manifest.webmanifest?v=609j-r2" />
+  <title>Hornet Mapper NL — v6.1.0</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Geoman CSS -->
+  <link rel="stylesheet"
+        href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="./app.css?v=610" />
+
+  <!-- Manifest (optioneel) -->
+  <link rel="manifest" href="./manifest.webmanifest?v=610" />
+
   <meta name="theme-color" content="#0aa879" />
 </head>
+
 <body>
 <header>
-  <button id="toggle-sidebar" aria-label="Toggle sidebar">☰</button>
-  <h1>Hornet Mapper NL — 6.0.9j-R2</h1>
+  <button id="toggle-sidebar" aria-label="Sidebar">☰</button>
+  <h1>Hornet Mapper NL — v6.1.0</h1>
   <div id="status-bar">
     <span id="status-sw">SW: —</span>
     <span id="status-geo">Geocoder: —</span>
@@ -25,50 +35,89 @@
 </header>
 
 <main>
+  <!-- ==================== SIDEBAR ==================== -->
   <aside class="sidebar">
+
+    <!-- ⭐ JOUW NIEUWE DATASET SELECTOR ⭐ -->
+    <section>
+      <h2>Dataset</h2>
+
+      <div class="tool-row">
+        <label for="sel-year">Jaar</label>
+        <select id="sel-year">
+          <option value="2025">2025</option>
+          <option value="2026">2026</option>
+          <option value="2027">2027</option>
+          <option value="2028">2028</option>
+        </select>
+      </div>
+
+      <div class="tool-row">
+        <label for="sel-group">Zoekgroep</label>
+        <select id="sel-group">
+          <option value="Hoornaar_Zeist">Hoornaar_Zeist</option>
+          <option value="Utrecht">Utrecht</option>
+          <option value="De_Bilt">De_Bilt</option>
+          <option value="Soesterberg">Soesterberg</option>
+          <option value="Driebergen">Driebergen</option>
+        </select>
+      </div>
+
+      <button id="apply-scope">Scope toepassen</button>
+    </section>
+    <!-- ================================================ -->
+
+
+    <!-- ZOEK -->
     <section>
       <h2>Zoeken</h2>
-      <p>Tik op de 🔍 knop (rechtsboven) om te zoeken.</p>
+      <p>Tik op 🔍 (rechtsboven) om te zoeken.</p>
     </section>
 
+    <!-- INSTELLINGEN -->
     <section>
       <h2>Instellingen</h2>
       <div class="tool-row">
         <label for="hard-debounce">Harde debounce:</label>
         <input id="hard-debounce" type="checkbox" />
       </div>
+
       <div class="tool-row">
         <label for="geocoder-select">Geocoder:</label>
         <select id="geocoder-select">
-          <option value="auto">Auto (Photon → maps.co)</option>
+          <option value="auto">Auto (Photon → Maps.co)</option>
           <option value="photon">Alleen Photon</option>
-          <option value="mapsco">Alleen maps.co</option>
+          <option value="mapsco">Alleen Maps.co</option>
         </select>
       </div>
+
       <div class="tool-row">
         <label for="mapsco-key">maps.co API key:</label>
         <input id="mapsco-key" type="text" placeholder="optioneel" />
       </div>
-      <button id="save-settings">Instellingen opslaan</button>
     </section>
 
+    <!-- FILTERS -->
     <section>
       <h2>Filter</h2>
-      <div class="filter-row"><label><input type="checkbox" id="f_type_hoornaar" checked> Waarneming</label></div>
-      <div class="filter-row"><label><input type="checkbox" id="f_type_nest" checked> Nest</label></div>
-      <div class="filter-row"><label><input type="checkbox" id="f_type_nest_geruimd" checked> Nest geruimd</label></div>
-      <div class="filter-row"><label><input type="checkbox" id="f_type_lokpot" checked> Lokpot</label></div>
-      <div class="filter-row"><label><input type="checkbox" id="f_type_pending" checked> Nieuw/pending</label></div>
+      <div class="filter-row"><label><input type="checkbox" id="f_type_hoornaar" checked /> Waarneming</label></div>
+      <div class="filter-row"><label><input type="checkbox" id="f_type_nest" checked /> Nest</label></div>
+      <div class="filter-row"><label><input type="checkbox" id="f_type_nest_geruimd" checked /> Nest geruimd</label></div>
+      <div class="filter-row"><label><input type="checkbox" id="f_type_lokpot" checked /> Lokpot</label></div>
+      <div class="filter-row"><label><input type="checkbox" id="f_type_pending" checked /> Nieuw/pending</label></div>
+
       <div class="filter-row">
         <label>Verberg iconen vóór datum:</label>
         <input type="date" id="f_date_before" />
       </div>
+
       <div class="filter-actions">
         <button id="apply-filters">Toepassen</button>
         <button id="reset-filters">Reset</button>
       </div>
     </section>
 
+    <!-- DATA -->
     <section>
       <h2>Data</h2>
       <button id="save-btn">Opslaan (lokaal)</button>
@@ -79,12 +128,16 @@
       <button id="clear-btn" class="danger">Alles wissen</button>
     </section>
 
+    <!-- FIRESTORE INFO -->
     <section>
       <h2>Realtime Sync</h2>
-      <p>(Voorbereid — uitgeschakeld)</p>
-      <p>Map-ID: <code>stichting-hornet</code></p>
+      <p>Hybride modus actief</p>
+      <p>Dataset: jaar + groep</p>
     </section>
+
   </aside>
+
+  <!-- =============== MAP ================= -->
   <section id="map"></section>
 </main>
 
@@ -92,7 +145,10 @@
   <small>Kaartgegevens © OpenStreetMap-bijdragers</small>
 </footer>
 
+<!-- Floating search button -->
 <button id="floating-search-btn" title="Zoeken">🔍</button>
+
+<!-- Search overlay -->
 <div id="search-overlay" aria-hidden="true">
   <div id="search-box">
     <input id="place-input" type="text" placeholder="Zoek plaats..." />
@@ -101,22 +157,26 @@
   </div>
 </div>
 
-<!-- Modal for icon properties -->
+<!-- Modal voor icoon-eigenschappen -->
 <div id="prop-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="prop-title">
   <div class="modal-card">
     <h3 id="prop-title">Eigenschappen</h3>
+
     <div class="form-row">
       <label>Datum</label>
       <input id="pm-date" type="date" />
     </div>
+
     <div class="form-row">
       <label>Door wie</label>
       <input id="pm-by" type="text" placeholder="Naam" />
     </div>
+
     <div class="form-row only-hoornaar">
-      <label>Aantal waarnemingen</label>
-      <input id="pm-amount" type="number" min="1" placeholder="(optioneel)" />
+      <label>Aantal</label>
+      <input id="pm-amount" type="number" min="1" placeholder="(optie)" />
     </div>
+
     <div class="actions">
       <button id="pm-cancel" class="btn-secondary">Annuleren</button>
       <button id="pm-save" class="btn-primary">Opslaan</button>
@@ -124,15 +184,34 @@
   </div>
 </div>
 
+<!-- ========== Scripts (MODULES) ========== -->
+
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- Geoman -->
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-<script src="./app.js?v=609j-r2"></script>
+
+<!-- Firebase config -->
+<script type="module" src="./config.js?v=610"></script>
+
+<!-- Firebase init -->
+<script type="module" src="./firebase.js?v=610"></script>
+
+<!-- Sync Engine (real-time + offline) -->
+<script type="module" src="./sync-engine.js?v=610"></script>
+
+<!-- App logic -->
+<script type="module" src="./app.js?v=610"></script>
+
+<!-- Service Worker registratie -->
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./service-worker.js?v=609j-r2');
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js?v=610");
     });
   }
 </script>
+
 </body>
 </html>
