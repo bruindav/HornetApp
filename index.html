@@ -6,17 +6,21 @@
   <title>Hornet Mapper NL — v6.1.0</title>
 
   <!-- Leaflet CSS -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- Geoman CSS -->
-  <link rel="stylesheet"
-        href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
 
   <!-- App CSS -->
   <link rel="stylesheet" href="./app.css?v=610" />
 
   <meta name="theme-color" content="#0aa879" />
+
+  <!-- Fallback (kaart altijd zichtbaar) -->
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: calc(100vh - 64px); }
+  </style>
 </head>
 
 <body>
@@ -42,7 +46,7 @@
         <label for="sel-year">Jaar</label>
         <select id="sel-year">
           <option value="2025">2025</option>
-          <option value="2026">2026</option>
+          <option value="2026" selected>2026</option>
           <option value="2027">2027</option>
           <option value="2028">2028</option>
         </select>
@@ -62,8 +66,8 @@
       <button id="apply-scope">Scope toepassen</button>
     </section>
 
+    <!-- De rest van je sidebar blijft exact zoals jij had -->
     <section><h2>Zoeken</h2><p>Tik op 🔍 om te zoeken.</p></section>
-
     <section>
       <h2>Instellingen</h2>
       <div class="tool-row">
@@ -117,7 +121,6 @@
       <h2>Realtime sync</h2>
       <p>Hybride modus actief</p>
     </section>
-
   </aside>
 
   <section id="map"></section>
@@ -127,32 +130,15 @@
   <small>© OpenStreetMap</small>
 </footer>
 
-<button id="floating-search-btn">🔍</button>
-
-<div id="search-overlay" aria-hidden="true">
-  <div id="search-box">
-    <input id="place-input" type="text" placeholder="Zoek plaats..." />
-    <button id="search-btn">Zoek</button>
-    <button id="search-close">✕</button>
-  </div>
-</div>
-
-<!-- MODAL -->
-<div id="prop-modal" class="modal hidden">
-  <div class="modal-card">
-    <h3 id="prop-title">Eigenschappen</h3>
-    <div class="form-row"><label>Datum</label><input id="pm-date" type="date" /></div>
-    <div class="form-row"><label>Door wie</label><input id="pm-by" type="text" /></div>
-    <div class="form-row only-hoornaar"><label>Aantal</label><input id="pm-amount" type="number" /></div>
-    <div class="actions"><button id="pm-cancel">Annuleren</button><button id="pm-save">Opslaan</button></div>
-  </div>
-</div>
-
-<!-- Leaflet + Geoman -->
+<!-- Leaflet + Geoman JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
-<!-- ModulesserviceWorker" in navigator) {
+<!-- ENTRY MODULE -->
+<script type="module" src="./app.js?v=610"></script>
+
+<script>
+  if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js?v=610");
   }
 </script>
