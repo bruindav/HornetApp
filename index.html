@@ -6,17 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hornet Mapper NL</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='100%' height='100%' fill='%230aa879'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='90'>🐝</text></svg>">
-
-  <!-- Leaflet & Geoman CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
-
-  <!-- PWA manifest -->
-  <link rel="manifest" href="./manifest.webmanifest?v=609f" />
+  <link rel="manifest" href="./manifest.webmanifest?v=609g" />
   <meta name="theme-color" content="#0aa879" />
-
-  <!-- App CSS -->
-  <link rel="stylesheet" href="./app.css?v=609f" />
+  <link rel="stylesheet" href="./app.css?v=609g" />
 </head>
 <body>
   <header>
@@ -34,7 +28,7 @@
     <aside class="sidebar">
       <section>
         <h2>Zoeken</h2>
-        <p>Klik op 🔍 (rechtsboven) om een plaatsnaam te zoeken.</p>
+        <p>Tik op de 🔍 knop (rechtsboven) om te zoeken.</p>
       </section>
 
       <section>
@@ -97,7 +91,7 @@
   <button id="floating-search-btn" title="Zoeken">🔍</button>
 
   <!-- Search overlay (C2-A) -->
-  <div id="search-overlay">
+  <div id="search-overlay" aria-hidden="true">
     <div id="search-box">
       <input id="place-input" type="text" placeholder="Zoek plaats..." />
       <button id="search-btn">Zoek</button>
@@ -105,15 +99,13 @@
     </div>
   </div>
 
-  <!-- Leaflet & Geoman JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
-  <script src="./app.js?v=609f"></script>
-
+  <script src="./app.js?v=609g"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=609f');
+        navigator.serviceWorker.register('./service-worker.js?v=609g');
       });
     }
   </script>
