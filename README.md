@@ -1,19 +1,21 @@
 
-# Hornet Mapper NL — v6.0.9g (C2-A)
+# Hornet Mapper NL — 6.0.9j-R2
 
-Fixes t.o.v. 6.0.9f:
-- Zoekoverlay en 🔍-knop altijd bovenin (fixed), z-index verhoogd
-- Zoeken reageert weer (Enter/klik), overlay sluit bij succes
-- Polygoon contextmenu terug: label/kleur wijzigen, verwijderen
-- Contextmenu sluit veilig bij annuleren/klik buiten/Escape
-- Tweede (en volgende) iconen toevoegen werkt stabiel
-- SW cache-bump (v6-609g)
+## Wat is nieuw t.o.v. 6.0.9i
+- Unified **contextmenu** voor polygonen + icoonacties
+- **Zichtlijnen** vanuit lokpot (meerdere per lokpot) met handle & sector ±45°
+- **Datepicker‑modal** (default vandaag) voor iconen
+- **Filter** verbergt lijnen mee met lokpotten
+- **Export/Import** van markers, zichtlijnen en polygonen
+- **Service Worker bump** (v609j-r2)
+- **Firestore voorbereiding (UIT)** — zie `app.js` → `ENABLE_FIRESTORE`
 
-## Publiceren via GitHub Pages
-1. Push alle bestanden naar public repo
-2. Repo → Settings → Pages → Source: Deploy from a branch → Branch: main → Folder: /
-3. Je site komt op `https://<user>.github.io/<repo>/`
+## Publiceren
+1. Vervang alle bestanden in de repo‑root
+2. Commit & push
+3. Pages publiceert automatisch; bij twijfel: Cache reset in de app
 
-## PWA
-- HTTPS automatisch
-- App installeren op Android via Chrome menu (Toevoegen aan startscherm)
+## Licenties / CDN
+- Leaflet 1.9.4 (CDN)
+- Leaflet‑Geoman Free (CDN @latest)
+- Firebase JS SDK (optioneel) via CDN (wanneer ingeschakeld)
