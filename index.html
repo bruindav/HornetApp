@@ -62,7 +62,6 @@
       <button id="apply-scope">Scope toepassen</button>
     </section>
 
-    <!-- (rest van sidebar blijft hetzelfde) -->
     <section><h2>Zoeken</h2><p>Tik op 🔍 om te zoeken.</p></section>
 
     <section>
@@ -153,14 +152,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
-<!-- Modules -->
-<script type="module" src="./config.js?v=610"></script>
-<script type="module" src="./firebase.js?v=610"></script>
-<script type="module" src="./sync-engine.js?v=610"></script>
-<script type="module" src="./app.js?v=610"></script>
-
-<script>
-  if ("serviceWorker" in navigator) {
+<!-- ModulesserviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js?v=610");
   }
 </script>
