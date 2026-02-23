@@ -6,44 +6,114 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hornet Mapper NL</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><rect width='100%' height='100%' fill='%230aa879'/><text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-size='90'>🐝</text></svg>">
+
+  <!-- Leaflet & Geoman CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.css" />
-  <link rel="manifest" href="./manifest.webmanifest?v=609e" />
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="./manifest.webmanifest?v=609f" />
   <meta name="theme-color" content="#0aa879" />
-  <link rel="stylesheet" href="./app.css?v=609e" />
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="./app.css?v=609f" />
 </head>
 <body>
   <header>
-    <button id="toggle-sidebar" title="Zijbalk in-/uitklappen" aria-label="Zijbalk togglen">☰</button>
+    <button id="toggle-sidebar" aria-label="Sidebar">☰</button>
     <h1>Hornet Mapper NL</h1>
-    <div class="search-bar">
-      <input id="place-input" type="text" placeholder="Zoek plaats (bv. Utrecht)" />
-      <button id="search-btn" title="Zoek">Zoek</button>
-    </div>
-    <div id="status-bar" aria-live="polite" title="App status">
+    <div id="status-bar">
       <span id="status-sw">SW: —</span>
       <span id="status-geo">Geocoder: —</span>
-      <button id="btn-selftest" title="Voer snelle zelftest uit">Zelftest</button>
-      <button id="btn-reset-cache" title="Reset cache & service worker">Cache reset</button>
+      <button id="btn-selftest">Zelftest</button>
+      <button id="btn-reset-cache">Cache reset</button>
     </div>
   </header>
 
   <main>
-    <aside class="sidebar"></aside>
+    <aside class="sidebar">
+      <section>
+        <h2>Zoeken</h2>
+        <p>Klik op 🔍 (rechtsboven) om een plaatsnaam te zoeken.</p>
+      </section>
+
+      <section>
+        <h2>Instellingen</h2>
+        <div class="tool-row">
+          <label for="hard-debounce">Harde debounce:</label>
+          <input id="hard-debounce" type="checkbox" />
+        </div>
+        <div class="tool-row">
+          <label for="geocoder-select">Geocoder:</label>
+          <select id="geocoder-select">
+            <option value="auto">Auto (Photon → maps.co)</option>
+            <option value="photon">Alleen Photon</option>
+            <option value="mapsco">Alleen maps.co</option>
+          </select>
+        </div>
+        <div class="tool-row">
+          <label for="mapsco-key">maps.co API key:</label>
+          <input id="mapsco-key" type="text" placeholder="optioneel" />
+        </div>
+        <button id="save-settings">Instellingen opslaan</button>
+      </section>
+
+      <section>
+        <h2>Filter</h2>
+        <div class="filter-row"><label><input type="checkbox" id="f_type_hoornaar" checked> Waarneming</label></div>
+        <div class="filter-row"><label><input type="checkbox" id="f_type_nest" checked> Nest</label></div>
+        <div class="filter-row"><label><input type="checkbox" id="f_type_nest_geruimd" checked> Nest geruimd</label></div>
+        <div class="filter-row"><label><input type="checkbox" id="f_type_lokpot" checked> Lokpot</label></div>
+        <div class="filter-row"><label><input type="checkbox" id="f_type_pending" checked> Nieuw/pending</label></div>
+        <div class="filter-row">
+          <label>Verberg iconen vóór datum:</label>
+          <input type="date" id="f_date_before" />
+        </div>
+        <div class="filter-actions">
+          <button id="apply-filters">Toepassen</button>
+          <button id="reset-filters">Reset</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>Opslaan & Data</h2>
+        <button id="save-btn">Opslaan (lokaal)</button>
+        <button id="load-btn">Laden (lokaal)</button>
+        <button id="export-btn">Exporteren</button>
+        <label for="import-file" class="file-label">Importeren</label>
+        <input id="import-file" type="file" accept="application/json" />
+        <button id="clear-btn" class="danger">Alles wissen</button>
+      </section>
+    </aside>
+
     <section id="map"></section>
   </main>
 
   <footer>
-    <small>Kaartgegevens © OpenStreetMap-bijdragers. Gebruik onder redelijke belasting.</small>
+    <small>Kaartgegevens © OpenStreetMap-bijdragers</small>
   </footer>
 
+  <!-- Floating search button (C2-A) -->
+  <button id="floating-search-btn" title="Zoeken">🔍</button>
+
+  <!-- Search overlay (C2-A) -->
+  <div id="search-overlay">
+    <div id="search-box">
+      <input id="place-input" type="text" placeholder="Zoek plaats..." />
+      <button id="search-btn">Zoek</button>
+      <button id="search-close" title="Sluiten">✕</button>
+    </div>
+  </div>
+
+  <!-- Leaflet & Geoman JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.13.0/dist/leaflet-geoman.min.js"></script>
-  <script src="./app.js?v=609e"></script>
+  <script src="./app.js?v=609f"></script>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js?v=609e');
+        navigator.serviceWorker.register('./service-worker.js?v=609f');
       });
     }
   </script>
