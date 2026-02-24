@@ -7,15 +7,19 @@ h1 { margin: 0; font-size: 18px; }
 #status-bar { display: flex; align-items: center; gap: 10px; background: #10161f; border: 1px solid var(--border2); padding: 6px 10px; border-radius: 8px; color: var(--muted); font-size: 12px; }
 #status-bar span { padding: 2px 6px; border-radius: 6px; background: #0f141b; border: 1px solid #253244; }
 main { display: grid; grid-template-columns: 330px 1fr; height: calc(100% - 58px); }
-.sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+.sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; position: relative; z-index: 12050; }
 #map { width: 100%; height: 100%; }
 footer { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
 body.sidebar-collapsed main { grid-template-columns: 0 1fr; }
 body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; overflow: hidden; }
-/* Mobiel: backdrop voor sluiting sidebar */
+/* Mobiel: standaard dicht, maar open wanneer body.sidebar-open is gezet */
+@media (max-width: 900px){
+  main { grid-template-columns: 0 1fr !important; }
+  body.sidebar-open main { grid-template-columns: min(86vw, 330px) 1fr !important; }
+  body.sidebar-open .sidebar { width: auto; padding: 12px; border-right: 1px solid var(--border); }
+}
 #sidebar-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: block; z-index: 11000; }
 #sidebar-backdrop[hidden] { display: none; }
-@media (max-width: 900px){ main { grid-template-columns: 0 1fr !important; } }
 #floating-search-btn { position: fixed; z-index: 12000; right: 16px; top: 90px; background: var(--accent); color: #052d22; border: none; padding: 12px 15px; font-size: 22px; border-radius: 50%; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
 #search-overlay { position: fixed; left: 0; top: -120px; width: 100%; padding: 10px; background: rgba(15,20,30,0.95); backdrop-filter: blur(6px); z-index: 15000; transition: top .25s ease; }
 #search-overlay.active { top: 0; }
