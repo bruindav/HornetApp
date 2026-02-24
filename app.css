@@ -82,6 +82,19 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
   body.sidebar-open .sidebar { width: min(330px, 50vw); }
 }
 
-/* r2.1: zoek UI altijd boven sidebar */
-#search-overlay { z-index: 20000 !important; }
-#floating-search-btn { z-index: 20010 !important; }
+
+/* fix2: UI polish */
+:root{ --shadow-lg: 0 12px 28px rgba(0,0,0,.45); }
+.modal .modal-card{ box-shadow: var(--shadow-lg); }
+/* kleurmodal inputs */
+#color-modal input[type="text"]{ padding:8px; border-radius:8px; border:1px solid var(--border2); background:#0f141b; color:var(--text); }
+#color-modal select{ padding:8px; border-radius:8px; border:1px solid var(--border2); background:#0f141b; color:var(--text); }
+/* line handle beter zichtbaar */
+.line-handle div{ width:14px; height:14px; border-radius:50%; background:#fff; border:2px solid #111; box-shadow:0 2px 6px rgba(0,0,0,.45); }
+.line-handle div:hover{ box-shadow:0 0 0 4px rgba(10,168,121,.25), 0 2px 6px rgba(0,0,0,.45); }
+/* vloeiender sidebar maar respecteer prefers-reduced-motion */
+@media (max-width:900px){
+  @media (prefers-reduced-motion: reduce){
+    .sidebar{ transition:none !important; }
+  }
+}

@@ -1,10 +1,10 @@
-const CACHE = 'hornet-mapper-v610r21';
+const CACHE = 'hornet-mapper-v610r21f2';
 const ASSETS = [
   './',
-  './index.html?v=610r21',
-  './app.css?v=610r21',
-  './app.js?v=610r21',
-  './manifest.webmanifest?v=610r21'
+  './index.html?v=610r21f2',
+  './app.css?v=610r21f2',
+  './app.js?v=610r21f2',
+  './manifest.webmanifest?v=610r21f2'
 ];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))); });

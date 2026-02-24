@@ -124,17 +124,21 @@ function initUIBindings(){
   });
   // 🔍 Zoek overlay
   const floatingSearchBtn = req('floating-search-btn');
+  function restoreLastSearch(){ const v = localStorage.getItem('hm_last_query')||''; const inp=req('place-input'); if(inp) inp.value=v; }
+  restoreLastSearch();
+
   const searchOverlay = req('search-overlay');
   const searchClose = req('search-close');
+  if(searchOverlay){ searchOverlay.addEventListener('click', (ev)=>{ if(ev.target===searchOverlay){ searchOverlay.classList.remove('active'); searchOverlay.setAttribute('aria-hidden','true'); }});} 
   const searchBtn = req('search-btn');
   const placeInput = req('place-input');
-  on(floatingSearchBtn, 'click', ()=>{
+  on(floatingSearchBtn, 'click', ()=>{ restoreLastSearch();
     if(!searchOverlay || !placeInput) return;
     searchOverlay.classList.add('active');
     searchOverlay.setAttribute('aria-hidden','false');
     placeInput.focus();
   });
-  on(searchClose, 'click', ()=>{
+  on(searchClose, 'click', ()=>{ localStorage.setItem('hm_last_query', (req('place-input')?.value||'').trim());
     if(!searchOverlay) return;
     searchOverlay.classList.remove('active');
     searchOverlay.setAttribute('aria-hidden','true');
@@ -164,6 +168,8 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
+  // esc sluit search overlay
+  document.addEventListener('keydown', (e)=>{ /*esc-search*/ if(e.key==='Escape'){ if(searchOverlay&&searchOverlay.classList.contains('active')){ searchOverlay.classList.remove('active'); searchOverlay.setAttribute('aria-hidden','true'); } }});
 }
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
@@ -200,7 +206,7 @@ async function searchPlaceNL(){
   }
 }
 
-// === r2.1: NL kleurnamen toestaan ===
+// fix2: NL kleuren mapping en normalisatie
 const DUTCH_COLOR_MAP = {
   rood:'red', blauw:'blue', geel:'yellow', groen:'green',
   oranje:'orange', paars:'purple', zwart:'black', wit:'white',
@@ -322,11 +328,30 @@ function openLineColorPicker(line, x, y){
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     if(act==='cancel'){ closeContextMenu(); return; }
-    if(act==='save'){ const color=el.querySelector('#lc_hex').value; setSightLineColor(line,color,true); closeContextMenu(); }
+    if(act==='save'){ const color=el.querySelector('#lc_hex').value; localStorage.setItem('hm_last_line_color', color); setSightLineColor(line,color,true); closeContextMenu(); }
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
+// ======================= Kleurmodal =======================
+function openColorModal({initial="#0aa879", onSave}){
+  const modal = document.getElementById('color-modal');
+  const pick = document.getElementById('cm-color');
+  const sel  = document.getElementById('cm-nl');
+  const free = document.getElementById('cm-free');
+  const ok   = document.getElementById('cm-save');
+  const cancel = document.getElementById('cm-cancel');
+  if(!modal||!pick||!sel||!free||!ok||!cancel){ alert('Kleurmodal ontbreekt'); return; }
+  const last = localStorage.getItem('hm_last_color')||initial;
+  pick.value = /^#/.test(last)? last : '#0aa879';
+  free.value = last;
+  sel.value = '';
+  function close(){ modal.classList.add('hidden'); ok.onclick=null; cancel.onclick=null; }
+  ok.onclick = ()=>{ let v = sel.value || free.value || pick.value; v = normalizeColor(v); localStorage.setItem('hm_last_color', v); onSave&&onSave(v); close(); };
+  cancel.onclick = close;
+  modal.classList.remove('hidden');
+}
+
 // ======================= Modal (icon properties) =======================
 const modalEl = $('prop-modal');
 const pmDate = $('pm-date');
@@ -494,7 +519,7 @@ function startSightLine(lokpotMarker){
   const potLatLng=lokpotMarker.getLatLng();
   let dist = prompt('Afstand tot nest (meter):','200'); if(dist===null) return;
   dist=Math.max(1, parseInt(dist,10) || 1);
-  const defaultColor = '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+  const defaultColor = localStorage.getItem('hm_last_line_color') || '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
   const tempGuide=L.polyline([potLatLng,potLatLng],{color:defaultColor,weight:2,dashArray:'4 4'}).addTo(map);
   const onMove=(e)=>{ tempGuide.setLatLngs([potLatLng,e.latlng]); };
   const onClick=(e)=>{
@@ -578,6 +603,9 @@ function initPolygon(layer){
   const col = layer._props.color||'#0aa879';
   layer.setStyle({ color: col, fillColor: col, fillOpacity: .2, weight: 2 });
   refreshPolygonLabel(layer);
+  // highlight tijdens edit
+  layer.on('pm:enable', ()=>{ try{ layer.setStyle({ dashArray:'6 6', weight: 3 }); }catch{} });
+  layer.on('pm:disable',()=>{ try{ layer.setStyle({ dashArray:null, weight: 2 }); }catch{} });
   const open = (ev)=>{
     ev.originalEvent?.preventDefault(); ev.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;
@@ -617,16 +645,7 @@ function openUnifiedContextMenu(opts){
       if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); return; }
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
-      else if(act==='poly_color') {
-  let col = prompt('Kleur (NL/ENG/hex):', opts.polygonLayer._props?.color || '#0aa879');
-  if (col === null) return;
-  col = normalizeColor(col);
-  opts.polygonLayer._props.color = col;
-  opts.polygonLayer.setStyle({ color: col, fillColor: col });
-  refreshPolygonLabel(opts.polygonLayer);
-  persistPolygon(opts.polygonLayer);
-}
-); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
+      else if(act==='poly_color'){ const col=prompt('Kleur (CSS/hex, bv. #ffcc00):', opts.polygonLayer._props?.color||'#0aa879'); if(col===null) return; opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } polygonsGroup.removeLayer(opts.polygonLayer); }
     },0);

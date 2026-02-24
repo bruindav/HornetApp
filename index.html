@@ -143,5 +143,35 @@
     </div>
   </div>
 </div>
+
+<div id="color-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="color-title">
+  <div class="modal-card">
+    <h3 id="color-title">Kleur kiezen</h3>
+    <div class="form-row">
+      <label>Picker</label>
+      <input id="cm-color" type="color" value="#0aa879" />
+    </div>
+    <div class="form-row">
+      <label>NL kleur</label>
+      <select id="cm-nl">
+        <option value="">(geen)</option>
+        <option>rood</option><option>groen</option><option>blauw</option><option>geel</option>
+        <option>oranje</option><option>paars</option><option>zwart</option><option>wit</option>
+        <option>grijs</option><option>magenta</option><option>cyaan</option>
+        <option>bruin</option><option>roze</option>
+        <option>lichtblauw</option><option>donkerblauw</option>
+        <option>lichtgroen</option><option>donkergroen</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label>Hex/naam</label>
+      <input id="cm-free" type="text" placeholder="#ffcc00 of rood" />
+    </div>
+    <div class="actions">
+      <button id="cm-cancel" class="btn-secondary" type="button">Annuleren</button>
+      <button id="cm-save" class="btn-primary"   type="button">Opslaan</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
