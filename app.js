@@ -97,27 +97,23 @@ function initMap(){
   });
 }
 // ======================= UI‑bindingen =======================
-
 function updateHeaderHeightVar(){
   try{
-    const h = (document.querySelector('header')?.offsetHeight) || 58;
+    const h = document.querySelector('header')?.offsetHeight || 58;
     document.documentElement.style.setProperty('--header-h', h + 'px');
   }catch{}
 }
-
 function initUIBindings(){
   // Sidebar toggle + mobiel backdrop
   const backdrop = req('sidebar-backdrop');
+  const sidebarEl = document.querySelector('.sidebar');
+  try{ sidebarEl && sidebarEl.addEventListener('transitionend', (e)=>{ if(e.propertyName==='transform'){ try{ map?.invalidateSize(); }catch{} } }); }catch{}
   function setSidebar(open){
     document.body.classList.toggle('sidebar-collapsed', !open);
     document.body.classList.toggle('sidebar-open', !!open);
-    if(backdrop){
-      if(open){ backdrop.style.display='block'; backdrop.removeAttribute('hidden'); }
-      else { backdrop.style.display='none'; backdrop.setAttribute('hidden',''); }
-    }
+    if(backdrop){ if(open){ backdrop.style.display='block'; backdrop.removeAttribute('hidden'); } else { backdrop.style.display='none'; backdrop.setAttribute('hidden',''); } }
     // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
-    setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 350);
   }
   on(req('toggle-sidebar'), 'click', ()=>{
     const willOpen = document.body.classList.contains('sidebar-collapsed');
@@ -173,9 +169,9 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
-  try{ const mo=new MutationObserver(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }); mo.observe(document.querySelector('header'), {childList:true, subtree:true}); }catch{}
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
+  window.addEventListener('orientationchange', ()=>{ setTimeout(updateHeaderHeightVar, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
 }
 // ======================= Geocoder =======================

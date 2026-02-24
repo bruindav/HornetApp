@@ -6,7 +6,7 @@ header { display: grid; grid-template-columns: auto auto 1fr auto; align-items: 
 h1 { margin: 0; font-size: 18px; }
 #status-bar { display: flex; align-items: center; gap: 10px; background: #10161f; border: 1px solid var(--border2); padding: 6px 10px; border-radius: 8px; color: var(--muted); font-size: 12px; }
 #status-bar span { padding: 2px 6px; border-radius: 6px; background: #0f141b; border: 1px solid #253244; }
-main { display: grid; grid-template-columns: 330px 1fr; height: calc(100% - var(--header-h)); }
+main { display: grid; grid-template-columns: 330px 1fr; height: calc(100% - 58px); }
 .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; position: relative; z-index: 12050; }
 #map { width: 100%; height: 100%; }
 footer { padding: 6px 12px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
@@ -59,9 +59,9 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
   /* Sidebar niet meer in grid maar zwevend boven de map */
   .sidebar {
     position: fixed;
-    top: var(--header-h); /* header approx. height */
+    top: 58px; /* header approx. height */
     left: 0;
-    height: calc(100% - var(--header-h));
+    height: calc(100% - 58px);
     width: 0;
     max-width: 86vw;
     overflow-y: auto;
@@ -82,9 +82,35 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
   body.sidebar-open .sidebar { width: min(330px, 50vw); }
 }
 
-/* fix4 layout */
+
+/* fix5: transform-based drawer on mobile + dynamic viewport units */
+@media (max-width: 900px){
+  /* main is single column; map takes all */
+  main{ grid-template-columns: 1fr !important; height: calc(100dvh - var(--header-h)); min-height:0; }
+  #map{ width:100%; height:100%; }
+  /* drawer: take it out of flow and slide with transform */
+  .sidebar{
+    position: fixed; left: 0; top: var(--header-h);
+    height: calc(100dvh - var(--header-h));
+    width: min(360px, 86vw);
+    max-width: 86vw;
+    transform: translateX(-100%);
+    transition: transform .25s ease;
+    will-change: transform;
+    pointer-events: none; /* disabled when closed */
+    z-index: 12050;
+  }
+  body.sidebar-open .sidebar{ transform: translateX(0); pointer-events: auto; }
+
+  /* backdrop fades and has pointer-events only when open */
+  #sidebar-backdrop{
+    position: fixed; inset: 0; background: rgba(0,0,0,.45);
+    opacity: 0; transition: opacity .2s ease;
+    z-index: 11000; pointer-events: none;
+  }
+  body.sidebar-open #sidebar-backdrop{ opacity: 1; pointer-events: auto; display:block; }
+}
+
 body{ display:flex; flex-direction:column; min-height:100vh; }
 header{ flex:0 0 auto; }
 main{ flex:1 1 auto; min-height:0; }
-main{ height: calc(100vh - var(--header-h)); min-height:0; }
-body:not(.sidebar-open) #sidebar-backdrop{ display:none !important; }
