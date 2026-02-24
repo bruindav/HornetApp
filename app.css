@@ -1,4 +1,4 @@
-:root { --header-h: 58px; --bg: #0e1116; --panel: #171b22; --accent: #0aa879; --text: #e6eef5; --muted: #9fb2c7; --danger: #cc3a4b; --border:#243042; --border2:#2a384c; }
+:root { --bg: #0e1116; --panel: #171b22; --accent: #0aa879; --text: #e6eef5; --muted: #9fb2c7; --danger: #cc3a4b; --border:#243042; --border2:#2a384c; }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: var(--text); background: var(--bg); overflow-x: hidden; }
 header { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
@@ -83,34 +83,6 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
 }
 
 
-/* fix5: transform-based drawer on mobile + dynamic viewport units */
-@media (max-width: 900px){
-  /* main is single column; map takes all */
-  main{ grid-template-columns: 1fr !important; height: calc(100dvh - var(--header-h)); min-height:0; }
-  #map{ width:100%; height:100%; }
-  /* drawer: take it out of flow and slide with transform */
-  .sidebar{
-    position: fixed; left: 0; top: var(--header-h);
-    height: calc(100dvh - var(--header-h));
-    width: min(360px, 86vw);
-    max-width: 86vw;
-    transform: translateX(-100%);
-    transition: transform .25s ease;
-    will-change: transform;
-    pointer-events: none; /* disabled when closed */
-    z-index: 12050;
-  }
-  body.sidebar-open .sidebar{ transform: translateX(0); pointer-events: auto; }
-
-  /* backdrop fades and has pointer-events only when open */
-  #sidebar-backdrop{
-    position: fixed; inset: 0; background: rgba(0,0,0,.45);
-    opacity: 0; transition: opacity .2s ease;
-    z-index: 11000; pointer-events: none;
-  }
-  body.sidebar-open #sidebar-backdrop{ opacity: 1; pointer-events: auto; display:block; }
-}
-
-body{ display:flex; flex-direction:column; min-height:100vh; }
-header{ flex:0 0 auto; }
-main{ flex:1 1 auto; min-height:0; }
+/* fix7: zone modal styles */
+#zone-list button{ display:block; width:100%; text-align:left; padding:10px 12px; border-radius:8px; border:1px solid var(--border2); background:#0f141b; color:var(--text); cursor:pointer; }
+#zone-list button:hover{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(10,168,121,.18); }
