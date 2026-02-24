@@ -1,41 +1,38 @@
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
-//   ./sync-engine.js   → importeert ./firebase.js → importeert ./config.js
-//   Leaflet + Geoman (globaal L) moeten vóór app.js geladen zijn.
-//
+// ./sync-engine.js → importeert ./firebase.js → importeert ./config.js
+// Leaflet + Geoman (globaal L) moeten vóór app.js geladen zijn.
+// 
 // Belangrijk: alle DOM‑bindingen pas NA DOMContentLoaded.
-//
+// 
 // ----------------------------------------------------------------------------
-
 import {
   setActiveScope,
   listenToCloudChanges,
   saveMarkerToCloud, deleteMarkerFromCloud,
-  saveLineToCloud,   deleteLineFromCloud,
+  saveLineToCloud, deleteLineFromCloud,
   saveSectorToCloud, deleteSectorFromCloud,
   savePolygonToCloud, deletePolygonFromCloud
 } from "./sync-engine.js";
-
 // ======================= Kleine helpers =======================
-function $(id)              { return document.getElementById(id); }
-function on(el, ev, fn)     { if (el) el.addEventListener(ev, fn, { passive: true }); }
-function req(id)            { const el = $(id); if (!el) console.warn(`[UI] Element met id="${id}" niet gevonden`); return el; }
-function nowISODate()       { return new Date().toISOString().slice(0,10); }
-function genId(prefix)      { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
+function $(id) { return document.getElementById(id); }
+function on(el, ev, fn) { if (el) el.addEventListener(ev, fn, { passive: true }); }
+function req(id) { const el = $(id); if (!el) console.warn(`[UI] Element met id="${id}" niet gevonden`); return el; }
+function nowISODate() { return new Date().toISOString().slice(0,10); }
+function genId(prefix) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
 function debounceEventGate(msGetter){
   let last = 0;
   return () => {
     const ms = msGetter();
-    const t  = Date.now();
+    const t = Date.now();
     if (t - last < ms) return true;
     last = t;
     return false;
   };
 }
-
 // ======================= Status UI =======================
-const statusSW  = $('status-sw');
+const statusSW = $('status-sw');
 const statusGeo = $('status-geo');
 function setStatus(el, text, cls){ if(!el) return; el.textContent=text; el.classList.remove('ok','warn','err'); if(cls) el.classList.add(cls); }
 function updateSWStatus(){
@@ -45,33 +42,27 @@ function updateSWStatus(){
     setStatus(statusSW, `SW: ${st}`, 'ok');
   }catch{}
 }
-
 // ======================= Debounce =======================
 const SOFT_MS=150, HARD_MS=300; let DEBOUNCE_MS=SOFT_MS;
 const shouldDebounce = debounceEventGate(()=>DEBOUNCE_MS);
-
 // ======================= Map & Layers =======================
-let map;                   // maak globaal voor jouw tests (typeof map === "object")
-const markersGroup  = L.featureGroup();
-const linesGroup    = L.featureGroup();
-const circlesGroup  = L.featureGroup();
-const handlesGroup  = L.featureGroup();
+let map; // maak globaal voor jouw tests (typeof map === "object")
+const markersGroup = L.featureGroup();
+const linesGroup = L.featureGroup();
+const circlesGroup = L.featureGroup();
+const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
-
 let allMarkers=[], allLines=[], allSectors=[];
-
 function initMap(){
   map = L.map('map', { zoomControl: true }).setView([52.1, 5.3], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19, attribution:'&copy; OpenStreetMap-bijdragers'
+    maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   }).addTo(map);
-
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
   handlesGroup.addTo(map);
   polygonsGroup.addTo(map);
-
   // Geoman toolbar
   map.pm.addControls({
     position:'topleft',
@@ -79,7 +70,6 @@ function initMap(){
     drawCircle:false, drawCircleMarker:false,
     editMode:true, dragMode:true, cutPolygon:false, removalMode:true
   });
-
   // Create polygonen → initialiseren + opslaan naar cloud
   map.on('pm:create', (e)=>{
     const layer=e.layer;
@@ -91,63 +81,65 @@ function initMap(){
       layer.remove();
     }
   });
-
   // Kaart‑click/contextmenu → nieuw‑icoon menu (alleen wanneer niet aan het tekenen)
   let drawing=false;
   map.on('pm:drawstart',()=>drawing=true);
   map.on('pm:drawend', ()=>drawing=false);
-
   map.on('click', e=>{
     if(shouldDebounce()) return;
     if(drawing) return;
     openMapContextMenu(e.latlng, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
-
   map.on('contextmenu', e=>{
     if(shouldDebounce()) return;
     if(drawing) return;
     openMapContextMenu(e.latlng, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
 }
-
 // ======================= UI‑bindingen =======================
 function initUIBindings(){
-
-  // Sidebar toggle (optioneel)
-  on(req('toggle-sidebar'), 'click', ()=>{
-    document.body.classList.toggle('sidebar-collapsed');
+  // Sidebar toggle + mobiel backdrop
+  const backdrop = req('sidebar-backdrop');
+  function setSidebar(open){
+    document.body.classList.toggle('sidebar-collapsed', !open);
+    if(backdrop){
+      if(open){ backdrop.removeAttribute('hidden'); }
+      else { backdrop.setAttribute('hidden',''); }
+    }
     // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
+  }
+  on(req('toggle-sidebar'), 'click', ()=>{
+    const isCollapsed = document.body.classList.contains('sidebar-collapsed');
+    setSidebar(isCollapsed); // als dicht → open; als open → dicht
   });
+  on(backdrop, 'click', ()=> setSidebar(false));
+  // Init: op mobiel standaard dicht
+  if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
 
-  // Hard debounce
+  // Harde debounce
   on(req('hard-debounce'),'change', e=>{
     DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
   });
-
   // 🔍 Zoek overlay
   const floatingSearchBtn = req('floating-search-btn');
-  const searchOverlay     = req('search-overlay');
-  const searchClose       = req('search-close');
-  const searchBtn         = req('search-btn');
-  const placeInput        = req('place-input');
-
+  const searchOverlay = req('search-overlay');
+  const searchClose = req('search-close');
+  const searchBtn = req('search-btn');
+  const placeInput = req('place-input');
   on(floatingSearchBtn, 'click', ()=>{
     if(!searchOverlay || !placeInput) return;
     searchOverlay.classList.add('active');
     searchOverlay.setAttribute('aria-hidden','false');
     placeInput.focus();
   });
-
   on(searchClose, 'click', ()=>{
     if(!searchOverlay) return;
     searchOverlay.classList.remove('active');
     searchOverlay.setAttribute('aria-hidden','true');
   });
-
   on(placeInput, 'keydown', (e)=>{ if(e.key==='Enter') searchPlaceNL(); });
   on(searchBtn, 'click', searchPlaceNL);
-
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
   on(req('reset-filters'), 'click', ()=>{
@@ -156,14 +148,12 @@ function initUIBindings(){
     const fdb = $('f_date_before'); if (fdb) fdb.value = '';
     applyFilters();
   });
-
   // Zelftest
   on(req('btn-selftest'), 'click', async()=>{
     try{ await geocodePhoton('Utrecht'); setStatus(statusGeo,'Photon OK','ok'); }catch{ setStatus(statusGeo,'Photon NOK','err'); }
     const key = $('mapsco-key')?.value?.trim() || '';
     try{ await geocodeMapsCo('Utrecht', key); setStatus(statusGeo,'Maps.co OK','ok'); }catch{ setStatus(statusGeo,'Maps.co NOK','err'); }
   });
-
   // Cache reset
   on(req('btn-reset-cache'), 'click', async()=>{
     try{
@@ -172,10 +162,8 @@ function initUIBindings(){
       localStorage.clear(); alert('Cache & SW gereset. Herladen…'); location.reload(true);
     }catch{ alert('Reset mislukt'); }
   });
-
   updateSWStatus();
 }
-
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
   const r=await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
@@ -195,7 +183,7 @@ async function searchPlaceNL(){
   const placeInput = $('place-input'); const q=placeInput?.value?.trim(); if(!q) return;
   setStatus(statusGeo,'Geocoder: zoeken…','warn');
   const geocoder = $('geocoder-select')?.value || 'auto';
-  const key      = $('mapsco-key')?.value?.trim() || '';
+  const key = $('mapsco-key')?.value?.trim() || '';
   try{
     let res;
     if(geocoder==='photon'){ res=await geocodePhoton(q); }
@@ -210,7 +198,6 @@ async function searchPlaceNL(){
     setStatus(statusGeo,'Geocoder: fout','err');
   }
 }
-
 // ======================= Iconen =======================
 function makeDivIcon(html,bg='#1e293b',border='#334155'){
   return L.divIcon({
@@ -226,7 +213,6 @@ const ICONS = {
   lokpot:()=>makeDivIcon('🪤','#274','#396'),
   pending:()=>makeDivIcon('➕','#333','#555')
 };
-
 // ======================= Contextmenu infra =======================
 let contextMenuEl=null;
 function closeContextMenu(){
@@ -243,7 +229,6 @@ function positionMenu(el,x,y){
 }
 function escClose(e){ if(e.key==='Escape') closeContextMenu(); }
 function closeContextMenuOnce(){ closeContextMenu(); }
-
 function openMapContextMenu(latlng, x, y){
   closeContextMenu();
   const el=document.createElement('div');
@@ -268,7 +253,6 @@ function openMapContextMenu(latlng, x, y){
   document.addEventListener('keydown',escClose);
   document.addEventListener('click',closeContextMenuOnce,true);
 }
-
 function openMarkerContextMenu(marker, x, y){
   closeContextMenu(); const isLokpot=(marker._meta||{}).type==='lokpot';
   const el=document.createElement('div'); el.className='ctx-menu';
@@ -293,7 +277,6 @@ function openMarkerContextMenu(marker, x, y){
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
-
 function openLineContextMenu(line, x, y){
   closeContextMenu();
   const el=document.createElement('div'); el.className='ctx-menu';
@@ -309,7 +292,6 @@ function openLineContextMenu(line, x, y){
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
-
 function openLineColorPicker(line, x, y){
   closeContextMenu();
   const curr=line._meta?.color||'#ffcc00';
@@ -317,8 +299,8 @@ function openLineColorPicker(line, x, y){
   el.innerHTML=`<h4>Lijnkleur</h4>
   <input id="lc_hex" type="color" value="${curr}" style="width:100%;height:36px;border:0;background:transparent" />
   <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
-    <button data-act="cancel" class="btn-secondary">Annuleren</button>
-    <button data-act="save" class="btn-primary">Opslaan</button>
+  <button data-act="cancel" class="btn-secondary">Annuleren</button>
+  <button data-act="save" class="btn-primary">Opslaan</button>
   </div>`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
@@ -328,23 +310,20 @@ function openLineColorPicker(line, x, y){
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
-
 // ======================= Modal (icon properties) =======================
 const modalEl = $('prop-modal');
-const pmDate  = $('pm-date');
-const pmBy    = $('pm-by');
+const pmDate = $('pm-date');
+const pmBy = $('pm-by');
 const pmAmount= $('pm-amount');
-const pmSave  = $('pm-save');
+const pmSave = $('pm-save');
 const pmCancel= $('pm-cancel');
-
 function openPropModal({type, init={}, onSave}){
   if(!modalEl){ console.warn('[UI] prop-modal ontbreekt'); return; }
-  if(pmDate)   pmDate.value = init.date || nowISODate();
-  if(pmBy)     pmBy.value   = init.by   || '';
-  const onlyH  = document.querySelector('.only-hoornaar');
+  if(pmDate) pmDate.value = init.date || nowISODate();
+  if(pmBy) pmBy.value = init.by || '';
+  const onlyH = document.querySelector('.only-hoornaar');
   if(onlyH) onlyH.style.display = (type==='hoornaar' ? 'grid' : 'none');
   if(type==='hoornaar' && pmAmount) pmAmount.value = (init.aantal!=null? init.aantal : '');
-
   modalEl.classList.remove('hidden');
   function cleanup(){ if(pmCancel) pmCancel.onclick=null; if(pmSave) pmSave.onclick=null; modalEl.classList.add('hidden'); }
   if(pmCancel) pmCancel.onclick = ()=>cleanup();
@@ -354,7 +333,6 @@ function openPropModal({type, init={}, onSave}){
     onSave && onSave(vals); cleanup();
   };
 }
-
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
   const m=marker._meta||{}; let txt='';
@@ -369,7 +347,7 @@ function attachMarkerPopup(marker){
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
   if(vals.date) m.date=vals.date; else delete m.date;
-  if(vals.by)   m.by=vals.by;     else delete m.by;
+  if(vals.by) m.by=vals.by; else delete m.by;
   if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; marker.setIcon(ICONS.hoornaar(m.aantal)); }
   else if(m.type==='nest'){ marker.setIcon(ICONS.nest()); }
   else if(m.type==='nest_geruimd'){ marker.setIcon(ICONS.nest_geruimd()); }
@@ -411,7 +389,6 @@ function persistMarker(marker){
   };
   saveMarkerToCloud(doc);
 }
-
 // ======================= Zichtlijnen =======================
 const R_EARTH=6371000;
 const toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
@@ -435,9 +412,7 @@ function arcPoints(center,radius,startDeg,endDeg,steps=32){
 }
 function registerLine(line){ if(!allLines.includes(line)) allLines.push(line); }
 function registerSector(sector){ if(!allSectors.includes(sector)) allSectors.push(sector); }
-
 function makeHandleIcon(){ return L.divIcon({className:'line-handle',html:'<div></div>',iconSize:[12,12],iconAnchor:[6,6]}); }
-
 function setSightLineColor(line,color,save=false){
   line.setStyle({color});
   line._meta=line._meta||{}; line._meta.color=color;
@@ -542,8 +517,7 @@ function persistSector(sector){
   const m=sector._meta||{};
   const doc = { id:m.id, type:'sector', pot:m.pot||null, distance:m.distance||0,
     color:m.color||'#ffcc00', bearing:m.bearing||0, rInner:m.rInner||0, rOuter:m.rOuter||0,
-    angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null
-  };
+    angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null };
   saveSectorToCloud(doc);
 }
 function removePotAssociations(potId){
@@ -552,7 +526,6 @@ function removePotAssociations(potId){
   const toRemoveSectors=[]; allSectors.forEach(c=>{ const m=c._meta||{}; if(m.type==='sector'&&(m.pot?.id===potId||m.potId===potId)) toRemoveSectors.push(c); });
   toRemoveSectors.forEach(c=>{ const sid=c._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(c); });
 }
-
 // ======================= Polygons =======================
 function polygonCentroid(layer){
   try{
@@ -601,7 +574,6 @@ function persistPolygon(layer){
   const doc = { id, label:layer._props.label||'', color:layer._props.color||'#0aa879', latlngs };
   savePolygonToCloud(doc);
 }
-
 // ======================= Unified contextmenu =======================
 function openUnifiedContextMenu(opts){
   closeContextMenu();
@@ -609,19 +581,18 @@ function openUnifiedContextMenu(opts){
   let html='';
   if(opts.polygonLayer){
     html += `<h4>Polygoon</h4>
-      <button data-act="poly_label">✏️ Label wijzigen</button>
-      <button data-act="poly_color">🎨 Kleur wijzigen</button>
-      <button data-act="poly_edit">✍️ Vorm bewerken aan/uit</button>
-      <button data-act="poly_delete">🗑️ Verwijderen</button>
-      <hr/>`;
+    <button data-act="poly_label">✏️ Label wijzigen</button>
+    <button data-act="poly_color">🎨 Kleur wijzigen</button>
+    <button data-act="poly_edit">✍️ Vorm bewerken aan/uit</button>
+    <button data-act="poly_delete">🗑️ Verwijderen</button>
+    <hr/>`;
   }
   html += `<h4>Nieuw icoon</h4>
-    <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
-    <button data-act="mk" data-type="nest">🪹 Nest</button>
-    <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
-    <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+  <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
+  <button data-act="mk" data-type="nest">🪹 Nest</button>
+  <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
+  <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
   el.innerHTML=html;
-
   el.addEventListener('click', ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
@@ -634,11 +605,9 @@ function openUnifiedContextMenu(opts){
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } polygonsGroup.removeLayer(opts.polygonLayer); }
     },0);
   });
-
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el, opts.x||0, opts.y||0);
   document.addEventListener('keydown', escClose); document.addEventListener('click', closeContextMenuOnce, true);
 }
-
 // ======================= Filters =======================
 function getActiveFilters(){ return {
   hoornaar: !!$('f_type_hoornaar')?.checked,
@@ -674,7 +643,6 @@ function applyFilters(){
     }
   });
 }
-
 // ======================= Cloud → kaart (realtime) =======================
 function upsertMarkerFromCloud(doc){
   // zoek bestaande marker
@@ -695,7 +663,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.type = doc.type;
     m._meta.potId = doc.potId||null;
     m._meta.date = doc.date||null;
-    m._meta.by   = doc.by||null;
+    m._meta.by = doc.by||null;
     m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
     if(doc.type==='hoornaar') m.setIcon(ICONS.hoornaar(m._meta.aantal));
     if(doc.type==='nest') m.setIcon(ICONS.nest());
@@ -709,7 +677,6 @@ function deleteMarkerFromCloudLocal(id){
   const m = allMarkers.find(x=>x._meta?.id===id);
   if(m){ deleteMarkerAndAssociations(m); }
 }
-
 function upsertLineFromCloud(doc){
   let l = allLines.find(x=>x._meta?.id===doc.id);
   const latlngs = (doc.latlngs||[]).map(p=>L.latLng(p.lat,p.lng));
@@ -730,7 +697,6 @@ function deleteLineFromCloudLocal(id){
   const l = allLines.find(x=>x._meta?.id===id);
   if(l) deleteSightLine(l,false);
 }
-
 function upsertSectorFromCloud(doc){
   const line = allLines.find(l=>l._meta?.id===doc.flightId);
   if(line && line._sector){ circlesGroup.removeLayer(line._sector); }
@@ -746,7 +712,6 @@ function deleteSectorFromCloudLocal(id){
   const s = allSectors.find(x=>x._meta?.id===id);
   if(s){ circlesGroup.removeLayer(s); }
 }
-
 function upsertPolygonFromCloud(doc){
   let p = polygonsGroup.getLayers().find(x=>x._props?.id===doc.id);
   if(p){ polygonsGroup.removeLayer(p); }
@@ -759,62 +724,52 @@ function deletePolygonFromCloudLocal(id){
   const p = polygonsGroup.getLayers().find(x=>x._props?.id===id);
   if(p){ polygonsGroup.removeLayer(p); }
 }
-
 // ======================= Scope & opstart =======================
 const LS_SCOPE = "hornet_scope_v610"; // {year, group}
-const DEFAULT_YEAR  = String(new Date().getFullYear());
+const DEFAULT_YEAR = String(new Date().getFullYear());
 const DEFAULT_GROUP = "Hoornaar_Zeist";
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
-
 function activateScope(year, group, reload=false){
   const { base } = setActiveScope(year, group);
   writeScope(year, group);
-
   // Realtime listeners
   listenToCloudChanges({
-    onMarkerUpdate:   upsertMarkerFromCloud,
-    onMarkerDelete:   deleteMarkerFromCloudLocal,
-    onLineUpdate:     upsertLineFromCloud,
-    onLineDelete:     deleteLineFromCloudLocal,
-    onSectorUpdate:   upsertSectorFromCloud,
-    onSectorDelete:   deleteSectorFromCloudLocal,
-    onPolygonUpdate:  upsertPolygonFromCloud,
-    onPolygonDelete:  deletePolygonFromCloudLocal
+    onMarkerUpdate: upsertMarkerFromCloud,
+    onMarkerDelete: deleteMarkerFromCloudLocal,
+    onLineUpdate: upsertLineFromCloud,
+    onLineDelete: deleteLineFromCloudLocal,
+    onSectorUpdate: upsertSectorFromCloud,
+    onSectorDelete: deleteSectorFromCloudLocal,
+    onPolygonUpdate: upsertPolygonFromCloud,
+    onPolygonDelete: deletePolygonFromCloudLocal
   });
-
   if(reload){
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
     allMarkers=[]; allLines=[]; allSectors=[];
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
 }
-
 // ======================= DOMContentLoaded: alles starten =======================
 function boot(){
   initMap();
   initUIBindings();
-
-  const selYear  = $('sel-year');
+  const selYear = $('sel-year');
   const selGroup = $('sel-group');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
-
   if(selYear && ![...selYear.options].some(o=>o.value===saved.year)){
     selYear.insertAdjacentHTML('afterbegin', `<option value="${saved.year}">${saved.year}</option>`);
   }
-  if(selYear)  selYear.value  = saved.year;
+  if(selYear) selYear.value = saved.year;
   if(selGroup) selGroup.value = saved.group;
-
   on(req('apply-scope'), 'click', ()=>{
-    const y = selYear?.value  || DEFAULT_YEAR;
+    const y = selYear?.value || DEFAULT_YEAR;
     const g = selGroup?.value || DEFAULT_GROUP;
     activateScope(y, g, /*reload=*/true);
   });
-
   activateScope(saved.year, saved.group, /*reload=*/true);
   applyFilters();
 }
-
 if (document.readyState === 'loading'){
   document.addEventListener('DOMContentLoaded', boot);
 } else {

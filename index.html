@@ -4,25 +4,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Hornet Mapper NL — v6.1.0</title>
-
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- Geoman CSS -->
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-
-  <!-- App CSS -->
   <link rel="stylesheet" href="./app.css?v=610" />
-
   <meta name="theme-color" content="#0aa879" />
-
-  <!-- Fallback (kaart altijd zichtbaar) -->
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: calc(100vh - 64px); }
   </style>
 </head>
-
 <body>
 <header>
   <button id="toggle-sidebar" aria-label="Toggle sidebar">☰</button>
@@ -34,14 +24,10 @@
     <button id="btn-reset-cache">Cache reset</button>
   </div>
 </header>
-
 <main>
   <aside class="sidebar">
-
-    <!-- DATASET-SECTIE -->
     <section>
       <h2>Dataset</h2>
-
       <div class="tool-row">
         <label for="sel-year">Jaar</label>
         <select id="sel-year">
@@ -51,7 +37,6 @@
           <option value="2028">2028</option>
         </select>
       </div>
-
       <div class="tool-row">
         <label for="sel-group">Zoekgroep</label>
         <select id="sel-group">
@@ -62,11 +47,8 @@
           <option value="Driebergen">Driebergen</option>
         </select>
       </div>
-
       <button id="apply-scope">Scope toepassen</button>
     </section>
-
-    <!-- De rest van je sidebar blijft exact zoals jij had -->
     <section><h2>Zoeken</h2><p>Tik op 🔍 om te zoeken.</p></section>
     <section>
       <h2>Instellingen</h2>
@@ -87,7 +69,6 @@
         <input id="mapsco-key" type="text" placeholder="optioneel" />
       </div>
     </section>
-
     <section>
       <h2>Filter</h2>
       <div class="filter-row"><label><input type="checkbox" id="f_type_hoornaar" checked> Waarneming</label></div>
@@ -95,18 +76,15 @@
       <div class="filter-row"><label><input type="checkbox" id="f_type_nest_geruimd" checked> Nest geruimd</label></div>
       <div class="filter-row"><label><input type="checkbox" id="f_type_lokpot" checked> Lokpot</label></div>
       <div class="filter-row"><label><input type="checkbox" id="f_type_pending" checked> Nieuw/pending</label></div>
-
       <div class="filter-row">
         <label>Verberg vóór datum</label>
         <input type="date" id="f_date_before">
       </div>
-
       <div class="filter-actions">
         <button id="apply-filters">Toepassen</button>
         <button id="reset-filters">Reset</button>
       </div>
     </section>
-
     <section>
       <h2>Data</h2>
       <button id="save-btn">Opslaan</button>
@@ -116,37 +94,27 @@
       <input id="import-file" type="file" accept="application/json" />
       <button id="clear-btn" class="danger">Alles wissen</button>
     </section>
-
     <section>
       <h2>Realtime sync</h2>
       <p>Hybride modus actief</p>
     </section>
   </aside>
-
   <section id="map"></section>
 </main>
-
+<!-- Backdrop voor mobiel om het zijmenu te sluiten -->
+<div id="sidebar-backdrop" hidden></div>
 <footer>
   <small>© OpenStreetMap</small>
 </footer>
-
-<!-- Leaflet + Geoman JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-
-<!-- ENTRY MODULE -->
 <script type="module" src="./app.js?v=610"></script>
-
 <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js?v=610");
   }
 </script>
-
-<!-- Floating search button (🔍) -->
 <button id="floating-search-btn" title="Zoeken">🔍</button>
-
-<!-- Search overlay -->
 <div id="search-overlay" aria-hidden="true">
   <div id="search-box">
     <input id="place-input" type="text" placeholder="Zoek plaats..." />
@@ -154,33 +122,26 @@
     <button id="search-close" type="button" title="Sluiten">✕</button>
   </div>
 </div>
-
-<!-- Modal voor icoon-eigenschappen (zorg dat deze IDs bestaan voor app.js) -->
 <div id="prop-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="prop-title">
   <div class="modal-card">
     <h3 id="prop-title">Eigenschappen</h3>
-
     <div class="form-row">
       <label>Datum</label>
       <input id="pm-date" type="date" />
     </div>
-
     <div class="form-row">
       <label>Door wie</label>
       <input id="pm-by" type="text" placeholder="Naam" />
     </div>
-
     <div class="form-row only-hoornaar">
       <label>Aantal</label>
       <input id="pm-amount" type="number" min="1" placeholder="(optioneel)" />
     </div>
-
     <div class="actions">
       <button id="pm-cancel" class="btn-secondary" type="button">Annuleren</button>
       <button id="pm-save" class="btn-primary"   type="button">Opslaan</button>
     </div>
   </div>
 </div>
-
 </body>
 </html>

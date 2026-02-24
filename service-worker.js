@@ -1,4 +1,3 @@
-
 const CACHE = 'hornet-mapper-v6-609j-r2';
 const ASSETS = [
   './',
