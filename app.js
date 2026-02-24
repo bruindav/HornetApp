@@ -97,6 +97,14 @@ function initMap(){
   });
 }
 // ======================= UI‑bindingen =======================
+
+function updateHeaderHeightVar(){
+  try{
+    const h = (document.querySelector('header')?.offsetHeight) || 58;
+    document.documentElement.style.setProperty('--header-h', h + 'px');
+  }catch{}
+}
+
 function initUIBindings(){
   // Sidebar toggle + mobiel backdrop
   const backdrop = req('sidebar-backdrop');
@@ -124,21 +132,17 @@ function initUIBindings(){
   });
   // 🔍 Zoek overlay
   const floatingSearchBtn = req('floating-search-btn');
-  function restoreLastSearch(){ const v = localStorage.getItem('hm_last_query')||''; const inp=req('place-input'); if(inp) inp.value=v; }
-  restoreLastSearch();
-
   const searchOverlay = req('search-overlay');
   const searchClose = req('search-close');
-  if(searchOverlay){ searchOverlay.addEventListener('click', (ev)=>{ if(ev.target===searchOverlay){ searchOverlay.classList.remove('active'); searchOverlay.setAttribute('aria-hidden','true'); }});} 
   const searchBtn = req('search-btn');
   const placeInput = req('place-input');
-  on(floatingSearchBtn, 'click', ()=>{ restoreLastSearch();
+  on(floatingSearchBtn, 'click', ()=>{
     if(!searchOverlay || !placeInput) return;
     searchOverlay.classList.add('active');
     searchOverlay.setAttribute('aria-hidden','false');
     placeInput.focus();
   });
-  on(searchClose, 'click', ()=>{ localStorage.setItem('hm_last_query', (req('place-input')?.value||'').trim());
+  on(searchClose, 'click', ()=>{
     if(!searchOverlay) return;
     searchOverlay.classList.remove('active');
     searchOverlay.setAttribute('aria-hidden','true');
@@ -168,8 +172,8 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
-  // esc sluit search overlay
-  document.addEventListener('keydown', (e)=>{ /*esc-search*/ if(e.key==='Escape'){ if(searchOverlay&&searchOverlay.classList.contains('active')){ searchOverlay.classList.remove('active'); searchOverlay.setAttribute('aria-hidden','true'); } }});
+  updateHeaderHeightVar();
+  window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
 }
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
@@ -204,22 +208,6 @@ async function searchPlaceNL(){
     alert('Geen resultaat.');
     setStatus(statusGeo,'Geocoder: fout','err');
   }
-}
-
-// fix2: NL kleuren mapping en normalisatie
-const DUTCH_COLOR_MAP = {
-  rood:'red', blauw:'blue', geel:'yellow', groen:'green',
-  oranje:'orange', paars:'purple', zwart:'black', wit:'white',
-  grijs:'gray', magenta:'magenta', cyaan:'cyan',
-  bruin:'brown', roze:'pink',
-  lichtblauw:'#ADD8E6', donkerblauw:'#00008B',
-  lichtgroen:'#90EE90', donkergroen:'#006400'
-};
-function normalizeColor(input){
-  if(!input) return input;
-  const c = String(input).trim().toLowerCase();
-  if (c.startsWith('#') || c.startsWith('rgb') || c.startsWith('hsl')) return input;
-  return DUTCH_COLOR_MAP[c] || input;
 }
 // ======================= Iconen =======================
 function makeDivIcon(html,bg='#1e293b',border='#334155'){
@@ -328,30 +316,11 @@ function openLineColorPicker(line, x, y){
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     if(act==='cancel'){ closeContextMenu(); return; }
-    if(act==='save'){ const color=el.querySelector('#lc_hex').value; localStorage.setItem('hm_last_line_color', color); setSightLineColor(line,color,true); closeContextMenu(); }
+    if(act==='save'){ const color=el.querySelector('#lc_hex').value; setSightLineColor(line,color,true); closeContextMenu(); }
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
-// ======================= Kleurmodal =======================
-function openColorModal({initial="#0aa879", onSave}){
-  const modal = document.getElementById('color-modal');
-  const pick = document.getElementById('cm-color');
-  const sel  = document.getElementById('cm-nl');
-  const free = document.getElementById('cm-free');
-  const ok   = document.getElementById('cm-save');
-  const cancel = document.getElementById('cm-cancel');
-  if(!modal||!pick||!sel||!free||!ok||!cancel){ alert('Kleurmodal ontbreekt'); return; }
-  const last = localStorage.getItem('hm_last_color')||initial;
-  pick.value = /^#/.test(last)? last : '#0aa879';
-  free.value = last;
-  sel.value = '';
-  function close(){ modal.classList.add('hidden'); ok.onclick=null; cancel.onclick=null; }
-  ok.onclick = ()=>{ let v = sel.value || free.value || pick.value; v = normalizeColor(v); localStorage.setItem('hm_last_color', v); onSave&&onSave(v); close(); };
-  cancel.onclick = close;
-  modal.classList.remove('hidden');
-}
-
 // ======================= Modal (icon properties) =======================
 const modalEl = $('prop-modal');
 const pmDate = $('pm-date');
@@ -519,7 +488,7 @@ function startSightLine(lokpotMarker){
   const potLatLng=lokpotMarker.getLatLng();
   let dist = prompt('Afstand tot nest (meter):','200'); if(dist===null) return;
   dist=Math.max(1, parseInt(dist,10) || 1);
-  const defaultColor = localStorage.getItem('hm_last_line_color') || '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+  const defaultColor = '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
   const tempGuide=L.polyline([potLatLng,potLatLng],{color:defaultColor,weight:2,dashArray:'4 4'}).addTo(map);
   const onMove=(e)=>{ tempGuide.setLatLngs([potLatLng,e.latlng]); };
   const onClick=(e)=>{
@@ -603,9 +572,6 @@ function initPolygon(layer){
   const col = layer._props.color||'#0aa879';
   layer.setStyle({ color: col, fillColor: col, fillOpacity: .2, weight: 2 });
   refreshPolygonLabel(layer);
-  // highlight tijdens edit
-  layer.on('pm:enable', ()=>{ try{ layer.setStyle({ dashArray:'6 6', weight: 3 }); }catch{} });
-  layer.on('pm:disable',()=>{ try{ layer.setStyle({ dashArray:null, weight: 2 }); }catch{} });
   const open = (ev)=>{
     ev.originalEvent?.preventDefault(); ev.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;

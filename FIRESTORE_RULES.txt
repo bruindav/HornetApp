@@ -1,0 +1,33 @@
+// Firestore Security Rules for Hornet Mapper (dev-friendly)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write in the 4 subcollections under the 'data' doc
+    match /maps/{year}/{group}/data/markers/{docId} { allow read, write: if true; }
+    match /maps/{year}/{group}/data/lines/{docId}   { allow read, write: if true; }
+    match /maps/{year}/{group}/data/sectors/{docId} { allow read, write: if true; }
+    match /maps/{year}/{group}/data/polygons/{docId}{ allow read, write: if true; }
+  }
+}
+// NOTE: use this only for testing. For production, restrict with request.auth != null or custom claims.
+
+
+
+//rules_version = '2';
+//service cloud.firestore {
+//  match /databases/{database}/documents {
+
+//    function isHornetPath() {
+      // verwacht: maps/{jaar}/{groep}/data/{type}/{docId}
+ //     return request.resource != null;
+ //   }
+
+    // Lezen blijft open
+ //   match /maps/{year}/{group}/data/{type}/{docId} {
+ //     allow read: if true;
+
+      // Schrijven alleen toestaan als client datumheader heeft (zwakke gate)
+  //    allow write: if isHornetPath() && request.time != null;
+//    }
+//  }
+//}
