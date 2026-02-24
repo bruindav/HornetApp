@@ -1,4 +1,4 @@
-// Your web app's Firebase configuration
+
 const firebaseConfig = {
   apiKey: "AIzaSyCgRWejn5vrpFB9znGxte7a_sFWRp-xeYk",
   authDomain: "hornet-mapper.firebaseapp.com",
