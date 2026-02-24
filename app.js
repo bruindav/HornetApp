@@ -112,11 +112,12 @@ function initUIBindings(){
     document.body.classList.toggle('sidebar-collapsed', !open);
     document.body.classList.toggle('sidebar-open', !!open);
     if(backdrop){
-      if(open){ backdrop.removeAttribute('hidden'); }
-      else { backdrop.setAttribute('hidden',''); }
+      if(open){ backdrop.style.display='block'; backdrop.removeAttribute('hidden'); }
+      else { backdrop.style.display='none'; backdrop.setAttribute('hidden',''); }
     }
     // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
+    setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 350);
   }
   on(req('toggle-sidebar'), 'click', ()=>{
     const willOpen = document.body.classList.contains('sidebar-collapsed');
@@ -172,8 +173,10 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
+  try{ const mo=new MutationObserver(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }); mo.observe(document.querySelector('header'), {childList:true, subtree:true}); }catch{}
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
+  setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
 }
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
