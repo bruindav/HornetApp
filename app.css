@@ -47,3 +47,37 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
 .file-label { display: inline-block; padding: 8px 10px; border-radius: 8px; background: #2a384c; color: #e6eef5; cursor: pointer; margin-top: 6px; }
 #import-file { display: none; }
 .danger { background: var(--danger); color: white; border: none; padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+
+/* === r2: mobiele sidebar fixed + animatie + header responsive === */
+@media (max-width: 900px){
+  /* Header mobile: flex & wrap */
+  header { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px; align-items: center; }
+  header h1 { font-size: 16px; margin: 0; }
+  #status-bar { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; font-size: 12px; }
+  #btn-selftest, #btn-reset-cache { font-size: 12px; padding: 4px 6px; }
+
+  /* Sidebar niet meer in grid maar zwevend boven de map */
+  .sidebar {
+    position: fixed;
+    top: 58px; /* header approx. height */
+    left: 0;
+    height: calc(100% - 58px);
+    width: 0;
+    max-width: 86vw;
+    overflow-y: auto;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    padding: 0; /* start dicht */
+    transition: width .25s ease, padding .25s ease;
+    z-index: 12050;
+  }
+  body.sidebar-open .sidebar { width: min(330px, 86vw); padding: 12px; }
+
+  /* Grid blijft op 0 / 1fr; sidebar staat daarboven fixed */
+  main { grid-template-columns: 0 1fr !important; }
+}
+
+/* Tablet (tussen 900 en 1200px): iets bredere open-stand */
+@media (min-width: 901px) and (max-width: 1200px){
+  body.sidebar-open .sidebar { width: min(330px, 50vw); }
+}
