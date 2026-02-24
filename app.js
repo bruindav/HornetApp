@@ -199,6 +199,22 @@ async function searchPlaceNL(){
     setStatus(statusGeo,'Geocoder: fout','err');
   }
 }
+
+// === r2.1: NL kleurnamen toestaan ===
+const DUTCH_COLOR_MAP = {
+  rood:'red', blauw:'blue', geel:'yellow', groen:'green',
+  oranje:'orange', paars:'purple', zwart:'black', wit:'white',
+  grijs:'gray', magenta:'magenta', cyaan:'cyan',
+  bruin:'brown', roze:'pink',
+  lichtblauw:'#ADD8E6', donkerblauw:'#00008B',
+  lichtgroen:'#90EE90', donkergroen:'#006400'
+};
+function normalizeColor(input){
+  if(!input) return input;
+  const c = String(input).trim().toLowerCase();
+  if (c.startsWith('#') || c.startsWith('rgb') || c.startsWith('hsl')) return input;
+  return DUTCH_COLOR_MAP[c] || input;
+}
 // ======================= Iconen =======================
 function makeDivIcon(html,bg='#1e293b',border='#334155'){
   return L.divIcon({
@@ -601,7 +617,16 @@ function openUnifiedContextMenu(opts){
       if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); return; }
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
-      else if(act==='poly_color'){ const col=prompt('Kleur (CSS/hex, bv. #ffcc00):', opts.polygonLayer._props?.color||'#0aa879'); if(col===null) return; opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
+      else if(act==='poly_color') {
+  let col = prompt('Kleur (NL/ENG/hex):', opts.polygonLayer._props?.color || '#0aa879');
+  if (col === null) return;
+  col = normalizeColor(col);
+  opts.polygonLayer._props.color = col;
+  opts.polygonLayer.setStyle({ color: col, fillColor: col });
+  refreshPolygonLabel(opts.polygonLayer);
+  persistPolygon(opts.polygonLayer);
+}
+); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } polygonsGroup.removeLayer(opts.polygonLayer); }
     },0);

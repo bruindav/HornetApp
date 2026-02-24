@@ -81,3 +81,7 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
 @media (min-width: 901px) and (max-width: 1200px){
   body.sidebar-open .sidebar { width: min(330px, 50vw); }
 }
+
+/* r2.1: zoek UI altijd boven sidebar */
+#search-overlay { z-index: 20000 !important; }
+#floating-search-btn { z-index: 20010 !important; }

@@ -23,10 +23,10 @@ export function setActiveScope(year, group) {
   ACTIVE_YEAR = year;
   ACTIVE_GROUP = group;
 const base = `maps/${ACTIVE_YEAR}/${ACTIVE_GROUP}/data`;
-colMarkers = collection(db, `${base}/markers`);
-colLines = collection(db, `${base}/lines`);
-colSectors = collection(db, `${base}/sectors`);
-colPolys = collection(db, `${base}/polygons`);
+colMarkers = db ? collection(db, `${base}/markers`);
+colLines = db ? collection(db, `${base}/lines`);
+colSectors = db ? collection(db, `${base}/sectors`);
+colPolys = db ? collection(db, `${base}/polygons`);
   return { year: ACTIVE_YEAR, group: ACTIVE_GROUP, base };
 }
 // Init default scope:
