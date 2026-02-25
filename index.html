@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Hornet Mapper NL — v6.1.0-r2.1-fix8</title>
+  <title>Hornet Mapper NL — v6.1.0-r2.1-fix9</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
-  <link rel="stylesheet" href="./app.css?v=610r21f8" />
+  <link rel="stylesheet" href="./app.css?v=610r21f9" />
   <meta name="theme-color" content="#0aa879" />
   <style>
     html, body { height: 100%; margin: 0; }
@@ -16,7 +16,7 @@
 <body>
 <header>
   <button id="toggle-sidebar" aria-label="Toggle sidebar">☰</button>
-  <h1>Hornet Mapper NL — v6.1.0-r2.1-fix8</h1>
+  <h1>Hornet Mapper NL — v6.1.0-r2.1-fix9</h1>
   <div id="status-bar">
     <span id="status-sw">SW: —</span>
     <span id="status-geo">Geocoder: —</span>
@@ -99,10 +99,7 @@
       <p>Hybride modus actief</p>
     </section>
   
-<section id="setup-wizard"><h2>Setup / Troubleshooting</h2>
-<div id="swz-content" style="display:grid;gap:8px;font-size:13px"></div>
-<button id="swz-run" class="btn-secondary">Run checks</button>
-</section>
+<section id="admin-panel"><h2>Beheer</h2><div id="admin-users"></div><button id="admin-refresh">Vernieuwen</button></section>
 </aside>
   <section id="map"></section>
 </main>
@@ -113,10 +110,12 @@
 </footer>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
-<script type="module" src="./app.js?v=610r21f8"></script>
+<script type="module" src="./config.js?v=610r21f9"></script>
+<script type="module" src="./firebase.js?v=610r21f9"></script>
+<script type="module" src="./app.js?v=610r21f9"></script>
 <script>
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js?v=610r21f8");
+    navigator.serviceWorker.register("./service-worker.js?v=610r21f9");
   }
 </script>
 <button id="floating-search-btn" title="Zoeken">🔍</button>
