@@ -97,21 +97,16 @@ function initMap(){
   });
 }
 // ======================= UI‑bindingen =======================
-function updateHeaderHeightVar(){
-  try{
-    const h = document.querySelector('header')?.offsetHeight || 58;
-    document.documentElement.style.setProperty('--header-h', h + 'px');
-  }catch{}
-}
 function initUIBindings(){
   // Sidebar toggle + mobiel backdrop
   const backdrop = req('sidebar-backdrop');
-  const sidebarEl = document.querySelector('.sidebar');
-  try{ sidebarEl && sidebarEl.addEventListener('transitionend', (e)=>{ if(e.propertyName==='transform'){ try{ map?.invalidateSize(); }catch{} } }); }catch{}
   function setSidebar(open){
     document.body.classList.toggle('sidebar-collapsed', !open);
     document.body.classList.toggle('sidebar-open', !!open);
-    if(backdrop){ if(open){ backdrop.style.display='block'; backdrop.removeAttribute('hidden'); } else { backdrop.style.display='none'; backdrop.setAttribute('hidden',''); } }
+    if(backdrop){
+      if(open){ backdrop.removeAttribute('hidden'); }
+      else { backdrop.setAttribute('hidden',''); }
+    }
     // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
   }
@@ -169,10 +164,6 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
-  updateHeaderHeightVar();
-  window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
-  window.addEventListener('orientationchange', ()=>{ setTimeout(updateHeaderHeightVar, 250); }, {passive:true});
-  setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
 }
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
@@ -248,15 +239,12 @@ function openMapContextMenu(latlng, x, y){
   <button data-act="mk" data-type="nest">🪹 Nest</button>
   <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
   <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
-  el.addEventListener('click',ev=>{
+  el.addEventListener('click', async , async ,ev=>{
     const b=ev.target.closest('button'); if(!b) return;
     closeContextMenu();
     openPropModal({
       type:b.dataset.type,
-      onSave:(vals)=>{
-        const m = createMarkerWithPropsAt(latlng, b.dataset.type, vals);
-        persistMarker(m);
-      }
+      onSave: async (vals)=>{ const zid = await ensureZoneForLatLng(latlng); if(!zid && !isAdmin()) return; const m = await createMarkerWithPropsAt(latlng, b.dataset.type, vals, zid||null); if(m) persistMarker(m); }
     });
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
@@ -270,7 +258,7 @@ function openMarkerContextMenu(marker, x, y){
   <button data-act="edit">✏️ Eigenschappen</button>
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
   <button data-act="delete">🗑️ Verwijderen</button>`;
-  el.addEventListener('click',ev=>{
+  el.addEventListener('click', async , async ,ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     setTimeout(()=>{
@@ -293,7 +281,7 @@ function openLineContextMenu(line, x, y){
   el.innerHTML=`<h4>Zichtlijn</h4>
   <button data-act="color">🎨 Kleur bewerken</button>
   <button data-act="delete">🗑️ Verwijderen</button>`;
-  el.addEventListener('click',ev=>{
+  el.addEventListener('click', async , async ,ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     if(act==='delete'){ deleteSightLine(line,true); }
@@ -312,7 +300,7 @@ function openLineColorPicker(line, x, y){
   <button data-act="cancel" class="btn-secondary">Annuleren</button>
   <button data-act="save" class="btn-primary">Opslaan</button>
   </div>`;
-  el.addEventListener('click',ev=>{
+  el.addEventListener('click', async , async ,ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     if(act==='cancel'){ closeContextMenu(); return; }
     if(act==='save'){ const color=el.querySelector('#lc_hex').value; setSightLineColor(line,color,true); closeContextMenu(); }
@@ -320,6 +308,28 @@ function openLineColorPicker(line, x, y){
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
+// ======================= Zone-selector =======================
+function openZoneSelector(candidates){
+  // candidates: [{id, label, color}] ; returns Promise<string|null>
+  return new Promise((resolve)=>{
+    const modal = document.getElementById('zone-modal');
+    const list  = document.getElementById('zone-list');
+    const cancel= document.getElementById('zm-cancel');
+    if(!modal||!list||!cancel){ alert('Zone-selector ontbreekt.'); resolve(null); return; }
+    list.innerHTML = '';
+    candidates.forEach(z=>{
+      const b=document.createElement('button');
+      const lbl=z.label||z.id; const col=z.color||'#0aa879';
+      b.innerHTML = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${col};margin-right:8px;border:1px solid #234;"></span>${lbl}`;
+      b.onclick = ()=>{ cleanup(); resolve(z.id); };
+      list.appendChild(b);
+    });
+    function cleanup(){ cancel.onclick=null; modal.classList.add('hidden'); }
+    cancel.onclick = ()=>{ cleanup(); resolve(null); };
+    modal.classList.remove('hidden');
+  });
+}
+
 // ======================= Modal (icon properties) =======================
 const modalEl = $('prop-modal');
 const pmDate = $('pm-date');
@@ -364,7 +374,9 @@ function applyPropsToMarker(marker, vals){
   else if(m.type==='lokpot'){ marker.setIcon(ICONS.lokpot()); }
   marker._meta=m; attachMarkerPopup(marker);
 }
-function placeMarkerAt(latlng, type='pending'){
+function placeMarkerAt(latlng, type='pending', zoneOverride=null){
+  let zoneId = zoneOverride != null ? zoneOverride : findZoneForLatLng(latlng);
+  if(!isAdmin()){ if(!zoneId || !canWriteZone(zoneId)){ return null; } }
   const id = genId('mk'); let marker;
   if(type==='hoornaar'){ marker=L.marker(latlng,{icon:ICONS.hoornaar()}); marker._meta={id,type}; }
   else if(type==='nest'){ marker=L.marker(latlng,{icon:ICONS.nest()}); marker._meta={id,type}; }
@@ -379,9 +391,9 @@ function placeMarkerAt(latlng, type='pending'){
   allMarkers.push(marker); markersGroup.addLayer(marker); attachMarkerPopup(marker);
   return marker;
 }
-function createMarkerWithPropsAt(latlng, type, vals){
-  const marker = placeMarkerAt(latlng, type);
-  applyPropsToMarker(marker, vals);
+async function createMarkerWithPropsAt(latlng, type, vals, zoneOverride=null){
+  const marker = placeMarkerAt(latlng, type, zoneOverride);
+  if(!marker) return null; applyPropsToMarker(marker, vals);
   return marker;
 }
 function deleteMarkerAndAssociations(marker){
@@ -402,6 +414,23 @@ function persistMarker(marker){
 // ======================= Zichtlijnen =======================
 const R_EARTH=6371000;
 const toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
+async function ensureZoneForLatLng(latlng){
+  if(isAdmin()) return findZoneForLatLng(latlng) || null;
+  // Preferred: zone via polygon containment
+  let zid = findZoneForLatLng(latlng);
+  if(zid && canWriteZone(zid)) return zid;
+  // Otherwise: if user has N>0 zones, offer selector
+  const polys = polygonsGroup.getLayers();
+  const allowed = (ALLOWED_ZONES||[]).map(id=>{
+    const p = polys.find(x=>x._props?.id===id);
+    return p ? { id, label:(p._props?.label||id), color:(p._props?.color||'#0aa879') } : { id, label:id, color:'#0aa879' };
+  });
+  if(!allowed.length){ alert('Je hebt geen zones toegewezen.'); return null; }
+  if(allowed.length===1) return allowed[0].id;
+  const pick = await openZoneSelector(allowed);
+  return pick || null;
+}
+
 function bearingBetween(a,b){
   const phi1=toRad(a.lat),phi2=toRad(b.lat), dlam=toRad(b.lng-a.lng);
   const y=Math.sin(dlam)*Math.cos(phi2);
@@ -603,7 +632,7 @@ function openUnifiedContextMenu(opts){
   <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
   <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
   el.innerHTML=html;
-  el.addEventListener('click', ev=>{
+  el.addEventListener('click', async , async , ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     setTimeout(()=>{
