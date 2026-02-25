@@ -1,1 +1,9 @@
-{"name": "Hornet Mapper NL", "short_name": "HorMap", "start_url": ".", "display": "standalone", "background_color": "#0e1116", "theme_color": "#0aa879", "lang": "nl-NL"}
+{
+  "name": "Hornet Mapper NL — v6.1.0-r2.1-fix14",
+  "short_name": "HorMap",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0e1116",
+  "theme_color": "#0aa879",
+  "lang": "nl-NL"
+}
