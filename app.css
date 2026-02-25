@@ -86,3 +86,5 @@ body.sidebar-collapsed .sidebar { width: 0; padding: 0; border-right: none; over
 /* fix7: zone modal styles */
 #zone-list button{ display:block; width:100%; text-align:left; padding:10px 12px; border-radius:8px; border:1px solid var(--border2); background:#0f141b; color:var(--text); cursor:pointer; }
 #zone-list button:hover{ border-color: var(--accent); box-shadow: 0 0 0 3px rgba(10,168,121,.18); }
+
+#role-indicator{ padding:2px 6px; border-radius:6px; background:#0f141b; border:1px solid var(--border2); color:var(--muted); font-size:12px; }

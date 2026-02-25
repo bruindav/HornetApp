@@ -15,6 +15,9 @@ import {
   saveSectorToCloud, deleteSectorFromCloud,
   savePolygonToCloud, deletePolygonFromCloud
 } from "./sync-engine.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithRedirect, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { doc as fsDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { db } from "./firebase.js";
 // ======================= Kleine helpers =======================
 function $(id) { return document.getElementById(id); }
 function on(el, ev, fn) { if (el) el.addEventListener(ev, fn, { passive: true }); }
@@ -31,6 +34,25 @@ function debounceEventGate(msGetter){
     return false;
   };
 }
+
+// fix8: ensure status bar auth UI exists and wire up role indicator
+function ensureAuthUI(){
+  const bar = document.getElementById('status-bar');
+  if(!bar) return;
+  const haveSignin = document.getElementById('btn-signin');
+  if(!haveSignin){
+    const who = document.createElement('span'); who.id='whoami'; who.textContent='(niet ingelogd)';
+    const btnIn = document.createElement('button'); btnIn.id='btn-signin'; btnIn.textContent='Inloggen';
+    const btnOut= document.createElement('button'); btnOut.id='btn-signout'; btnOut.textContent='Uitloggen'; btnOut.hidden=true;
+    const role  = document.createElement('span'); role.id='role-indicator'; role.textContent='Rol: gast';
+    bar.appendChild(who); bar.appendChild(btnIn); bar.appendChild(btnOut); bar.appendChild(role);
+  }
+}
+
+// ======================= Auth & Rollen =======================
+let CURRENT_USER=null; let CURRENT_ROLE="guest"; let ALLOWED_ZONES=[];
+function isAdmin(){ return CURRENT_ROLE==="admin"||CURRENT_ROLE==="beheerder"; }
+function canWriteZone(z){ return isAdmin() || (ALLOWED_ZONES||[]).includes(z); }
 // ======================= Status UI =======================
 const statusSW = $('status-sw');
 const statusGeo = $('status-geo');
@@ -164,6 +186,7 @@ function initUIBindings(){
     }catch{ alert('Reset mislukt'); }
   });
   updateSWStatus();
+  try{ ensureAuthUI(); }catch(e){}
 }
 // ======================= Geocoder =======================
 async function geocodePhoton(q){
@@ -814,3 +837,37 @@ if (document.readyState === 'loading'){
 } else {
   boot();
 }
+
+(function(){
+  try{
+    const a = getAuth();
+    function bind(){ const btnIn=document.getElementById('btn-signin'), btnOut=document.getElementById('btn-signout'), who=document.getElementById('whoami'), role=document.getElementById('role-indicator');
+      if(btnIn) btnIn.onclick=()=>{ try{ const p=new GoogleAuthProvider(); signInWithRedirect(a,p); }catch(e){ alert('Login mislukt'); } };
+      if(btnOut) btnOut.onclick=()=>{ try{ signOut(a); }catch(e){} };
+      return {btnIn,btnOut,who,role}; }
+    let ui = bind();
+    onAuthStateChanged(a, async(u)=>{
+      ui = bind();
+      CURRENT_USER=u||null;
+      if(!u){ CURRENT_ROLE='guest'; ALLOWED_ZONES=[]; if(ui.who) ui.who.textContent='(niet ingelogd)'; if(ui.btnIn) ui.btnIn.hidden=false; if(ui.btnOut) ui.btnOut.hidden=true; if(ui.role) ui.role.textContent='Rol: gast'; return; }
+      if(ui.who) ui.who.textContent=u.email||u.uid; if(ui.btnIn) ui.btnIn.hidden=true; if(ui.btnOut) ui.btnOut.hidden=false;
+      try{ const r=await getDoc(fsDoc(db,'roles',u.uid)); const d=r.data()||{}; const nl=d.rol; CURRENT_ROLE=(nl==='beheerder'?'admin':(nl==='vrijwilliger'?'volunteer':'guest')); ALLOWED_ZONES=Array.isArray(d.gebieden)? d.gebieden:[];
+        const label=(CURRENT_ROLE==='admin'?'beheerder':(CURRENT_ROLE==='volunteer'?'vrijwilliger':'gast'));
+        const areas=(ALLOWED_ZONES&&ALLOWED_ZONES.length)? ' ('+ALLOWED_ZONES.join(', ')+')': (label==='vrijwilliger'?' (geen gebieden)':'');
+        if(ui.role) ui.role.textContent='Rol: '+label+areas;
+      }catch(e){ if(ui.role) ui.role.textContent='Rol: onbekend'; }
+    });
+  }catch(e){}
+})();
+
+function runSetupChecks(){
+  const el=document.getElementById('swz-content'); if(!el) return;
+  const BUILD_VERSION='v6.1.0-r2.1-fix8'; const BUILD_QS='610r21f8';
+  const who = CURRENT_USER? (CURRENT_USER.email||CURRENT_USER.uid) : '(niet ingelogd)';
+  const role = CURRENT_ROLE;
+  el.innerHTML = `<div><b>Versie</b>: ${BUILD_VERSION} (qs ${BUILD_QS})</div>`+
+                 `<div><b>Gebruiker</b>: ${who}</div>`+
+                 `<div><b>Rol</b>: ${role}</div>`+
+                 `<div><b>Gebieden</b>: ${(ALLOWED_ZONES||[]).join(', ')||'-'}</div>`;
+}
+const _swz=document.getElementById('swz-run'); if(_swz) _swz.addEventListener('click', runSetupChecks);
