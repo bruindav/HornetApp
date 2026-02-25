@@ -1,3 +1,5 @@
+import './firebase.js?v=610r21f12';
+import './sync-engine.js?v=610r21f12';
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
