@@ -1,0 +1,40 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() { return request.auth != null; }
+    function userDoc() { return get(/databases/{database}/documents/roles/{request.auth.uid}); }
+    function userRole() { return userDoc().data.role; }
+    function userZones() { return userDoc().data.zones; }
+    function isAdmin() { return isSignedIn() && userRole() == 'admin'; }
+    function canWriteZone(z) { return isAdmin() || (isSignedIn() && z in userZones()); }
+
+    match /maps/{year}/{group}/data/markers/{docId} {
+      allow read: if true;
+      allow create: if canWriteZone(request.resource.data.zoneId);
+      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
+      allow delete: if canWriteZone(resource.data.zoneId);
+    }
+    match /maps/{year}/{group}/data/lines/{docId} {
+      allow read: if true;
+      allow create: if canWriteZone(request.resource.data.zoneId);
+      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
+      allow delete: if canWriteZone(resource.data.zoneId);
+    }
+    match /maps/{year}/{group}/data/sectors/{docId} {
+      allow read: if true;
+      allow create: if canWriteZone(request.resource.data.zoneId);
+      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
+      allow delete: if canWriteZone(resource.data.zoneId);
+    }
+    match /maps/{year}/{group}/data/polygons/{docId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+    match /roles/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid || isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
