@@ -1,460 +1,97 @@
-// Hornet Mapper NL — main.js v6.1.0-r2.2-fix17
-import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js';
 
-import './firebase.js?v=610r21f17';
-import './sync-engine.js?v=610r21f17';
-
-// ------------------------------------------------------------
-// Kleine helpers
-// ------------------------------------------------------------
-function $(id) { return document.getElementById(id); }
-function on(el, ev, fn) { if (el) el.addEventListener(ev, fn, { passive: true }); }
-function req(id) { const el = $(id); if (!el) console.warn(`[UI] Element met id="${id}" niet gevonden`); return el; }
-function nowISODate() { return new Date().toISOString().slice(0, 10); }
-function genId(prefix) { return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2)}`; }
-
-function debounceEventGate(msGetter) {
-  let last = 0;
-  return () => {
-    const ms = msGetter();
-    const t = Date.now();
-    if (t - last < ms) return true;
-    last = t;
-    return false;
-  };
+// HornetApp main entry
+// Anti-dubbelstart guard
+if (window.__hornetStarted) {
+  console.warn('startHornetApp: tweede start gedetecteerd – skip');
+} else {
+  window.__hornetStarted = true;
 }
 
-// ------------------------------------------------------------
-// Auth UI injectie
-// ------------------------------------------------------------
-function ensureAuthUI() {
-  const bar = document.getElementById('status-bar');
-  if (!bar) return;
+// Module imports (zorg dat bestandsnamen exact matchen)
+import './config.js';
+import './firebase.js';
+import { openMapContextMenu } from './sync-engine.js';
 
-  if (!document.getElementById('whoami')) {
-    const who = document.createElement('span');
-    who.id = 'whoami';
-    who.textContent = '(niet ingelogd)';
+window.addEventListener('DOMContentLoaded', () => {
+  startHornetApp();
+}, { once: true });
 
-    const btnIn = document.createElement('button');
-    btnIn.id = 'btn-signin';
-    btnIn.textContent = 'Inloggen';
-
-    const btnOut = document.createElement('button');
-    btnOut.id = 'btn-signout';
-    btnOut.textContent = 'Uitloggen';
-    btnOut.hidden = true;
-
-    const role = document.createElement('span');
-    role.id = 'role-indicator';
-    role.textContent = 'Rol: gast';
-
-    bar.appendChild(who);
-    bar.appendChild(btnIn);
-    bar.appendChild(btnOut);
-    bar.appendChild(role);
-  }
-}
-
-// ------------------------------------------------------------
-// Auth & Rollen
-// ------------------------------------------------------------
-let CURRENT_USER = null;
-let CURRENT_ROLE = 'guest';
-let ALLOWED_ZONES = [];
-
-function isAdmin() {
-  return CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'beheerder';
-}
-
-function canWriteZone(z) {
-  return isAdmin() || (ALLOWED_ZONES || []).includes(z);
-}
-
-// ------------------------------------------------------------
-// Status UI
-// ------------------------------------------------------------
-const statusSW = $('status-sw');
-const statusGeo = $('status-geo');
-
-function setStatus(el, text, cls) {
-  if (!el) return;
-  el.textContent = text;
-  el.classList.remove('ok', 'warn', 'err');
-  if (cls) el.classList.add(cls);
-}
-
-function updateSWStatus() {
-  try {
-    if (!('serviceWorker' in navigator)) {
-      setStatus(statusSW, 'SW: niet ondersteund', 'warn');
-      return;
-    }
-    const st = navigator.serviceWorker.controller ? 'actief' : 'geregistreerd';
-    setStatus(statusSW, `SW: ${st}`, 'ok');
-  } catch {}
-}
-
-// ------------------------------------------------------------
-// Debounce
-// ------------------------------------------------------------
-const SOFT_MS = 150, HARD_MS = 300;
-let DEBOUNCE_MS = SOFT_MS;
-const shouldDebounce = debounceEventGate(() => DEBOUNCE_MS);
-
-// ------------------------------------------------------------
-// Map & Layers
-// ------------------------------------------------------------
+// Leaflet map referentie
 let map;
-const markersGroup = L.featureGroup();
-const linesGroup = L.featureGroup();
-const circlesGroup = L.featureGroup();
-const handlesGroup = L.featureGroup();
-const polygonsGroup = L.featureGroup();
 
-let allMarkers = [], allLines = [], allSectors = [];
+export function startHornetApp() {
+  // Idempotente init
+  initMap();
+  bindUi();
+}
 
 function initMap() {
-  map = L.map('map', { zoomControl: true }).setView([52.1, 5.3], 8);
+  if (map && map.remove) {
+    map.remove();
+  }
+  const el = document.getElementById('map');
+  if (el && el._leaflet_id) el._leaflet_id = null;
 
+  // LET OP: verwacht dat Leaflet L.global al geladen is. Pas aan naar jouw tiles.
+  if (!window.L) {
+    console.warn('Leaflet (L) niet gevonden – laad leaflet JS/CSS in index.html');
+    return;
+  }
+
+  map = L.map('map', {
+    center: [52.0907, 5.1214], // Utrecht als default
+    zoom: 12,
+  });
+
+  // Voorbeeld tile (OpenStreetMap)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    attribution: '© OpenStreetMap-bijdragers',
+    attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
-  markersGroup.addTo(map);
-  linesGroup.addTo(map);
-  circlesGroup.addTo(map);
-  handlesGroup.addTo(map);
-  polygonsGroup.addTo(map);
+  bindMapEvents(map);
+  return map;
+}
 
-  map.pm.addControls({
-    position: 'topleft',
-    drawMarker: false,
-    drawPolyline: false,
-    drawRectangle: true,
-    drawPolygon: true,
-    drawCircle: false,
-    drawCircleMarker: false,
-    editMode: true,
-    dragMode: true,
-    cutPolygon: false,
-    removalMode: true,
-  });
-
-  map.on('pm:create', (e) => {
-    const layer = e.layer;
-    if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
-      polygonsGroup.addLayer(layer);
-      initPolygon(layer);
-      persistPolygon(layer);
+function bindMapEvents(map) {
+  const clickToMenu = (e) => {
+    const x = e.originalEvent?.clientX ?? e.clientX ?? 0;
+    const y = e.originalEvent?.clientY ?? e.clientY ?? 0;
+    if (typeof openMapContextMenu === 'function') {
+      openMapContextMenu(e.latlng, x, y);
+    } else if (window.openMapContextMenu) {
+      window.openMapContextMenu(e.latlng, x, y);
     } else {
-      layer.remove();
-    }
-  });
-
-  let drawing = false;
-
-  map.on('pm:drawstart', () => (drawing = true));
-  map.on('pm:drawend', () => (drawing = false));
-
-  map.on('click', (e) => {
-    if (shouldDebounce()) return;
-    if (drawing) return;
-    openMapContextMenu(
-      e.latlng,
-      e.originalEvent?.clientX || 0,
-      e.originalEvent?.clientY || 0
-    );
-  });
-
-  map.on('contextmenu', (e) => {
-    if (shouldDebounce()) return;
-    if (drawing) return;
-    openMapContextMenu(
-      e.latlng,
-      e.originalEvent?.clientX || 0,
-      e.originalEvent?.clientY || 0
-    );
-  });
-}
-
-// ------------------------------------------------------------
-// Zoekfunctie (minimale implementatie)
-// ------------------------------------------------------------
-async function searchPlaceNL() {
-  try {
-    const place = document.getElementById('place-input')?.value?.trim();
-    if (!place) return;
-
-    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(place)}&limit=1`;
-    const res = await fetch(url);
-    const json = await res.json();
-
-    if (!json.features || !json.features.length) {
-      alert('Geen resultaat gevonden');
-      return;
-    }
-
-    const coords = json.features[0].geometry.coordinates; // [lon, lat]
-    const latlng = [coords[1], coords[0]];
-    map.setView(latlng, 14);
-
-    const overlay = document.getElementById('search-overlay');
-    if (overlay) {
-      overlay.classList.remove('active');
-      overlay.setAttribute('aria-hidden', 'true');
-    }
-  } catch (e) {
-    console.error('[searchPlaceNL]', e);
-    alert('Zoekfout');
-  }
-}
-
-// ------------------------------------------------------------
-// Filtering placeholder (vereist voor stabiele startup)
-// ------------------------------------------------------------
-function applyFilters() {
-  console.log('[Filters] applyFilters() aangeroepen');
-  // TODO: echte filtering hier terugbrengen (types, datum, etc.)
-}
-
-// ------------------------------------------------------------
-// UI Bindings
-// ------------------------------------------------------------
-function initUIBindings() {
-  const backdrop = req('sidebar-backdrop');
-
-  function setSidebar(open) {
-    document.body.classList.toggle('sidebar-collapsed', !open);
-    document.body.classList.toggle('sidebar-open', !!open);
-
-    if (backdrop) {
-      if (open) backdrop.removeAttribute('hidden');
-      else backdrop.setAttribute('hidden', '');
-    }
-    setTimeout(() => {
-      try {
-        map?.invalidateSize();
-      } catch {}
-    }, 150);
-  }
-
-  on(req('toggle-sidebar'), 'click', () => {
-    const collapsed = document.body.classList.contains('sidebar-collapsed');
-    setSidebar(collapsed);
-  });
-
-  on(backdrop, 'click', () => setSidebar(false));
-
-  if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
-
-  on(req('hard-debounce'), 'change', (e) => {
-    DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
-  });
-
-  const floatingSearchBtn = req('floating-search-btn');
-  const searchOverlay = req('search-overlay');
-  const searchClose = req('search-close');
-  const searchBtn = req('search-btn');
-  const placeInput = req('place-input');
-
-  on(floatingSearchBtn, 'click', () => {
-    if (!searchOverlay || !placeInput) return;
-    searchOverlay.classList.add('active');
-    searchOverlay.setAttribute('aria-hidden', 'false');
-    placeInput.focus();
-  });
-
-  on(searchClose, 'click', () => {
-    if (!searchOverlay) return;
-    searchOverlay.classList.remove('active');
-    searchOverlay.setAttribute('aria-hidden', 'true');
-  });
-
-  on(placeInput, 'keydown', (e) => {
-    if (e.key === 'Enter') searchPlaceNL();
-  });
-  on(searchBtn, 'click', searchPlaceNL);
-
-  on(req('apply-filters'), 'click', applyFilters);
-
-  on(req('reset-filters'), 'click', () => {
-    ['f_type_hoornaar', 'f_type_nest', 'f_type_nest_geruimd', 'f_type_lokpot', 'f_type_pending'].forEach((id) => {
-      const el = $(id);
-      if (el) el.checked = true;
-    });
-    const fdb = $('f_date_before');
-    if (fdb) fdb.value = '';
-    applyFilters();
-  });
-
-  on(req('btn-selftest'), 'click', async () => {
-    try {
-      await geocodePhoton('Utrecht');
-      setStatus(statusGeo, 'Photon OK', 'ok');
-    } catch {
-      setStatus(statusGeo, 'Photon NOK', 'err');
-    }
-
-    const key = $('mapsco-key')?.value?.trim() || '';
-    try {
-      await geocodeMapsCo('Utrecht', key);
-      setStatus(statusGeo, 'Maps.co OK', 'ok');
-    } catch {
-      setStatus(statusGeo, 'Maps.co NOK', 'err');
-    }
-  });
-
-  on(req('btn-reset-cache'), 'click', async () => {
-    try {
-      if ('caches' in window) {
-        const ks = await caches.keys();
-        await Promise.all(ks.map((k) => caches.delete(k)));
-      }
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister()));
-      }
-      localStorage.clear();
-      alert('Cache & SW gereset. Herladen…');
-      location.reload(true);
-    } catch {
-      alert('Reset mislukt');
-    }
-  });
-
-  updateSWStatus();
-  try {
-    ensureAuthUI();
-  } catch {}
-}
-
-// ------------------------------------------------------------
-// Admin functies
-// ------------------------------------------------------------
-async function adminRefresh() {
-  try {
-    if (!(CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'beheerder')) {
-      const list = document.getElementById('admin-list');
-      if (list) list.innerHTML = '<i>Alleen beheerders kunnen rollen beheren.</i>';
-      return;
-    }
-
-    const db = getFirestore();
-    const snap = await getDocs(collection(db, 'roles'));
-    const items = [];
-
-    snap.forEach((d) => {
-      const data = d.data() || {};
-      items.push({
-        uid: d.id,
-        rol: data.rol || '(geen)',
-        gebieden: Array.isArray(data.gebieden) ? data.gebieden : [],
-      });
-    });
-
-    const list = document.getElementById('admin-list');
-    list.innerHTML = items.length
-      ? items
-          .map(
-            (it) => `
-<div class="adm-row" data-uid="${it.uid}" style="padding:6px;border-bottom:1px solid var(--border2);cursor:pointer">
-  <b>${it.uid}</b><br>
-  rol: ${it.rol} — gebieden: ${(it.gebieden || []).join(', ') || '-'}
-</div>`
-          )
-          .join('')
-      : '<i>Geen rollen gevonden.</i>';
-
-    list.querySelectorAll('.adm-row').forEach((row) => {
-      row.addEventListener('click', async () => {
-        const uid = row.dataset.uid;
-        const ref = doc(getFirestore(), 'roles', uid);
-        const s = await getDoc(ref);
-        const d = s.exists() ? s.data() : { rol: 'vrijwilliger', gebieden: [] };
-
-        document.getElementById('adm-uid').value = uid;
-        document.getElementById('adm-rol').value = d.rol || 'vrijwilliger';
-        document.querySelectorAll('.adm-area').forEach((cb) => {
-          cb.checked = Array.isArray(d.gebieden) ? d.gebieden.includes(cb.value) : false;
-        });
-      });
-    });
-  } catch (e) {
-    console.error('[adminRefresh]', e);
-    alert('Fout bij laden rollen.');
-  }
-}
-
-async function adminSave() {
-  try {
-    if (!(CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'beheerder')) return;
-
-    const uid = document.getElementById('adm-uid').value.trim();
-    if (!uid) {
-      alert('Vul een UID in.');
-      return;
-    }
-
-    const rol = document.getElementById('adm-rol').value;
-    const areas = Array.from(document.querySelectorAll('.adm-area'))
-      .filter((cb) => cb.checked)
-      .map((cb) => cb.value);
-
-    await setDoc(doc(getFirestore(), 'roles', uid), { rol, gebieden: areas }, { merge: true });
-    alert('Opgeslagen.');
-    adminRefresh();
-  } catch (e) {
-    console.error('[adminSave]', e);
-    alert('Opslaan mislukt.');
-  }
-}
-
-async function adminDelete() {
-  try {
-    if (!(CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'beheerder')) return;
-
-    const uid = document.getElementById('adm-uid').value.trim();
-    if (!uid) {
-      alert('Vul een UID in.');
-      return;
-    }
-
-    if (!confirm('Weet je zeker dat je deze rol wilt verwijderen?')) return;
-
-    await deleteDoc(doc(getFirestore(), 'roles', uid));
-    alert('Verwijderd.');
-    document.getElementById('adm-uid').value = '';
-    adminRefresh();
-  } catch (e) {
-    console.error('[adminDelete]', e);
-    alert('Verwijderen mislukt.');
-  }
-}
-
-document.getElementById('admin-refresh')?.addEventListener('click', adminRefresh);
-document.getElementById('adm-save')?.addEventListener('click', adminSave);
-document.getElementById('adm-delete')?.addEventListener('click', adminDelete);
-
-// ------------------------------------------------------------
-// Startup
-// ------------------------------------------------------------
-(function startHornetApp() {
-  const start = () => {
-    try {
-      ensureAuthUI();
-      initUIBindings();
-      initMap();
-      console.log('[Hornet] main.js is gestart (v6.1.0-r2.2-fix17)');
-    } catch (e) {
-      console.error('Init-fout:', e);
+      console.warn('openMapContextMenu is niet beschikbaar');
     }
   };
 
-  if (document.readyState === 'loading')
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  else
-    start();
-})();
+  map.on('click', clickToMenu);
+  map.on('contextmenu', clickToMenu);
+}
+
+function bindUi() {
+  document.getElementById('loginBtn')?.addEventListener('click', onLogin, { once: false });
+  document.getElementById('addUserBtn')?.addEventListener('click', onAddUser, { once: false });
+}
+
+async function onLogin() {
+  try {
+    const { loginWithGoogle } = await import('./firebase.js');
+    await loginWithGoogle();
+    alert('Ingelogd');
+  } catch (err) {
+    console.error('Login error:', err);
+    alert(`Login mislukt: ${err?.code || err?.message || err}`);
+  }
+}
+
+async function onAddUser() {
+  try {
+    // Voorbeeld: hier zou je Firestore write kunnen doen
+    alert('User toegevoegd (voorbeeld)');
+  } catch (err) {
+    console.error('addUser error:', err);
+    alert(`User toevoegen mislukt: ${err?.code || err?.message || err}`);
+  }
+}

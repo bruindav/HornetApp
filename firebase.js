@@ -1,20 +1,14 @@
+
+// Firebase setup (modular SDK)
+// Vul je config in via config.js
+import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { firebaseConfig } from './config.js';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js';
-import { getFirestore, enableMultiTabIndexedDbPersistence } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
 
-// Initialize Firebase app and Firestore
-export const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+export const auth = getAuth(app);
 
-// Enable multi-tab IndexedDB persistence (ignore if not supported)
-(async () => {
-  try {
-    if (!window.__hm_persistence_set) {
-      window.__hm_persistence_set = true;
-      await enableMultiTabIndexedDbPersistence(db);
-    }
-  } catch (e) {
-    // No-op: fallback to in-memory if blocked/not supported
-    console.warn('[persistence]', e?.message || e);
-  }
-})();
+export async function loginWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(auth, provider);
+}

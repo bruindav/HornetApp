@@ -1,171 +1,30 @@
 
 <!DOCTYPE html>
 <html lang="nl">
-<head>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HornetApp</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./favicon.ico" />
+    <link rel="stylesheet" href="./app.css" />
+    <!-- Plaats overige <meta> en <link> tags hier -->
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <h1>HornetApp</h1>
+      </header>
+      <main>
+        <div id="map" style="height:60vh; background:#ddd"></div>
+        <div style="margin-top:1rem">
+          <button id="loginBtn">Inloggen</button>
+          <button id="addUserBtn">Nieuwe user toevoegen</button>
+        </div>
+      </main>
+    </div>
 
- <script>
-  window.addEventListener('load', () => {
-    console.log('main.js geladen?', typeof window.main !== 'undefined');
-  });
-</script>
- 
- <meta charset="utf-8" />
- <meta name="viewport" content="width=device-width, initial-scale=1" />
- <title>Hornet Mapper NL — v6.1.0-r2.2-fix17</title>
- <link rel="stylesheet" href="./app.css?v=610r21f17" />
- ...
- <script type="module" src="./main.js?v=610r21f17"></script>
- <script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js?v=610r21f17");
-  }
-</script>
-
- <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
- <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
- <link rel="stylesheet" href="./app.css?v=610r21f15" />
- <meta name="theme-color" content="#0aa879" />
- <style>
- html, body { height: 100%; margin: 0; }
- </style>
-<link rel="icon" href="./favicon.ico" />
-</head>
-<body>
-<header>
- <button id="toggle-sidebar" aria-label="Toggle sidebar">☰</button>
- <h1>Hornet Mapper NL — v6.1.0-r2.1-fix17</h1>
- <div id="status-bar">
- <span id="status-sw">SW: —</span>
- <span id="status-geo">Geocoder: —</span>
- <button id="btn-selftest">Zelftest</button>
- <button id="btn-reset-cache">Cache reset</button>
- </div>
-</header>
-<main>
- <aside class="sidebar">
- <section>
- <h2>Dataset</h2>
- <div class="tool-row">
- <label for="sel-year">Jaar</label>
- <select id="sel-year">
- <option value="2025">2025</option>
- <option value="2026" selected>2026</option>
- <option value="2027">2027</option>
- <option value="2028">2028</option>
- </select>
- </div>
- <div class="tool-row">
- <label for="sel-group">Zoekgroep</label>
- <select id="sel-group">
- <option value="Hoornaar_Zeist">Hoornaar_Zeist</option>
- <option value="Utrecht">Utrecht</option>
- <option value="De_Bilt">De_Bilt</option>
- <option value="Soesterberg">Soesterberg</option>
- <option value="Driebergen">Driebergen</option>
- </select>
- </div>
- <button id="apply-scope">Scope toepassen</button>
- </section>
- <section><h2>Zoeken</h2><p>Tik op 🔍 om te zoeken.</p></section>
- <section>
- <h2>Instellingen</h2>
- <div class="tool-row">
- <label for="hard-debounce">Harde debounce</label>
- <input id="hard-debounce" type="checkbox">
- </div>
- <div class="tool-row">
- <label for="geocoder-select">Geocoder</label>
- <select id="geocoder-select">
- <option value="auto">Auto</option>
- <option value="photon">Photon</option>
- <option value="mapsco">Maps.co</option>
- </select>
- </div>
- <div class="tool-row">
- <label for="mapsco-key">maps.co key</label>
- <input id="mapsco-key" type="text" placeholder="optioneel" />
- </div>
- </section>
- <section>
- <h2>Filter</h2>
- <div class="filter-row"><label><input type="checkbox" id="f_type_hoornaar" checked> Waarneming</label></div>
- <div class="filter-row"><label><input type="checkbox" id="f_type_nest" checked> Nest</label></div>
- <div class="filter-row"><label><input type="checkbox" id="f_type_nest_geruimd" checked> Nest geruimd</label></div>
- <div class="filter-row"><label><input type="checkbox" id="f_type_lokpot" checked> Lokpot</label></div>
- <div class="filter-row"><label><input type="checkbox" id="f_type_pending" checked> Nieuw/pending</label></div>
- <div class="filter-row">
- <label>Verberg vóór datum</label>
- <input type="date" id="f_date_before">
- </div>
- <div class="filter-actions">
- <button id="apply-filters">Toepassen</button>
- <button id="reset-filters">Reset</button>
- </div>
- </section>
- <section>
- <h2>Data</h2>
- <button id="save-btn">Opslaan</button>
- <button id="load-btn">Laden</button>
- <button id="export-btn">Export</button>
- <label for="import-file" class="file-label">Import</label>
- <input id="import-file" type="file" accept="application/json" />
- <button id="clear-btn" class="danger">Alles wissen</button>
- </section>
- <section>
- <h2>Realtime sync</h2>
- <p>Hybride modus actief</p>
- </section>
-<section id="admin-panel"><h2>Beheer</h2><div style="display:grid;gap:8px;"><button id="admin-refresh" class="btn-secondary">Vernieuwen</button><div id="admin-list" style="border:1px solid var(--border2);padding:8px;border-radius:8px;max-height:220px;overflow:auto;"></div><div id="admin-editor" style="border:1px solid var(--border2);padding:8px;border-radius:8px;"><h3 style="margin:0 0 6px;">Rol bewerken / toevoegen</h3><label>UID<br><input id="adm-uid" type="text" placeholder="UID uit Authentication → Users"/></label><br><label>Rol<br><select id="adm-rol"><option value="beheerder">beheerder</option><option value="vrijwilliger" selected>vrijwilliger</option><option value="gast">gast</option></select></label><div style="margin-top:6px;"><div><b>Gebieden</b></div><label><input type="checkbox" class="adm-area" value="Zeist"> Zeist</label><label><input type="checkbox" class="adm-area" value="De Bilt"> De Bilt</label><label><input type="checkbox" class="adm-area" value="Soesterberg"> Soesterberg</label><label><input type="checkbox" class="adm-area" value="Driebergen"> Driebergen</label><label><input type="checkbox" class="adm-area" value="Doorn"> Doorn</label><label><input type="checkbox" class="adm-area" value="Bunnik"> Bunnik</label><label><input type="checkbox" class="adm-area" value="Odijk"> Odijk</label></div><div style="display:flex;gap:8px;margin-top:8px;"><button id="adm-save" class="btn-primary">Opslaan</button><button id="adm-delete" class="danger">Verwijderen</button></div></div></div></section>
-</aside>
- <section id="map"></section>
-</main>
-<!-- Backdrop voor mobiel om het zijmenu te sluiten -->
-<div id="sidebar-backdrop" hidden></div>
-<footer>
- <small>© OpenStreetMap</small>
-</footer>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
- 
-
-<button id="floating-search-btn" title="Zoeken">🔍</button>
-<div id="search-overlay" aria-hidden="true">
- <div id="search-box">
- <input id="place-input" type="text" placeholder="Zoek plaats..." />
- <button id="search-btn" type="button">Zoek</button>
- <button id="search-close" type="button" title="Sluiten">✕</button>
- </div>
-</div>
-<div id="prop-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="prop-title">
- <div class="modal-card">
- <h3 id="prop-title">Eigenschappen</h3>
- <div class="form-row">
- <label>Datum</label>
- <input id="pm-date" type="date" />
- </div>
- <div class="form-row">
- <label>Door wie</label>
- <input id="pm-by" type="text" placeholder="Naam" />
- </div>
- <div class="form-row only-hoornaar">
- <label>Aantal</label>
- <input id="pm-amount" type="number" min="1" placeholder="(optioneel)" />
- </div>
- <div class="actions">
- <button id="pm-cancel" class="btn-secondary" type="button">Annuleren</button>
- <button id="pm-save" class="btn-primary" type="button">Opslaan</button>
- </div>
- </div>
-</div>
-<div id="zone-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="zone-title">
- <div class="modal-card">
- <h3 id="zone-title">Kies zone</h3>
- <p style="margin:6px 0 10px;color:var(--muted)">Je hebt meerdere zones. Kies waar dit icoon thuishoort.</p>
- <div id="zone-list" style="display:grid;gap:8px;max-height:45vh;overflow:auto"></div>
- <div class="actions">
- <button id="zm-cancel" class="btn-secondary" type="button">Annuleren</button>
- </div>
- </div>
-</div>
-</body>
+    <!-- Belangrijk: slechts 1 entry-point (type=module) en een consistente versie. -->
+    <script type="module" src="./main.js?v=610r21f17"></script>
+  </body>
 </html>
