@@ -375,4 +375,5 @@ async function adminSave() {
 
         alert('Opgeslagen.');
         adminRefresh();
-
+    }
+}
