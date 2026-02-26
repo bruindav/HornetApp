@@ -5,7 +5,7 @@ import './firebase.js?v=610r21f13';
 import './sync-engine.js?v=610r21f12b';
 
 // ============================================================
-// Hornet Mapper NL — main.js (volledig opgeschoond en hersteld)
+// Hornet Mapper NL — main.js (volledig opgeschoond en hersteld f16)
 // ============================================================
 
 // ------------------------------------------------------------
