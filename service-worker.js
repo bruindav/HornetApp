@@ -1,12 +1,12 @@
-const CACHE='hornet-610r21f15';
+const CACHE='hornet-610r21f17';
 const ASSETS=[
 './',
-'./index.html?v=610r21f15',
-'./main.js?v=610r21f15',
-'./app.css?v=610r21f15',
-'./firebase.js?v=610r21f15',
-'./config.js?v=610r21f15',
-'./manifest.webmanifest?v=610r21f15',
+'./index.html?v=610r21f17',
+'./main.js?v=610r21f17',
+'./app.css?v=610r21f17',
+'./firebase.js?v=610r21f17',
+'./config.js?v=610r21f17',
+'./manifest.webmanifest?v=610r21f17',
 './favicon.ico'
 ];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)))});
