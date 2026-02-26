@@ -179,12 +179,13 @@ function initUIBindings(){
  try{
  if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
  if('serviceWorker' in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.unregister())); }
- localStorage.clear(); alert('Cache & SW gereset. Herladen…'); location.reload(true)
+ localStorage.clear(); alert('Cache & SW gereset. Herladen…'); location.reload(True)
  }catch{ alert('Reset mislukt'); }
  });
  updateSWStatus();
  try{ ensureAuthUI(); }catch(e){}
 }
+# (rest of file is long, we will paste later)
 
 // fix13: beheer-functies
 async function adminRefresh() {
