@@ -2,8 +2,8 @@
 import { getFirestore, collection, getDocs, doc, getDoc, setDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from 'https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js';
 
-import './firebase.js?v=610r21f13';
-import './sync-engine.js?v=610r21f12b';
+import './firebase.js?v=610r21f17';
+import './sync-engine.js?v=610r21f17';
 
 // ------------------------------------------------------------
 // Kleine helpers
