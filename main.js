@@ -396,3 +396,40 @@ async function adminDelete() {
 document.getElementById('admin-refresh')?.addEventListener('click', adminRefresh);
 document.getElementById('adm-save')?.addEventListener('click', adminSave);
 document.getElementById('adm-delete')?.addEventListener('click', adminDelete);
+
+
+// ======= Startup: DOM ready → UI + Map initialiseren =======
+(function startHornetApp() {
+  const start = () => {
+    try {
+      // Auth‐UI alvast injecteren, zodat je knoppen meteen ziet
+      ensureAuthUI();
+
+      // UI‑bindingen (events, toggles enz.)
+      initUIBindings();
+
+      // Kaart tekenen + Geoman toolbars
+      initMap();
+
+      // (optioneel) hier kun je later nog listeners of data‑loads starten
+      // bv. onAuthStateChanged(...) of listenToCloudChanges(...)
+      console.log('[Hornet] main.js is gestart ✅');
+    } catch (e) {
+      console.error('[Hornet] Fout tijdens initialisatie:', e);
+      const sb = document.getElementById('status-bar');
+      if (sb) {
+        const em = document.createElement('span');
+        em.style.color = '#f66';
+        em.textContent = 'Init‑fout: zie console';
+        sb.appendChild(em);
+      }
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start, { once: true });
+  } else {
+    start();
+  }
+})();
+
