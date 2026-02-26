@@ -5,12 +5,8 @@ import './firebase.js?v=610r21f13';
 import './sync-engine.js?v=610r21f12b';
 
 // ============================================================
-// Hornet Mapper NL — main.js (gereconstrueerd en opgeschoond)
+// Hornet Mapper NL — main.js (volledig opgeschoond en hersteld)
 // ============================================================
-
-// Vereist (door index.html alléén app.js te laden):
-// sync-engine.js → firebase.js → config.js
-// Leaflet + Geoman moeten VÓÓR dit bestand geladen zijn.
 
 // ------------------------------------------------------------
 // Kleine helpers
@@ -136,7 +132,6 @@ function initMap() {
     handlesGroup.addTo(map);
     polygonsGroup.addTo(map);
 
-    // Geoman toolbar
     map.pm.addControls({
         position: 'topleft',
         drawMarker: false,
@@ -151,19 +146,15 @@ function initMap() {
         removalMode: true
     });
 
-    // Polygon create
     map.on('pm:create', e => {
         const layer = e.layer;
         if (e.shape === 'Polygon' || e.shape === 'Rectangle') {
             polygonsGroup.addLayer(layer);
             initPolygon(layer);
             persistPolygon(layer);
-        } else {
-            layer.remove();
-        }
+        } else layer.remove();
     });
 
-    // Context menus
     let drawing = false;
 
     map.on('pm:drawstart', () => drawing = true);
@@ -172,16 +163,48 @@ function initMap() {
     map.on('click', e => {
         if (shouldDebounce()) return;
         if (drawing) return;
-
         openMapContextMenu(e.latlng, e.originalEvent?.clientX || 0, e.originalEvent?.clientY || 0);
     });
 
     map.on('contextmenu', e => {
         if (shouldDebounce()) return;
         if (drawing) return;
-
         openMapContextMenu(e.latlng, e.originalEvent?.clientX || 0, e.originalEvent?.clientY || 0);
     });
+}
+
+// ------------------------------------------------------------
+// Zoekfunctie (ontbrak en veroorzaakte app-crash)
+// ------------------------------------------------------------
+async function searchPlaceNL() {
+    try {
+        const place = document.getElementById('place-input')?.value?.trim();
+        if (!place) return;
+
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(place)}&limit=1`;
+        const res = await fetch(url);
+        const json = await res.json();
+
+        if (!json.features || !json.features.length) {
+            alert('Geen resultaat gevonden');
+            return;
+        }
+
+        const coords = json.features[0].geometry.coordinates;
+        const latlng = [coords[1], coords[0]];
+
+        map.setView(latlng, 14);
+
+        const overlay = document.getElementById('search-overlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.setAttribute('aria-hidden', 'true');
+        }
+
+    } catch (e) {
+        console.error('[searchPlaceNL]', e);
+        alert('Zoekfout');
+    }
 }
 
 // ------------------------------------------------------------
@@ -189,7 +212,6 @@ function initMap() {
 // ------------------------------------------------------------
 function initUIBindings() {
 
-    // Sidebar toggle
     const backdrop = req('sidebar-backdrop');
 
     function setSidebar(open) {
@@ -205,21 +227,18 @@ function initUIBindings() {
     }
 
     on(req('toggle-sidebar'), 'click', () => {
-        const willOpen = document.body.classList.contains('sidebar-collapsed');
-        setSidebar(!willOpen);
+        const collapsed = document.body.classList.contains('sidebar-collapsed');
+        setSidebar(collapsed);
     });
 
     on(backdrop, 'click', () => setSidebar(false));
 
-    // Mobile default collapsed
     if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
 
-    // Hard debounce
     on(req('hard-debounce'), 'change', e => {
         DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
     });
 
-    // Zoek overlay
     const floatingSearchBtn = req('floating-search-btn');
     const searchOverlay = req('search-overlay');
     const searchClose = req('search-close');
@@ -242,7 +261,6 @@ function initUIBindings() {
     on(placeInput, 'keydown', e => { if (e.key === 'Enter') searchPlaceNL(); });
     on(searchBtn, 'click', searchPlaceNL);
 
-    // Filters
     on(req('apply-filters'), 'click', applyFilters);
 
     on(req('reset-filters'), 'click', () => {
@@ -253,7 +271,6 @@ function initUIBindings() {
         applyFilters();
     });
 
-    // Zelftest
     on(req('btn-selftest'), 'click', async () => {
         try { await geocodePhoton('Utrecht'); setStatus(statusGeo, 'Photon OK', 'ok'); }
         catch { setStatus(statusGeo, 'Photon NOK', 'err'); }
@@ -261,10 +278,9 @@ function initUIBindings() {
         const key = $('mapsco-key')?.value?.trim() || '';
 
         try { await geocodeMapsCo('Utrecht', key); setStatus(statusGeo, 'Maps.co OK', 'ok'); }
-       catch { setStatus(statusGeo, 'Maps.co NOK', 'err'); }
+        catch { setStatus(statusGeo, 'Maps.co NOK', 'err'); }
     });
 
-    // Cache reset
     on(req('btn-reset-cache'), 'click', async () => {
         try {
             if ('caches' in window) {
@@ -279,7 +295,6 @@ function initUIBindings() {
             localStorage.clear();
             alert('Cache & SW gereset. Herladen…');
             location.reload(true);
-
         } catch {
             alert('Reset mislukt');
         }
@@ -291,7 +306,7 @@ function initUIBindings() {
 }
 
 // ------------------------------------------------------------
-// ADMIN functies
+// Admin functies
 // ------------------------------------------------------------
 async function adminRefresh() {
     try {
@@ -303,8 +318,8 @@ async function adminRefresh() {
 
         const db = getFirestore();
         const snap = await getDocs(collection(db, 'roles'));
-
         const items = [];
+
         snap.forEach(d => {
             const data = d.data() || {};
             items.push({
@@ -315,18 +330,15 @@ async function adminRefresh() {
         });
 
         const list = document.getElementById('admin-list');
-
-        if (list)
-            list.innerHTML =
-                items.length ?
-                    items.map(it => `
+        list.innerHTML = items.length
+            ? items.map(it => `
 <div class="adm-row" data-uid="${it.uid}" style="padding:6px;border-bottom:1px solid var(--border2);cursor:pointer">
 <b>${it.uid}</b><br>
 rol: ${it.rol} — gebieden: ${(it.gebieden || []).join(', ') || '-'}
 </div>`).join('')
-                    : '<i>Geen rollen gevonden.</i>';
+            : '<i>Geen rollen gevonden.</i>';
 
-        list?.querySelectorAll('.adm-row').forEach(row => {
+        list.querySelectorAll('.adm-row').forEach(row => {
             row.addEventListener('click', async () => {
                 const uid = row.dataset.uid;
                 const ref = doc(getFirestore(), 'roles', uid);
@@ -335,7 +347,6 @@ rol: ${it.rol} — gebieden: ${(it.gebieden || []).join(', ') || '-'}
 
                 document.getElementById('adm-uid').value = uid;
                 document.getElementById('adm-rol').value = d.rol || 'vrijwilliger';
-
                 document.querySelectorAll('.adm-area').forEach(cb => {
                     cb.checked = Array.isArray(d.gebieden) ? d.gebieden.includes(cb.value) : false;
                 });
@@ -364,72 +375,4 @@ async function adminSave() {
 
         alert('Opgeslagen.');
         adminRefresh();
-
-    } catch (e) {
-        console.error('[adminSave]', e);
-        alert('Opslaan mislukt.');
-    }
-}
-
-async function adminDelete() {
-    try {
-        if (!(CURRENT_ROLE === 'admin' || CURRENT_ROLE === 'beheerder')) return;
-
-        const uid = document.getElementById('adm-uid').value.trim();
-        if (!uid) { alert('Vul een UID in.'); return; }
-
-        if (!confirm('Weet je zeker dat je deze rol wilt verwijderen?')) return;
-
-        await deleteDoc(doc(getFirestore(), 'roles', uid));
-
-        alert('Verwijderd.');
-        document.getElementById('adm-uid').value = '';
-        adminRefresh();
-
-    } catch (e) {
-        console.error('[adminDelete]', e);
-        alert('Verwijderen mislukt.');
-    }
-}
-
-// knop-bindingen
-document.getElementById('admin-refresh')?.addEventListener('click', adminRefresh);
-document.getElementById('adm-save')?.addEventListener('click', adminSave);
-document.getElementById('adm-delete')?.addEventListener('click', adminDelete);
-
-
-// ======= Startup: DOM ready → UI + Map initialiseren =======
-(function startHornetApp() {
-  const start = () => {
-    try {
-      // Auth‐UI alvast injecteren, zodat je knoppen meteen ziet
-      ensureAuthUI();
-
-      // UI‑bindingen (events, toggles enz.)
-      initUIBindings();
-
-      // Kaart tekenen + Geoman toolbars
-      initMap();
-
-      // (optioneel) hier kun je later nog listeners of data‑loads starten
-      // bv. onAuthStateChanged(...) of listenToCloudChanges(...)
-      console.log('[Hornet] main.js is gestart ✅');
-    } catch (e) {
-      console.error('[Hornet] Fout tijdens initialisatie:', e);
-      const sb = document.getElementById('status-bar');
-      if (sb) {
-        const em = document.createElement('span');
-        em.style.color = '#f66';
-        em.textContent = 'Init‑fout: zie console';
-        sb.appendChild(em);
-      }
-    }
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', start, { once: true });
-  } else {
-    start();
-  }
-})();
 
