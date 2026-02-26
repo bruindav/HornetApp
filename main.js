@@ -185,7 +185,6 @@ function initUIBindings(){
  updateSWStatus();
  try{ ensureAuthUI(); }catch(e){}
 }
-# (rest of file is long, we will paste later)
 
 // fix13: beheer-functies
 async function adminRefresh() {
