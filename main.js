@@ -1,5 +1,5 @@
 // HornetApp main entry
-<script type="module" src="./main.js?v=610r21f17"></script>
+
 if (window.__hornetStarted) console.warn('startHornetApp: tweede start gedetecteerd – skip');
 else window.__hornetStarted = true;
 
