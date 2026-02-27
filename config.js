@@ -2,7 +2,7 @@
 // Vervang onderstaande placeholders met je echte Firebase config
 export const firebaseConfig = {
   apiKey: "AIzaSyCgRWejn5vrpFB9znGxte7a_sFWRp-xeYk",
-  authDomain: "hornet-mapper.firebaseapp.com",
+  authDomain: "hornetapp.davedebruin123-75f.workers.dev",
   projectId: "hornet-mapper",
   storageBucket: "hornet-mapper.firebasestorage.app",
   messagingSenderId: "533861029631",
