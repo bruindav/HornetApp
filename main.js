@@ -1,55 +1,51 @@
-// HornetApp main entry
 
-if (window.__hornetStarted) console.warn('startHornetApp: tweede start gedetecteerd – skip');
-else window.__hornetStarted = true;
-
-import './config.js';
+// Auth-gated bootstrap
 import { auth } from './firebase.js';
-import { openMapContextMenu } from './sync-engine.js';
-import { getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { onAuthStateChanged, getRedirectResult, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-getRedirectResult(auth).then(result => {
-  if (result?.user) {
-    console.log('Redirect login OK:', result.user);
-    alert('Succesvol ingelogd!');
-  }
-}).catch(console.error);
-
-window.addEventListener('DOMContentLoaded', () => { startHornetApp(); }, { once:true });
-
-let map;
-export function startHornetApp(){ initMap(); bindUi(); }
-
-function initMap(){
-  if(map && map.remove) map.remove();
-  const el=document.getElementById('map');
-  if(el && el._leaflet_id) el._leaflet_id=null;
-  if(!window.L){ console.warn('Leaflet niet geladen'); return; }
-  map=L.map('map',{center:[52.0907,5.1214],zoom:12});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
-  bindMapEvents(map);
+// UI helpers: show/hide containers
+function showLogin(){
+  document.getElementById('login-screen')?.classList.remove('hidden');
+  document.getElementById('app-shell')?.classList.add('hidden');
+}
+function showApp(){
+  document.getElementById('login-screen')?.classList.add('hidden');
+  document.getElementById('app-shell')?.classList.remove('hidden');
 }
 
-function bindMapEvents(map){
-  const handler=e=>{
-    const x=e.originalEvent?.clientX ?? e.clientX ?? 0;
-    const y=e.originalEvent?.clientY ?? e.clientY ?? 0;
-    openMapContextMenu?.(e.latlng,x,y);
-  };
-  map.on('click',handler);
-  map.on('contextmenu',handler);
+// header helpers
+function renderHeader(user){
+  const who = document.getElementById('hdr-user');
+  if (who) who.textContent = user?.displayName || user?.email || user?.uid || 'Onbekend';
 }
 
-function bindUi(){
-  document.getElementById('loginBtn')?.addEventListener('click', onLogin);
-  document.getElementById('addUserBtn')?.addEventListener('click', onAddUser);
+async function startAppOnce(){
+  if (window.__hornetAppBooted) return;
+  window.__hornetAppBooted = true;
+  const mod = await import('./app-core.js');
+  mod.boot();
 }
 
-async function onLogin(){
-  try{
+// Bind login / logout buttons
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('loginBtn')?.addEventListener('click', async () => {
     const { loginWithGoogle } = await import('./firebase.js');
     await loginWithGoogle();
-  }catch(err){ console.error(err); alert('Login mislukt: '+(err?.message||err)); }
-}
+  });
+  document.getElementById('logoutBtn')?.addEventListener('click', () => signOut(auth));
+});
 
-async function onAddUser(){ alert('User toegevoegd (voorbeeld)'); }
+// Handle redirect result for info only
+getRedirectResult(auth).catch(console.error);
+
+// Auth state gate
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    showApp();
+    renderHeader(user);
+    startAppOnce();
+  } else {
+    showLogin();
+    window.__hornetAppBooted = false; // user switched – require fresh boot after login
+  }
+});
