@@ -9,29 +9,28 @@
     <link rel="icon" href="./favicon.ico" />
     <link rel="stylesheet" href="./app.css" />
 
-    <!-- Leaflet CSS -->
+    <!-- Leaflet CSS (GEEN integrity!) -->
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha512-mB8H6Q8vS2H1vV6zkRgZNpmjQe7YQDdyCjTiMQuuLHfoalGoVYLRNvKcJsteVEhDWUpAJZKkd06P88GJEYJTbQ=="
       crossorigin=""
     />
 
-    <!-- Leaflet JS -->
+    <!-- Leaflet JS (GEEN integrity!) -->
     <script
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      integrity="sha512-vuZ6xZ9E9QnUnxE27XGr0C+MEY0S8mV+4CSkiqhSSjMBDlNIQP5CKEM5Qn2ATmNnS/xPbbGr3HdWu3UwG4hXhQ=="
       crossorigin=""
     ></script>
+
   </head>
 
   <body>
     <div id="app">
-      <header><h1>HornetApp</h1></header>
-
+      <header>
+        <h1>HornetApp</h1>
+      </header>
       <main>
         <div id="map" style="height:60vh; background:#ddd"></div>
-
         <div style="margin-top:1rem">
           <button id="loginBtn">Inloggen</button>
           <button id="addUserBtn">Nieuwe user toevoegen</button>
@@ -39,7 +38,7 @@
       </main>
     </div>
 
-    <!-- hoofd-entrypoint -->
+    <!-- Hoofd-module -->
     <script type="module" src="./main.js?v=610r21f17"></script>
   </body>
 </html>
