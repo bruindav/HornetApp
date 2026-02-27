@@ -12,6 +12,16 @@ import './config.js';
 import './firebase.js';
 import { openMapContextMenu } from './sync-engine.js';
 
+import { getRedirectResult } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { auth } from './firebase.js';
+
+getRedirectResult(auth).then(result => {
+  if (result?.user) {
+    console.log("Redirect login OK:", result.user);
+    alert("Succesvol ingelogd!");
+  }
+}).catch(console.error);
+
 window.addEventListener('DOMContentLoaded', () => {
   startHornetApp();
 }, { once: true });
