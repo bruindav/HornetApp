@@ -4,7 +4,7 @@ import {
   getAuth,
   GoogleAuthProvider,
   signInWithRedirect
-} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.mjs';
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 import { firebaseConfig } from './config.js';
 
