@@ -10,5 +10,5 @@ export const auth = getAuth(app);
 
 export async function loginWithGoogle() {
   const provider = new GoogleAuthProvider();
-  return signInWithPopup(auth, provider);
+  return signInWithRedirect(auth, provider);
 }
