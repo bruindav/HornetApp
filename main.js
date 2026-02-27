@@ -5,7 +5,7 @@ else window.__hornetStarted = true;
 import './config.js';
 import { auth } from './firebase.js';
 import { openMapContextMenu } from './sync-engine.js';
-import { getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.mjs';
+import { getRedirectResult } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 getRedirectResult(auth).then(result => {
   if (result?.user) {
