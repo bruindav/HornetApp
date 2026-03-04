@@ -1,8 +1,7 @@
-
-// Vervang onderstaande placeholders met je echte Firebase config
+// Fix 3 — authDomain terug naar origineel (Cloudflare hosting)
 export const firebaseConfig = {
   apiKey: "AIzaSyCgRWejn5vrpFB9znGxte7a_sFWRp-xeYk",
-  authDomain: "hornetapp.davedebruin123-75f.workers.dev",
+  authDomain: "hornet-mapper.firebaseapp.com",
   projectId: "hornet-mapper",
   storageBucket: "hornet-mapper.firebasestorage.app",
   messagingSenderId: "533861029631",
