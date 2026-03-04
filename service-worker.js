@@ -1,5 +1,5 @@
-
-const CACHE = 'hornet-v610r21f17';
+// Fix 5 — cache versie verhoogd om oude app-core.js te wissen
+const CACHE = 'hornet-v5';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -10,7 +10,6 @@ self.addEventListener('install', (event) => {
       '/app.css',
       '/favicon.ico',
       '/manifest.webmanifest',
-      // bewust geen main.js hier, zodat we geen oude versie pinnen
     ]))
   );
 });
@@ -27,7 +26,6 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
 
   if (req.destination === 'script') {
-    // network-first voor scripts (zoals main.js)
     event.respondWith((async () => {
       try {
         const fresh = await fetch(req);
@@ -41,7 +39,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // default: cache-first
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);
