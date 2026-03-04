@@ -387,7 +387,7 @@ const toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
 function bearingBetween(a,b){
   const phi1=toRad(a.lat),phi2=toRad(b.lat), dlam=toRad(b.lng-a.lng);
   const y=Math.sin(dlam)*Math.cos(phi2);
-  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam));
+  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam);
   const theta=Math.atan2(y,x); return (toDeg(theta)+360)%360;
 }
 function destinationPoint(start,distance,bearingDeg){
