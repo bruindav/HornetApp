@@ -1,34 +1,117 @@
+// sync-engine.js — Fix 7 — Firestore sync voor HornetApp
+// Verzorgt alle lees/schrijf/luister operaties naar Firestore
+// Pad structuur: /maps/{year}/{group}/data/{collection}/{docId}
 
-// Exporteer het contextmenu zodat main.js het kan importeren
-export function openMapContextMenu(latlng, clientX, clientY) {
-  // Eenvoudig demo-menu
-  const id = 'mapContextMenu';
-  let menu = document.getElementById(id);
-  if (!menu) {
-    menu = document.createElement('div');
-    menu.id = id;
-    Object.assign(menu.style, {
-      position: 'fixed',
-      zIndex: 9999,
-      background: '#fff',
-      border: '1px solid #ccc',
-      borderRadius: '4px',
-      boxShadow: '0 2px 8px rgba(0,0,0,.15)',
-      padding: '8px 12px',
-      fontFamily: 'system-ui, Arial, sans-serif',
-      fontSize: '14px'
+import { app } from './firebase.js';
+import {
+  getFirestore,
+  collection, doc,
+  setDoc, deleteDoc,
+  onSnapshot,
+  query
+} from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const db = getFirestore(app);
+
+// Huidige scope
+let _year = String(new Date().getFullYear());
+let _group = 'Hoornaar_Zeist';
+let _base = '';
+
+// Actieve Firestore listeners (zodat we ze kunnen stoppen bij scope wissel)
+let _unsubscribers = [];
+
+// ======================= Scope =======================
+export function setActiveScope(year, group) {
+  _year = year;
+  _group = group;
+  _base = `maps/${year}/${group}/data`;
+  // Stop bestaande listeners
+  _unsubscribers.forEach(fn => { try { fn(); } catch {} });
+  _unsubscribers = [];
+  return { base: _base };
+}
+
+// ======================= Realtime listeners =======================
+export function listenToCloudChanges({
+  onMarkerUpdate, onMarkerDelete,
+  onLineUpdate,   onLineDelete,
+  onSectorUpdate, onSectorDelete,
+  onPolygonUpdate, onPolygonDelete
+}) {
+  // Stop bestaande listeners eerst
+  _unsubscribers.forEach(fn => { try { fn(); } catch {} });
+  _unsubscribers = [];
+
+  function listen(colName, onUpdate, onDelete) {
+    const colRef = collection(db, _base, colName);
+    const unsub = onSnapshot(query(colRef), (snap) => {
+      snap.docChanges().forEach(change => {
+        if (change.type === 'added' || change.type === 'modified') {
+          onUpdate && onUpdate({ id: change.doc.id, ...change.doc.data() });
+        } else if (change.type === 'removed') {
+          onDelete && onDelete(change.doc.id);
+        }
+      });
+    }, (err) => {
+      console.warn(`[sync] listener fout op ${colName}:`, err.message);
     });
-    document.body.appendChild(menu);
+    _unsubscribers.push(unsub);
   }
-  menu.innerHTML = '';
-  const title = document.createElement('div');
-  title.textContent = `Kaartpositie: ${latlng?.lat?.toFixed(5)}, ${latlng?.lng?.toFixed(5)}`;
-  const close = document.createElement('button');
-  close.textContent = 'Sluiten';
-  close.onclick = () => menu.remove();
-  menu.appendChild(title);
-  menu.appendChild(document.createElement('hr'));
-  menu.appendChild(close);
-  menu.style.left = `${clientX}px`;
-  menu.style.top = `${clientY}px`;
+
+  listen('markers',  onMarkerUpdate,  onMarkerDelete);
+  listen('lines',    onLineUpdate,    onLineDelete);
+  listen('sectors',  onSectorUpdate,  onSectorDelete);
+  listen('polygons', onPolygonUpdate, onPolygonDelete);
+}
+
+// ======================= Schrijf helpers =======================
+async function saveDoc(colName, id, data) {
+  try {
+    const ref = doc(db, _base, colName, id);
+    await setDoc(ref, data, { merge: true });
+  } catch (err) {
+    console.error(`[sync] saveDoc ${colName}/${id} mislukt:`, err.message);
+  }
+}
+
+async function deleteDocument(colName, id) {
+  try {
+    const ref = doc(db, _base, colName, id);
+    await deleteDoc(ref);
+  } catch (err) {
+    console.error(`[sync] deleteDoc ${colName}/${id} mislukt:`, err.message);
+  }
+}
+
+// ======================= Markers =======================
+export function saveMarkerToCloud(docData) {
+  return saveDoc('markers', docData.id, docData);
+}
+export function deleteMarkerFromCloud(id) {
+  return deleteDocument('markers', id);
+}
+
+// ======================= Lines =======================
+export function saveLineToCloud(docData) {
+  return saveDoc('lines', docData.id, docData);
+}
+export function deleteLineFromCloud(id) {
+  return deleteDocument('lines', id);
+}
+
+// ======================= Sectors =======================
+export function saveSectorToCloud(docData) {
+  return saveDoc('sectors', docData.id, docData);
+}
+export function deleteSectorFromCloud(id) {
+  return deleteDocument('sectors', id);
+}
+
+// ======================= Polygons =======================
+export function savePolygonToCloud(docData) {
+  return saveDoc('polygons', docData.id, docData);
+}
+export function deletePolygonFromCloud(id) {
+  return deleteDocument('polygons', id);
 }
