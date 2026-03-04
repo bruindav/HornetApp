@@ -1,11 +1,5 @@
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
-// ----------------------------------------------------------------------------
-// Vereist (door index.html alléén app.js te laden):
-// ./sync-engine.js → importeert ./firebase.js → importeert ./config.js
-// Leaflet + Geoman (globaal L) moeten vóór app.js geladen zijn.
-// 
-// Belangrijk: alle DOM‑bindingen pas NA DOMContentLoaded.
-// 
+// Fix 4 — syntax fix bearingBetween (ontbrekende haakjes)
 // ----------------------------------------------------------------------------
 import {
   setActiveScope,
@@ -46,7 +40,7 @@ function updateSWStatus(){
 const SOFT_MS=150, HARD_MS=300; let DEBOUNCE_MS=SOFT_MS;
 const shouldDebounce = debounceEventGate(()=>DEBOUNCE_MS);
 // ======================= Map & Layers =======================
-let map; // maak globaal voor jouw tests (typeof map === "object")
+let map;
 const markersGroup = L.featureGroup();
 const linesGroup = L.featureGroup();
 const circlesGroup = L.featureGroup();
@@ -63,14 +57,12 @@ function initMap(){
   circlesGroup.addTo(map);
   handlesGroup.addTo(map);
   polygonsGroup.addTo(map);
-  // Geoman toolbar
   map.pm.addControls({
     position:'topleft',
     drawMarker:false, drawPolyline:false, drawRectangle:true, drawPolygon:true,
     drawCircle:false, drawCircleMarker:false,
     editMode:true, dragMode:true, cutPolygon:false, removalMode:true
   });
-  // Create polygonen → initialiseren + opslaan naar cloud
   map.on('pm:create', (e)=>{
     const layer=e.layer;
     if(e.shape==='Polygon' || e.shape==='Rectangle'){
@@ -81,7 +73,6 @@ function initMap(){
       layer.remove();
     }
   });
-  // Kaart‑click/contextmenu → nieuw‑icoon menu (alleen wanneer niet aan het tekenen)
   let drawing=false;
   map.on('pm:drawstart',()=>drawing=true);
   map.on('pm:drawend', ()=>drawing=false);
@@ -96,7 +87,7 @@ function initMap(){
     openMapContextMenu(e.latlng, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
 }
-// ======================= UI‑bindingen =======================
+// ======================= UI-bindingen =======================
 function updateHeaderHeightVar(){
   try{
     const h = document.querySelector('header')?.offsetHeight || 58;
@@ -104,7 +95,6 @@ function updateHeaderHeightVar(){
   }catch{}
 }
 function initUIBindings(){
-  // Sidebar toggle + mobiel backdrop
   const backdrop = req('sidebar-backdrop');
   const sidebarEl = document.querySelector('.sidebar');
   try{ sidebarEl && sidebarEl.addEventListener('transitionend', (e)=>{ if(e.propertyName==='transform'){ try{ map?.invalidateSize(); }catch{} } }); }catch{}
@@ -112,22 +102,17 @@ function initUIBindings(){
     document.body.classList.toggle('sidebar-collapsed', !open);
     document.body.classList.toggle('sidebar-open', !!open);
     if(backdrop){ if(open){ backdrop.style.display='block'; backdrop.removeAttribute('hidden'); } else { backdrop.style.display='none'; backdrop.setAttribute('hidden',''); } }
-    // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
   }
   on(req('toggle-sidebar'), 'click', ()=>{
     const willOpen = document.body.classList.contains('sidebar-collapsed');
-    setSidebar(willOpen); // als dicht → open; als open → dicht
+    setSidebar(willOpen);
   });
   on(backdrop, 'click', ()=> setSidebar(false));
-  // Init: op mobiel standaard dicht
   if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
-
-  // Harde debounce
   on(req('hard-debounce'),'change', e=>{
     DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
   });
-  // 🔍 Zoek overlay
   const floatingSearchBtn = req('floating-search-btn');
   const searchOverlay = req('search-overlay');
   const searchClose = req('search-close');
@@ -146,7 +131,6 @@ function initUIBindings(){
   });
   on(placeInput, 'keydown', (e)=>{ if(e.key==='Enter') searchPlaceNL(); });
   on(searchBtn, 'click', searchPlaceNL);
-  // Filters
   on(req('apply-filters'), 'click', applyFilters);
   on(req('reset-filters'), 'click', ()=>{
     ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending']
@@ -154,13 +138,11 @@ function initUIBindings(){
     const fdb = $('f_date_before'); if (fdb) fdb.value = '';
     applyFilters();
   });
-  // Zelftest
   on(req('btn-selftest'), 'click', async()=>{
     try{ await geocodePhoton('Utrecht'); setStatus(statusGeo,'Photon OK','ok'); }catch{ setStatus(statusGeo,'Photon NOK','err'); }
     const key = $('mapsco-key')?.value?.trim() || '';
     try{ await geocodeMapsCo('Utrecht', key); setStatus(statusGeo,'Maps.co OK','ok'); }catch{ setStatus(statusGeo,'Maps.co NOK','err'); }
   });
-  // Cache reset
   on(req('btn-reset-cache'), 'click', async()=>{
     try{
       if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
@@ -405,7 +387,7 @@ const toRad=d=>d*Math.PI/180, toDeg=r=>r*180/Math.PI;
 function bearingBetween(a,b){
   const phi1=toRad(a.lat),phi2=toRad(b.lat), dlam=toRad(b.lng-a.lng);
   const y=Math.sin(dlam)*Math.cos(phi2);
-  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam;
+  const x=Math.cos(phi1)*Math.sin(phi2)-Math.sin(phi1)*Math.cos(phi2)*Math.cos(dlam));
   const theta=Math.atan2(y,x); return (toDeg(theta)+360)%360;
 }
 function destinationPoint(start,distance,bearingDeg){
@@ -655,7 +637,6 @@ function applyFilters(){
 }
 // ======================= Cloud → kaart (realtime) =======================
 function upsertMarkerFromCloud(doc){
-  // zoek bestaande marker
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
     m = L.marker([doc.lat, doc.lng], { icon: (()=>{
@@ -735,7 +716,7 @@ function deletePolygonFromCloudLocal(id){
   if(p){ polygonsGroup.removeLayer(p); }
 }
 // ======================= Scope & opstart =======================
-const LS_SCOPE = "hornet_scope_v610"; // {year, group}
+const LS_SCOPE = "hornet_scope_v610";
 const DEFAULT_YEAR = String(new Date().getFullYear());
 const DEFAULT_GROUP = "Hoornaar_Zeist";
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
@@ -743,7 +724,6 @@ function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify(
 function activateScope(year, group, reload=false){
   const { base } = setActiveScope(year, group);
   writeScope(year, group);
-  // Realtime listeners
   listenToCloudChanges({
     onMarkerUpdate: upsertMarkerFromCloud,
     onMarkerDelete: deleteMarkerFromCloudLocal,
@@ -760,7 +740,7 @@ function activateScope(year, group, reload=false){
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
 }
-// ======================= DOMContentLoaded: alles starten =======================
+// ======================= Boot =======================
 function boot(){
   initMap();
   initUIBindings();
