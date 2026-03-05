@@ -1,6 +1,6 @@
 // Fix 13 — drie rollen: admin, manager, volunteer
 // Datastructuur roles/{uid}:
-//   role: 'admin' | 'manager' | 'volunteer'
+//   role: 'admin' | 'gebiedcoordinator' | 'volunteer'
 //   zones: ['Zeist', 'Bilthoven']   ← toegewezen gebieden (voor manager en volunteer)
 //
 // Polygonen/{docId} bevatten:
@@ -18,13 +18,13 @@ service cloud.firestore {
     function userZones()   { return roleDoc().data.zones; }
 
     function isAdmin()     { return isSignedIn() && userRole() == 'admin'; }
-    function isManager()   { return isSignedIn() && userRole() == 'manager'; }
+    function isGebiedcoordinator()   { return isSignedIn() && userRole() == 'gebiedcoordinator'; }
     function isVolunteer() { return isSignedIn() && userRole() == 'volunteer'; }
 
     // Mag schrijven in dit gebied (group = bv. 'Zeist')?
     function canWriteInGroup(group) {
       return isAdmin()
-          || ( (isManager() || isVolunteer()) && group in userZones() );
+          || ( (isGebiedcoordinator() || isVolunteer()) && group in userZones() );
     }
 
     // ── Markers, lijnen, sectoren ─────────────────────────────────
@@ -48,7 +48,7 @@ service cloud.firestore {
     // Manager: aanmaken altijd, wijzigen/verwijderen alleen eigen polygonen
     match /maps/{year}/{group}/data/polygons/{docId} {
       allow read: if true;
-      allow create: if isAdmin() || isManager();
+      allow create: if isAdmin() || isGebiedcoordinator();
       allow update, delete:
         if isAdmin()
         || ( isManager() && resource.data.createdBy == uid() );
