@@ -1,4 +1,4 @@
-<!-- index.html — Fix 17 — pending wachtscherm toegevoegd -->
+<!-- index.html — Fix 19 — form tags voor wachtwoord inputs -->
 <!DOCTYPE html>
 <html lang="nl">
   <head>
@@ -294,6 +294,7 @@
 
         <!-- Inloggen tab -->
         <div id="tab-login" class="tab-panel active">
+          <form onsubmit="return false">
           <div class="form-group">
             <label>E-mailadres</label>
             <input type="email" id="login-email" placeholder="naam@voorbeeld.nl" autocomplete="email"/>
@@ -303,6 +304,7 @@
             <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
           </div>
           <button class="btn-primary" id="loginEmailBtn">Inloggen</button>
+          </form>
           <div class="divider">of</div>
           <button class="btn-google" id="loginGoogleBtn">
             <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5L31.8 34C29.9 35.3 27.1 36 24 36c-5.3 0-9.6-2.9-11.3-7.1l-6.6 4.8C9.6 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l5.7 5c3.6-3.1 6.8-8 6.8-15 0-1.3-.1-2.7-.1-4z"/></svg>
@@ -312,6 +314,7 @@
 
         <!-- Registreren tab -->
         <div id="tab-register" class="tab-panel">
+          <form onsubmit="return false">
           <div class="form-group">
             <label>Naam</label>
             <input type="text" id="reg-name" placeholder="Jan de Vries" autocomplete="name"/>
@@ -325,6 +328,7 @@
             <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password"/>
           </div>
           <button class="btn-primary" id="registerBtn">Account aanmaken</button>
+          </form>
           <div class="divider">of</div>
           <button class="btn-google" id="registerGoogleBtn">
             <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5L31.8 34C29.9 35.3 27.1 36 24 36c-5.3 0-9.6-2.9-11.3-7.1l-6.6 4.8C9.6 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l5.7 5c3.6-3.1 6.8-8 6.8-15 0-1.3-.1-2.7-.1-4z"/></svg>
@@ -465,6 +469,6 @@
       });
     </script>
 
-    <script type="module" src="./main.js?v=fix17"></script>
+    <script type="module" src="./main.js?v=fix19"></script>
   </body>
 </html>

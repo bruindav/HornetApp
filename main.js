@@ -1,4 +1,4 @@
-// main.js — Fix 17 — pending gebruikers krijgen wachtscherm, geen kaart
+// main.js — Fix 19 — rolcheck VOOR app boot, geen Firestore toegang voor pending
 import { auth, loginWithGoogle, loginWithEmail, registerWithEmail } from './firebase.js';
 import { onAuthStateChanged, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -29,9 +29,9 @@ function showAuthError(msg) {
 }
 
 function showScreen(id) {
-  ['login-screen','pending-screen','app-shell'].forEach(s => {
-    document.getElementById(s)?.classList.toggle('hidden', s !== id);
-  });
+  ['login-screen', 'pending-screen', 'app-shell'].forEach(s =>
+    document.getElementById(s)?.classList.toggle('hidden', s !== id)
+  );
 }
 
 function renderHeader(user) {
@@ -62,21 +62,26 @@ async function renderAdminLink(uid) {
   } catch {}
 }
 
-async function autoRegisterUser(user) {
+// Geeft de rol terug én registreert als pending als nog onbekend
+async function fetchOrRegisterRole(user) {
+  const ref = doc(db, 'roles', user.uid);
   try {
-    const ref = doc(db, 'roles', user.uid);
     const snap = await getDoc(ref);
-    if (!snap.exists()) {
-      await setDoc(ref, {
-        role: 'pending',
-        zones: [],
-        displayName: user.displayName || '',
-        email: user.email || '',
-        registeredAt: new Date().toISOString()
-      });
+    if (snap.exists()) {
+      return snap.data().role || 'pending';
     }
+    // Eerste login — aanmaken als pending
+    await setDoc(ref, {
+      role: 'pending',
+      zones: [],
+      displayName: user.displayName || '',
+      email: user.email || '',
+      registeredAt: new Date().toISOString()
+    });
+    return 'pending';
   } catch (e) {
-    console.warn('[auth] auto-register mislukt:', e.message);
+    console.warn('[auth] rolcheck mislukt:', e.message);
+    return 'pending'; // veilig terugvallen
   }
 }
 
@@ -148,26 +153,21 @@ onAuthStateChanged(auth, async (user) => {
     return;
   }
 
-  // Registreer als pending als nog niet bekend
-  await autoRegisterUser(user);
+  // Stap 1: rol ophalen (of aanmaken als pending) — VOOR alles
+  const role = await fetchOrRegisterRole(user);
 
-  // Controleer rol
-  let role = 'pending';
-  try {
-    const snap = await getDoc(doc(db, 'roles', user.uid));
-    role = snap.data()?.role || 'pending';
-  } catch {}
-
+  // Stap 2: juiste scherm tonen op basis van rol
   if (role === 'pending') {
-    // Wachtscherm tonen — geen toegang tot kaart
     showScreen('pending-screen');
     const nameEl = document.getElementById('pending-name');
     if (nameEl) nameEl.textContent = user.displayName || user.email || 'Gebruiker';
-  } else {
-    // Toegang tot app
-    showScreen('app-shell');
-    renderHeader(user);
-    await renderAdminLink(user.uid);
-    startAppOnce();
+    // STOP HIER — geen app-core laden, geen Firestore listeners
+    return;
   }
+
+  // Stap 3: alleen voor goedgekeurde gebruikers de app starten
+  showScreen('app-shell');
+  renderHeader(user);
+  await renderAdminLink(user.uid);
+  startAppOnce(); // laadt app-core.js en Firestore listeners
 });
