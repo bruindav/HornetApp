@@ -1,6 +1,5 @@
-// sync-engine.js — Fix 7 — Firestore sync voor HornetApp
-// Verzorgt alle lees/schrijf/luister operaties naar Firestore
-// Pad structuur: /maps/{year}/{group}/data/{collection}/{docId}
+// sync-engine.js — Fix 12
+// Firestore sync voor HornetApp
 
 import { app } from './firebase.js';
 import {
@@ -13,20 +12,16 @@ import {
 
 const db = getFirestore(app);
 
-// Huidige scope
-let _year = String(new Date().getFullYear());
+let _year  = String(new Date().getFullYear());
 let _group = 'Hoornaar_Zeist';
-let _base = '';
-
-// Actieve Firestore listeners (zodat we ze kunnen stoppen bij scope wissel)
+let _base  = '';
 let _unsubscribers = [];
 
 // ======================= Scope =======================
 export function setActiveScope(year, group) {
-  _year = year;
+  _year  = year;
   _group = group;
-  _base = `maps/${year}/${group}/data`;
-  // Stop bestaande listeners
+  _base  = `maps/${year}/${group}/data`;
   _unsubscribers.forEach(fn => { try { fn(); } catch {} });
   _unsubscribers = [];
   return { base: _base };
@@ -34,12 +29,11 @@ export function setActiveScope(year, group) {
 
 // ======================= Realtime listeners =======================
 export function listenToCloudChanges({
-  onMarkerUpdate, onMarkerDelete,
-  onLineUpdate,   onLineDelete,
-  onSectorUpdate, onSectorDelete,
+  onMarkerUpdate,  onMarkerDelete,
+  onLineUpdate,    onLineDelete,
+  onSectorUpdate,  onSectorDelete,
   onPolygonUpdate, onPolygonDelete
 }) {
-  // Stop bestaande listeners eerst
   _unsubscribers.forEach(fn => { try { fn(); } catch {} });
   _unsubscribers = [];
 
@@ -47,14 +41,15 @@ export function listenToCloudChanges({
     const colRef = collection(db, _base, colName);
     const unsub = onSnapshot(query(colRef), (snap) => {
       snap.docChanges().forEach(change => {
+        const data = { id: change.doc.id, ...change.doc.data() };
         if (change.type === 'added' || change.type === 'modified') {
-          onUpdate && onUpdate({ id: change.doc.id, ...change.doc.data() });
+          onUpdate && onUpdate(data);
         } else if (change.type === 'removed') {
           onDelete && onDelete(change.doc.id);
         }
       });
     }, (err) => {
-      console.warn(`[sync] listener fout op ${colName}:`, err.message);
+      console.warn(`[sync] listener fout op ${colName}:`, err.code, err.message);
     });
     _unsubscribers.push(unsub);
   }
@@ -68,50 +63,33 @@ export function listenToCloudChanges({
 // ======================= Schrijf helpers =======================
 async function saveDoc(colName, id, data) {
   try {
-    const ref = doc(db, _base, colName, id);
-    await setDoc(ref, data, { merge: true });
+    await setDoc(doc(db, _base, colName, id), data, { merge: true });
   } catch (err) {
-    console.error(`[sync] saveDoc ${colName}/${id} mislukt:`, err.message);
+    console.error(`[sync] saveDoc ${colName}/${id} mislukt:`, err.code, '—', err.message);
+    throw err; // zodat aanroeper ook weet dat het mislukt is
   }
 }
 
 async function deleteDocument(colName, id) {
   try {
-    const ref = doc(db, _base, colName, id);
-    await deleteDoc(ref);
+    await deleteDoc(doc(db, _base, colName, id));
   } catch (err) {
-    console.error(`[sync] deleteDoc ${colName}/${id} mislukt:`, err.message);
+    console.error(`[sync] deleteDoc ${colName}/${id} mislukt:`, err.code, '—', err.message);
   }
 }
 
 // ======================= Markers =======================
-export function saveMarkerToCloud(docData) {
-  return saveDoc('markers', docData.id, docData);
-}
-export function deleteMarkerFromCloud(id) {
-  return deleteDocument('markers', id);
-}
+export function saveMarkerToCloud(data)   { return saveDoc('markers', data.id, data); }
+export function deleteMarkerFromCloud(id) { return deleteDocument('markers', id); }
 
 // ======================= Lines =======================
-export function saveLineToCloud(docData) {
-  return saveDoc('lines', docData.id, docData);
-}
-export function deleteLineFromCloud(id) {
-  return deleteDocument('lines', id);
-}
+export function saveLineToCloud(data)   { return saveDoc('lines', data.id, data); }
+export function deleteLineFromCloud(id) { return deleteDocument('lines', id); }
 
 // ======================= Sectors =======================
-export function saveSectorToCloud(docData) {
-  return saveDoc('sectors', docData.id, docData);
-}
-export function deleteSectorFromCloud(id) {
-  return deleteDocument('sectors', id);
-}
+export function saveSectorToCloud(data)   { return saveDoc('sectors', data.id, data); }
+export function deleteSectorFromCloud(id) { return deleteDocument('sectors', id); }
 
 // ======================= Polygons =======================
-export function savePolygonToCloud(docData) {
-  return saveDoc('polygons', docData.id, docData);
-}
-export function deletePolygonFromCloud(id) {
-  return deleteDocument('polygons', id);
-}
+export function savePolygonToCloud(data)   { return saveDoc('polygons', data.id, data); }
+export function deletePolygonFromCloud(id) { return deleteDocument('polygons', id); }
