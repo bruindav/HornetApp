@@ -1,9 +1,7 @@
-
-// Auth-gated bootstrap
+// main.js — Fix 9 — betere boot guard tegen dubbele initialisatie
 import { auth } from './firebase.js';
-import { onAuthStateChanged, getRedirectResult, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-// UI helpers: show/hide containers
 function showLogin(){
   document.getElementById('login-screen')?.classList.remove('hidden');
   document.getElementById('app-shell')?.classList.add('hidden');
@@ -12,18 +10,21 @@ function showApp(){
   document.getElementById('login-screen')?.classList.add('hidden');
   document.getElementById('app-shell')?.classList.remove('hidden');
 }
-
-// header helpers
 function renderHeader(user){
   const who = document.getElementById('hdr-user');
   if (who) who.textContent = user?.displayName || user?.email || user?.uid || 'Onbekend';
 }
 
+let _bootPromise = null;
+
 async function startAppOnce(){
-  if (window.__hornetAppBooted) return;
-  window.__hornetAppBooted = true;
-  const mod = await import('./app-core.js');
-  mod.boot();
+  // Als al bezig of al klaar → niet opnieuw starten
+  if (_bootPromise) return _bootPromise;
+  _bootPromise = (async () => {
+    const mod = await import('./app-core.js');
+    mod.boot();
+  })();
+  return _bootPromise;
 }
 
 // Bind login / logout buttons
@@ -32,11 +33,11 @@ window.addEventListener('DOMContentLoaded', () => {
     const { loginWithGoogle } = await import('./firebase.js');
     await loginWithGoogle();
   });
-  document.getElementById('logoutBtn')?.addEventListener('click', () => signOut(auth));
+  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    _bootPromise = null; // reset zodat na opnieuw inloggen app opnieuw boot
+    signOut(auth);
+  });
 });
-
-// Handle redirect result for info only
-getRedirectResult(auth).catch(console.error);
 
 // Auth state gate
 onAuthStateChanged(auth, (user) => {
@@ -46,6 +47,6 @@ onAuthStateChanged(auth, (user) => {
     startAppOnce();
   } else {
     showLogin();
-    window.__hornetAppBooted = false; // user switched – require fresh boot after login
+    _bootPromise = null;
   }
 });

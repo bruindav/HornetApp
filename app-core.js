@@ -48,6 +48,7 @@ const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
+  if (map) { try{ map.invalidateSize(); }catch{} return; } // voorkom dubbele init
   map = L.map('map', { zoomControl: true }).setView([52.1, 5.3], 8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
