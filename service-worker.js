@@ -1,5 +1,5 @@
-// Fix 10 — cache versie verhoogd
-const CACHE = 'hornet-v10';
+// Fix 21b — cache versie verhoogd naar v21
+const CACHE = 'hornet-v21';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
