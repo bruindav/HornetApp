@@ -1,4 +1,4 @@
-// admin.js — Fix 20 — uitgebreide foutmelding + getDocs ipv onSnapshot voor debug
+// admin.js — Fix 21 — uitgebreide foutmelding + getDocs ipv onSnapshot voor debug
 import { auth } from './firebase.js';
 import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';

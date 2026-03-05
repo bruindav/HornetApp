@@ -1,4 +1,4 @@
-// main.js — Fix 20 — rolcheck VOOR app boot, geen Firestore toegang voor pending
+// main.js — Fix 21 — rolcheck VOOR app boot, geen Firestore toegang voor pending
 import { auth, loginWithGoogle, loginWithEmail, registerWithEmail } from './firebase.js';
 import { onAuthStateChanged, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -51,7 +51,7 @@ async function renderAdminLink(uid) {
         btn.onmouseover = () => btn.style.color = '#fff';
         btn.onmouseout  = () => btn.style.color = '#94a3b8';
         btn.addEventListener('click', async () => {
-          const { openAdminOverlay } = await import('./admin.js?v=fix20');
+          const { openAdminOverlay } = await import('./admin.js?v=fix21');
           openAdminOverlay();
         });
         const hdr = document.querySelector('header');
