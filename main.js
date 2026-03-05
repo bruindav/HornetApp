@@ -1,4 +1,4 @@
-// main.js — Fix 16 — Google + email/wachtwoord + admin overlay
+// main.js — Fix 17 — pending gebruikers krijgen wachtscherm, geen kaart
 import { auth, loginWithGoogle, loginWithEmail, registerWithEmail } from './firebase.js';
 import { onAuthStateChanged, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -28,20 +28,17 @@ function showAuthError(msg) {
   if (el) { el.textContent = msg; el.classList.add('show'); }
 }
 
-function showLogin() {
-  document.getElementById('login-screen')?.classList.remove('hidden');
-  document.getElementById('app-shell')?.classList.add('hidden');
+function showScreen(id) {
+  ['login-screen','pending-screen','app-shell'].forEach(s => {
+    document.getElementById(s)?.classList.toggle('hidden', s !== id);
+  });
 }
-function showApp() {
-  document.getElementById('login-screen')?.classList.add('hidden');
-  document.getElementById('app-shell')?.classList.remove('hidden');
-}
+
 function renderHeader(user) {
   const who = document.getElementById('hdr-user');
   if (who) who.textContent = user?.displayName || user?.email || '–';
 }
 
-// Admin knop toevoegen aan header (alleen voor admins)
 async function renderAdminLink(uid) {
   try {
     const snap = await getDoc(doc(db, 'roles', uid));
@@ -65,7 +62,6 @@ async function renderAdminLink(uid) {
   } catch {}
 }
 
-// Nieuwe gebruiker automatisch als pending registreren
 async function autoRegisterUser(user) {
   try {
     const ref = doc(db, 'roles', user.uid);
@@ -95,7 +91,6 @@ async function startAppOnce() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
-  // Email inloggen
   document.getElementById('loginEmailBtn')?.addEventListener('click', async () => {
     const email    = document.getElementById('login-email')?.value?.trim();
     const password = document.getElementById('login-password')?.value;
@@ -109,13 +104,11 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Google inloggen
   document.getElementById('loginGoogleBtn')?.addEventListener('click', async () => {
     try { await loginWithGoogle(); }
     catch (e) { showAuthError(friendlyError(e.code)); }
   });
 
-  // Email registreren
   document.getElementById('registerBtn')?.addEventListener('click', async () => {
     const name     = document.getElementById('reg-name')?.value?.trim();
     const email    = document.getElementById('reg-email')?.value?.trim();
@@ -132,28 +125,49 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Google registreren
   document.getElementById('registerGoogleBtn')?.addEventListener('click', async () => {
     try { await loginWithGoogle(); }
     catch (e) { showAuthError(friendlyError(e.code)); }
   });
 
-  // Uitloggen
   document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    _bootPromise = null;
+    signOut(auth);
+  });
+
+  document.getElementById('pending-logout')?.addEventListener('click', () => {
     _bootPromise = null;
     signOut(auth);
   });
 });
 
 onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    showApp();
+  if (!user) {
+    showScreen('login-screen');
+    _bootPromise = null;
+    return;
+  }
+
+  // Registreer als pending als nog niet bekend
+  await autoRegisterUser(user);
+
+  // Controleer rol
+  let role = 'pending';
+  try {
+    const snap = await getDoc(doc(db, 'roles', user.uid));
+    role = snap.data()?.role || 'pending';
+  } catch {}
+
+  if (role === 'pending') {
+    // Wachtscherm tonen — geen toegang tot kaart
+    showScreen('pending-screen');
+    const nameEl = document.getElementById('pending-name');
+    if (nameEl) nameEl.textContent = user.displayName || user.email || 'Gebruiker';
+  } else {
+    // Toegang tot app
+    showScreen('app-shell');
     renderHeader(user);
-    await autoRegisterUser(user);
     await renderAdminLink(user.uid);
     startAppOnce();
-  } else {
-    showLogin();
-    _bootPromise = null;
   }
 });

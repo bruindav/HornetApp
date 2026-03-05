@@ -1,4 +1,4 @@
-// Fix 14 — drie rollen + auto-registratie pending gebruikers
+// Fix 17 — correcte rechten: admin leest alle roles, pending krijgt geen kaart toegang
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -12,7 +12,6 @@ service cloud.firestore {
     function isAdmin()     { return isSignedIn() && userRole() == 'admin'; }
     function isManager()   { return isSignedIn() && userRole() == 'manager'; }
     function isVolunteer() { return isSignedIn() && userRole() == 'volunteer'; }
-    function canWrite()    { return isAdmin() || isManager() || isVolunteer(); }
 
     // Mag schrijven in dit gebied?
     function canWriteInGroup(group) {
@@ -21,38 +20,43 @@ service cloud.firestore {
     }
 
     // ── Markers, lijnen, sectoren ──────────────────────────────────
+    // Pending gebruikers mogen NIETS lezen of schrijven
     match /maps/{year}/{group}/data/markers/{docId} {
-      allow read: if true;
+      allow read:                   if isAdmin() || isManager() || isVolunteer();
       allow create, update, delete: if canWriteInGroup(group);
     }
     match /maps/{year}/{group}/data/lines/{docId} {
-      allow read: if true;
+      allow read:                   if isAdmin() || isManager() || isVolunteer();
       allow create, update, delete: if canWriteInGroup(group);
     }
     match /maps/{year}/{group}/data/sectors/{docId} {
-      allow read: if true;
+      allow read:                   if isAdmin() || isManager() || isVolunteer();
       allow create, update, delete: if canWriteInGroup(group);
     }
 
-    // ── Polygonen (gebieden tekenen) ───────────────────────────────
+    // ── Polygonen ──────────────────────────────────────────────────
     match /maps/{year}/{group}/data/polygons/{docId} {
-      allow read: if true;
-      allow create: if isAdmin() || isManager();
-      allow update, delete:
-        if isAdmin()
-        || ( isManager() && resource.data.createdBy == uid() );
+      allow read:           if isAdmin() || isManager() || isVolunteer();
+      allow create:         if isAdmin() || isManager();
+      allow update, delete: if isAdmin()
+                            || (isManager() && resource.data.createdBy == uid());
     }
 
     // ── Rollen ────────────────────────────────────────────────────
     match /roles/{userId} {
-      // Eigen rol lezen (ook pending)
+      // Eigen rol lezen mag altijd (ook pending — nodig om rol te checken)
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      // Eigen rol aanmaken alleen als pending (auto-registratie bij eerste login)
+      // Zichzelf aanmaken als pending bij eerste login
       allow create: if isSignedIn()
                     && request.auth.uid == userId
                     && request.resource.data.role == 'pending';
       // Alleen admin mag rollen wijzigen
       allow update, delete: if isAdmin();
+    }
+
+    // ── Admin leest ALLE roles (voor gebruikersbeheer overlay) ─────
+    match /roles/{userId} {
+      allow list: if isAdmin();
     }
   }
 }

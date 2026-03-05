@@ -1,4 +1,4 @@
-<!-- index.html — Fix 16 — admin overlay CSS toegevoegd -->
+<!-- index.html — Fix 17 — pending wachtscherm toegevoegd -->
 <!DOCTYPE html>
 <html lang="nl">
   <head>
@@ -339,6 +339,22 @@
       </div>
     </section>
 
+    <!-- ── Pending scherm ── -->
+    <section id="pending-screen" class="login-wrap hidden">
+      <div class="login-card" style="text-align:center">
+        <div style="font-size:48px;margin-bottom:16px">⏳</div>
+        <h2>Wachten op goedkeuring</h2>
+        <p style="color:#64748b;font-size:14px;margin:12px 0 24px">
+          Hallo <strong id="pending-name"></strong>, je account is aangemaakt.<br>
+          Een beheerder moet je nog toegang geven tot een gebied.<br>
+          Je krijgt dan een e-mail en kunt opnieuw inloggen.
+        </p>
+        <button id="pending-logout" class="btn-primary" style="max-width:200px;margin:0 auto">
+          Uitloggen
+        </button>
+      </div>
+    </section>
+
     <!-- ── App shell ── -->
     <section id="app-shell" class="hidden">
       <header>
@@ -449,6 +465,6 @@
       });
     </script>
 
-    <script type="module" src="./main.js?v=fix16"></script>
+    <script type="module" src="./main.js?v=fix17"></script>
   </body>
 </html>
