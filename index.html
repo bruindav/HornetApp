@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="nl">
   <head>
@@ -9,36 +8,129 @@
     <link rel="icon" href="./favicon.ico" />
     <link rel="stylesheet" href="./app.css" />
 
-    <!-- Leaflet & Geoman (volgorde is belangrijk) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
 
     <style>
-      :root { --header-h: 58px; }
+      :root { --header-h: 58px; --sidebar-w: 300px; }
+      *, *::before, *::after { box-sizing: border-box; }
       body { margin:0; font-family: system-ui, Arial, sans-serif; }
-      header { position: sticky; top:0; z-index: 5; background:#0f172a; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:16px; }
+
+      /* ── Header ── */
+      header {
+        position: sticky; top:0; z-index: 10;
+        background:#0f172a; color:#fff;
+        padding:10px 16px;
+        display:flex; align-items:center; gap:16px;
+      }
       header .spacer { flex:1; }
-      .app { display:flex; min-height: calc(100vh - var(--header-h)); }
-      .sidebar { width: 300px; background:#f1f5f9; border-right:1px solid #cbd5e1; padding:12px; overflow:auto; }
-      .content { flex:1; position:relative; }
-      #map { position: absolute; inset: 0; }
+
+      /* ── App shell ── */
+      .app {
+        display:flex;
+        height: calc(100vh - var(--header-h));
+        overflow: hidden;
+      }
+
+      /* ── Sidebar ── */
+      .sidebar {
+        width: var(--sidebar-w);
+        flex-shrink: 0;
+        background:#f1f5f9;
+        border-right:1px solid #cbd5e1;
+        padding:12px;
+        overflow-y: auto;
+        transition: width 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
+      }
+      body.sidebar-collapsed .sidebar {
+        width: 0;
+        padding: 0;
+        overflow: hidden;
+        opacity: 0;
+        border-right: none;
+      }
+
+      /* ── Kaart ── */
+      .content { flex:1; position:relative; min-width: 0; }
+      #map { position:absolute; inset:0; }
+
+      /* ── Mobiel backdrop ── */
+      #sidebar-backdrop {
+        display: none;
+        position: fixed; inset:0;
+        background: rgba(0,0,0,0.35);
+        z-index: 8;
+      }
+      body.sidebar-open #sidebar-backdrop { display: block; }
+
+      /* ── Zoekbalk op kaart (rechtsboven) ── */
+      #search-overlay {
+        position: absolute;
+        top: 12px; right: 12px;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: #fff;
+        border: 2px solid #16a34a;
+        border-radius: 24px;
+        padding: 5px 10px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: all 0.2s ease;
+        max-width: 44px;
+        overflow: hidden;
+      }
+      #search-overlay.active {
+        max-width: 320px;
+        border-radius: 8px;
+      }
+      #floating-search-btn {
+        background: none; border: none;
+        cursor: pointer; font-size: 18px;
+        padding: 0; line-height: 1; flex-shrink: 0;
+      }
+      #place-input {
+        border: none; outline: none;
+        font-size: 14px; width: 0;
+        padding: 0; background: transparent;
+        transition: width 0.2s ease;
+        white-space: nowrap;
+      }
+      #search-overlay.active #place-input { width: 160px; }
+      #search-btn, #search-close {
+        display: none;
+        border: none; cursor: pointer;
+        font-size: 13px; padding: 3px 8px;
+        border-radius: 4px; white-space: nowrap;
+      }
+      #search-btn { background:#16a34a; color:#fff; }
+      #search-close { background:#e2e8f0; color:#333; }
+      #search-overlay.active #search-btn,
+      #search-overlay.active #search-close { display: inline-block; }
+
+      /* ── Overige ── */
       .hidden { display:none !important; }
-      .ctx-menu { position:fixed; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:8px; box-shadow:0 6px 24px rgba(15,23,42,.15); z-index: 9999; }
+      .ctx-menu { position:fixed; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:8px; box-shadow:0 6px 24px rgba(15,23,42,.15); z-index:9999; }
+      .ctx-menu h4 { margin:0 0 6px; font-size:13px; color:#64748b; }
+      .ctx-menu button { display:block; width:100%; text-align:left; background:none; border:none; padding:6px 8px; cursor:pointer; border-radius:4px; font-size:14px; }
+      .ctx-menu button:hover { background:#f1f5f9; }
       .poly-label { background:#fff; border:2px solid #0aa879; color:#111; font-weight:600; }
       .line-label { background:#111; color:#fff; border:0; }
       .line-handle div { width:12px; height:12px; border-radius:50%; background:#111; border:2px solid #fff; box-shadow:0 0 0 2px #111; }
-      .login { display:grid; place-items:center; min-height: 70vh; }
+      .login { display:grid; place-items:center; min-height:70vh; }
       .login .card { padding:24px; border:1px solid #e2e8f0; border-radius:8px; }
-      .status { font-size: 12px; color:#475569; }
+      .status { font-size:12px; color:#475569; }
       .grid { display:grid; gap:8px; }
-      .only-hoornaar { display:none; grid-template-columns: 1fr 1fr; gap:8px; }
+      .only-hoornaar { display:none; grid-template-columns:1fr 1fr; gap:8px; }
+      .btn-primary { background:#0f172a; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
+      .btn-secondary { background:#e2e8f0; color:#333; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
     </style>
   </head>
   <body>
-    <!-- Login screen -->
+
+    <!-- Login scherm -->
     <section id="login-screen" class="login">
       <div class="card">
         <h2>HornetApp – inloggen</h2>
@@ -51,13 +143,15 @@
     <!-- App shell -->
     <section id="app-shell" class="hidden">
       <header>
-        <button id="toggle-sidebar">☰</button>
+        <button id="toggle-sidebar" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;">☰</button>
         <strong>HornetApp</strong>
         <div class="spacer"></div>
         <div>Gebruiker: <span id="hdr-user">–</span></div>
         <button id="logoutBtn" style="margin-left:12px">Uitloggen</button>
       </header>
+
       <div class="app">
+        <!-- Sidebar -->
         <aside class="sidebar">
           <h3>Scope</h3>
           <div class="grid">
@@ -82,16 +176,14 @@
             <label><input type="checkbox" id="hard-debounce"/> Stabiele interactie (traag)</label>
           </div>
 
-          <h3 style="margin-top:16px">Zoeken</h3>
+          <h3 style="margin-top:16px">Geocoder</h3>
           <div class="grid">
             <select id="geocoder-select">
               <option value="auto">Auto</option>
               <option value="photon">Photon</option>
               <option value="mapsco">Maps.co</option>
             </select>
-            <input id="place-input" placeholder="Plaats"/>
             <input id="mapsco-key" placeholder="Maps.co API key (optioneel)"/>
-            <button id="search-btn">Zoek</button>
           </div>
 
           <h3 style="margin-top:16px">Beheer</h3>
@@ -100,24 +192,35 @@
             <button id="btn-reset-cache">Reset cache & SW</button>
           </div>
         </aside>
+
+        <!-- Kaart -->
         <div class="content">
           <div id="map"></div>
+
+          <!-- Zoekbalk rechtsboven op kaart -->
+          <div id="search-overlay" aria-label="Locatie zoeken">
+            <button id="floating-search-btn" title="Zoek locatie">🔍</button>
+            <input id="place-input" type="text" placeholder="Zoek plaats of adres…" autocomplete="off"/>
+            <button id="search-btn">Zoek</button>
+            <button id="search-close">✕</button>
+          </div>
         </div>
       </div>
 
-      <!-- Backdrop for mobile sidebar -->
-      <div id="sidebar-backdrop" class="hidden" aria-hidden="true"></div>
+      <!-- Mobiel backdrop -->
+      <div id="sidebar-backdrop" aria-hidden="true"></div>
 
-      <!-- Properties modal -->
-      <div id="prop-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.3)">
-        <div style="background:#fff; padding:16px; border-radius:8px; min-width:280px">
+      <!-- Eigenschappen modal -->
+      <div id="prop-modal" class="hidden" role="dialog" aria-modal="true"
+           style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.3);z-index:2000;">
+        <div style="background:#fff;padding:16px;border-radius:8px;min-width:280px;">
           <div class="grid">
             <label>Datum <input id="pm-date" type="date"/></label>
             <label>Door <input id="pm-by"/></label>
             <div class="only-hoornaar">
               <label>Aantal <input id="pm-amount" type="number" min="0"/></label>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px">
+            <div style="display:flex;justify-content:flex-end;gap:8px">
               <button id="pm-cancel" class="btn-secondary">Annuleren</button>
               <button id="pm-save" class="btn-primary">Opslaan</button>
             </div>
@@ -126,7 +229,6 @@
       </div>
     </section>
 
-    <!-- App entry (auth-gated) -->
-    <script type="module" src="./main.js?v=610r21f17"></script>
+    <script type="module" src="./main.js?v=fix10"></script>
   </body>
 </html>

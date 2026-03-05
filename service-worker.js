@@ -1,5 +1,5 @@
-// Fix 5 — cache versie verhoogd om oude app-core.js te wissen
-const CACHE = 'hornet-v5';
+// Fix 10 — cache versie verhoogd
+const CACHE = 'hornet-v10';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -24,21 +24,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-
   if (req.destination === 'script') {
     event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        return fresh;
-      } catch {
-        const cache = await caches.open(CACHE);
-        const cached = await cache.match(req);
+      try { return await fetch(req); }
+      catch {
+        const cached = await caches.open(CACHE).then(c => c.match(req));
         return cached || Response.error();
       }
     })());
     return;
   }
-
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);
