@@ -1,4 +1,4 @@
-<!-- index.html — Fix 10 — sidebar CSS + zoekbalk op kaart -->
+<!-- index.html — Fix 15 — login met Google én email/wachtwoord + registratie -->
 <!DOCTYPE html>
 <html lang="nl">
   <head>
@@ -19,7 +19,135 @@
       *, *::before, *::after { box-sizing: border-box; }
       body { margin:0; font-family: system-ui, Arial, sans-serif; }
 
-      /* ── Header ── */
+      /* ── Login scherm ── */
+      .login-wrap {
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f1f5f9;
+      }
+      .login-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 32px 28px;
+        width: 100%;
+        max-width: 380px;
+        box-shadow: 0 4px 24px rgba(15,23,42,.08);
+      }
+      .login-card h2 {
+        margin: 0 0 4px;
+        font-size: 20px;
+        color: #0f172a;
+      }
+      .login-card .subtitle {
+        color: #64748b;
+        font-size: 14px;
+        margin: 0 0 24px;
+      }
+      .tabs {
+        display: flex;
+        gap: 0;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        overflow: hidden;
+        margin-bottom: 20px;
+      }
+      .tab-btn {
+        flex: 1;
+        padding: 8px;
+        border: none;
+        background: #f8fafc;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 14px;
+        transition: background 0.15s;
+      }
+      .tab-btn.active {
+        background: #0f172a;
+        color: #fff;
+        font-weight: 600;
+      }
+      .tab-panel { display: none; }
+      .tab-panel.active { display: block; }
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+      }
+      .form-group label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #374151;
+      }
+      .form-group input {
+        padding: 9px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+      .form-group input:focus { border-color: #0f172a; }
+      .btn-primary {
+        width: 100%;
+        padding: 10px;
+        background: #0f172a;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 4px;
+        transition: background 0.15s;
+      }
+      .btn-primary:hover { background: #1e293b; }
+      .btn-primary:disabled { background: #94a3b8; cursor: not-allowed; }
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0;
+        color: #94a3b8;
+        font-size: 13px;
+      }
+      .divider::before, .divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: #e2e8f0;
+      }
+      .btn-google {
+        width: 100%;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: background 0.15s;
+      }
+      .btn-google:hover { background: #f8fafc; }
+      .error-msg {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #dc2626;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        margin-bottom: 12px;
+        display: none;
+      }
+      .error-msg.show { display: block; }
+      .status { font-size: 11px; color: #94a3b8; margin-top: 16px; text-align: center; }
+
+      /* ── App header ── */
       header {
         position: sticky; top:0; z-index: 10;
         background:#0f172a; color:#fff;
@@ -28,88 +156,46 @@
       }
       header .spacer { flex:1; }
 
-      /* ── App shell ── */
-      .app {
-        display:flex;
-        height: calc(100vh - var(--header-h));
-        overflow: hidden;
-      }
+      /* ── App layout ── */
+      .app { display:flex; height: calc(100vh - var(--header-h)); overflow: hidden; }
 
       /* ── Sidebar ── */
       .sidebar {
-        width: var(--sidebar-w);
-        flex-shrink: 0;
-        background:#f1f5f9;
-        border-right:1px solid #cbd5e1;
-        padding:12px;
-        overflow-y: auto;
+        width: var(--sidebar-w); flex-shrink: 0;
+        background:#f1f5f9; border-right:1px solid #cbd5e1;
+        padding:12px; overflow-y: auto;
         transition: width 0.25s ease, padding 0.25s ease, opacity 0.2s ease;
       }
       body.sidebar-collapsed .sidebar {
-        width: 0;
-        padding: 0;
-        overflow: hidden;
-        opacity: 0;
-        border-right: none;
+        width: 0; padding: 0; overflow: hidden; opacity: 0; border-right: none;
       }
-
-      /* ── Kaart ── */
       .content { flex:1; position:relative; min-width: 0; }
       #map { position:absolute; inset:0; }
 
       /* ── Mobiel backdrop ── */
       #sidebar-backdrop {
-        display: none;
-        position: fixed; inset:0;
-        background: rgba(0,0,0,0.35);
-        z-index: 8;
+        display: none; position: fixed; inset:0;
+        background: rgba(0,0,0,0.35); z-index: 8;
       }
       body.sidebar-open #sidebar-backdrop { display: block; }
 
-      /* ── Zoekbalk op kaart (rechtsboven) ── */
+      /* ── Zoekbalk op kaart ── */
       #search-overlay {
-        position: absolute;
-        top: 12px; right: 12px;
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        background: #fff;
-        border: 2px solid #16a34a;
-        border-radius: 24px;
-        padding: 5px 10px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        transition: all 0.2s ease;
-        max-width: 44px;
-        overflow: hidden;
+        position: absolute; top: 12px; right: 12px; z-index: 1000;
+        display: flex; align-items: center; gap: 4px;
+        background: #fff; border: 2px solid #16a34a; border-radius: 24px;
+        padding: 5px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        transition: all 0.2s ease; max-width: 44px; overflow: hidden;
       }
-      #search-overlay.active {
-        max-width: 320px;
-        border-radius: 8px;
-      }
-      #floating-search-btn {
-        background: none; border: none;
-        cursor: pointer; font-size: 18px;
-        padding: 0; line-height: 1; flex-shrink: 0;
-      }
-      #place-input {
-        border: none; outline: none;
-        font-size: 14px; width: 0;
-        padding: 0; background: transparent;
-        transition: width 0.2s ease;
-        white-space: nowrap;
-      }
-      #search-overlay.active #place-input { width: 160px; }
-      #search-btn, #search-close {
-        display: none;
-        border: none; cursor: pointer;
-        font-size: 13px; padding: 3px 8px;
-        border-radius: 4px; white-space: nowrap;
-      }
+      #search-overlay.active { max-width: 320px; border-radius: 8px; }
+      #floating-search-btn { background:none; border:none; cursor:pointer; font-size:18px; padding:0; line-height:1; flex-shrink:0; }
+      #place-input { border:none; outline:none; font-size:14px; width:0; padding:0; background:transparent; transition:width 0.2s ease; }
+      #search-overlay.active #place-input { width:160px; }
+      #search-btn, #search-close { display:none; border:none; cursor:pointer; font-size:13px; padding:3px 8px; border-radius:4px; }
       #search-btn { background:#16a34a; color:#fff; }
       #search-close { background:#e2e8f0; color:#333; }
       #search-overlay.active #search-btn,
-      #search-overlay.active #search-close { display: inline-block; }
+      #search-overlay.active #search-close { display:inline-block; }
 
       /* ── Overige ── */
       .hidden { display:none !important; }
@@ -120,39 +206,84 @@
       .poly-label { background:#fff; border:2px solid #0aa879; color:#111; font-weight:600; }
       .line-label { background:#111; color:#fff; border:0; }
       .line-handle div { width:12px; height:12px; border-radius:50%; background:#111; border:2px solid #fff; box-shadow:0 0 0 2px #111; }
-      .login { display:grid; place-items:center; min-height:70vh; }
-      .login .card { padding:24px; border:1px solid #e2e8f0; border-radius:8px; }
-      .status { font-size:12px; color:#475569; }
       .grid { display:grid; gap:8px; }
       .only-hoornaar { display:none; grid-template-columns:1fr 1fr; gap:8px; }
-      .btn-primary { background:#0f172a; color:#fff; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
-      .btn-secondary { background:#e2e8f0; color:#333; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
+      .btn-sec { background:#e2e8f0; color:#333; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; }
     </style>
   </head>
   <body>
 
-    <!-- Login scherm -->
-    <section id="login-screen" class="login">
-      <div class="card">
-        <h2>HornetApp – inloggen</h2>
-        <p>Log in om de kaart en tools te gebruiken.</p>
-        <button id="loginBtn">Inloggen met Google</button>
+    <!-- ── Login scherm ── -->
+    <section id="login-screen" class="login-wrap">
+      <div class="login-card">
+        <h2>🐝 HornetApp</h2>
+        <p class="subtitle">Log in of maak een account aan</p>
+
+        <div class="tabs">
+          <button class="tab-btn active" onclick="switchTab('login')">Inloggen</button>
+          <button class="tab-btn" onclick="switchTab('register')">Registreren</button>
+        </div>
+
+        <div id="auth-error" class="error-msg"></div>
+
+        <!-- Inloggen tab -->
+        <div id="tab-login" class="tab-panel active">
+          <div class="form-group">
+            <label>E-mailadres</label>
+            <input type="email" id="login-email" placeholder="naam@voorbeeld.nl" autocomplete="email"/>
+          </div>
+          <div class="form-group">
+            <label>Wachtwoord</label>
+            <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
+          </div>
+          <button class="btn-primary" id="loginEmailBtn">Inloggen</button>
+          <div class="divider">of</div>
+          <button class="btn-google" id="loginGoogleBtn">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5L31.8 34C29.9 35.3 27.1 36 24 36c-5.3 0-9.6-2.9-11.3-7.1l-6.6 4.8C9.6 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l5.7 5c3.6-3.1 6.8-8 6.8-15 0-1.3-.1-2.7-.1-4z"/></svg>
+            Inloggen met Google
+          </button>
+        </div>
+
+        <!-- Registreren tab -->
+        <div id="tab-register" class="tab-panel">
+          <div class="form-group">
+            <label>Naam</label>
+            <input type="text" id="reg-name" placeholder="Jan de Vries" autocomplete="name"/>
+          </div>
+          <div class="form-group">
+            <label>E-mailadres</label>
+            <input type="email" id="reg-email" placeholder="naam@voorbeeld.nl" autocomplete="email"/>
+          </div>
+          <div class="form-group">
+            <label>Wachtwoord <span style="font-size:11px;color:#94a3b8">(minimaal 6 tekens)</span></label>
+            <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password"/>
+          </div>
+          <button class="btn-primary" id="registerBtn">Account aanmaken</button>
+          <div class="divider">of</div>
+          <button class="btn-google" id="registerGoogleBtn">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20H24v8h11.3C33.6 33.1 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20c11 0 19.7-8 19.7-20 0-1.3-.1-2.7-.1-4z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.5 16 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-1.9 13.5-5L31.8 34C29.9 35.3 27.1 36 24 36c-5.3 0-9.6-2.9-11.3-7.1l-6.6 4.8C9.6 39.5 16.3 44 24 44z"/><path fill="#1976D2" d="M43.6 20H24v8h11.3c-.9 2.5-2.6 4.6-4.8 6l5.7 5c3.6-3.1 6.8-8 6.8-15 0-1.3-.1-2.7-.1-4z"/></svg>
+            Registreren met Google
+          </button>
+          <p style="font-size:12px;color:#94a3b8;margin-top:12px;text-align:center">
+            Na registratie krijgt een beheerder je toegang tot een gebied.
+          </p>
+        </div>
+
         <p class="status"><span id="status-sw">SW:</span> · <span id="status-geo">Geo:</span></p>
       </div>
     </section>
 
-    <!-- App shell -->
+    <!-- ── App shell ── -->
     <section id="app-shell" class="hidden">
       <header>
         <button id="toggle-sidebar" style="background:none;border:none;color:#fff;font-size:20px;cursor:pointer;padding:0 4px;">☰</button>
         <strong>HornetApp</strong>
         <div class="spacer"></div>
-        <div>Gebruiker: <span id="hdr-user">–</span></div>
+        <div style="font-size:13px">Gebruiker: <span id="hdr-user">–</span></div>
         <button id="logoutBtn" style="margin-left:12px">Uitloggen</button>
       </header>
 
       <div class="app">
-        <!-- Sidebar -->
         <aside class="sidebar">
           <h3>Scope</h3>
           <div class="grid">
@@ -161,7 +292,6 @@
             <datalist id="groups"><option value="Hoornaar_Zeist"></option></datalist>
             <button id="apply-scope">Toepassen</button>
           </div>
-
           <h3 style="margin-top:16px">Filters</h3>
           <div class="grid">
             <label><input type="checkbox" id="f_type_hoornaar" checked/> Waarneming</label>
@@ -170,13 +300,12 @@
             <label><input type="checkbox" id="f_type_lokpot" checked/> Lokpot (incl. lijnen)</label>
             <label><input type="checkbox" id="f_type_pending" checked/> Pending</label>
             <label>Datum vóór <input type="date" id="f_date_before"/></label>
-            <div style="display:flex; gap:8px">
+            <div style="display:flex;gap:8px">
               <button id="apply-filters">Toepassen</button>
               <button id="reset-filters">Reset</button>
             </div>
             <label><input type="checkbox" id="hard-debounce"/> Stabiele interactie (traag)</label>
           </div>
-
           <h3 style="margin-top:16px">Geocoder</h3>
           <div class="grid">
             <select id="geocoder-select">
@@ -186,7 +315,6 @@
             </select>
             <input id="mapsco-key" placeholder="Maps.co API key (optioneel)"/>
           </div>
-
           <h3 style="margin-top:16px">Beheer</h3>
           <div class="grid">
             <button id="btn-selftest">Zelftest</button>
@@ -194,11 +322,8 @@
           </div>
         </aside>
 
-        <!-- Kaart -->
         <div class="content">
           <div id="map"></div>
-
-          <!-- Zoekbalk rechtsboven op kaart -->
           <div id="search-overlay" aria-label="Locatie zoeken">
             <button id="floating-search-btn" title="Zoek locatie">🔍</button>
             <input id="place-input" type="text" placeholder="Zoek plaats of adres…" autocomplete="off"/>
@@ -208,10 +333,8 @@
         </div>
       </div>
 
-      <!-- Mobiel backdrop -->
       <div id="sidebar-backdrop" aria-hidden="true"></div>
 
-      <!-- Eigenschappen modal -->
       <div id="prop-modal" class="hidden" role="dialog" aria-modal="true"
            style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.3);z-index:2000;">
         <div style="background:#fff;padding:16px;border-radius:8px;min-width:280px;">
@@ -222,14 +345,44 @@
               <label>Aantal <input id="pm-amount" type="number" min="0"/></label>
             </div>
             <div style="display:flex;justify-content:flex-end;gap:8px">
-              <button id="pm-cancel" class="btn-secondary">Annuleren</button>
-              <button id="pm-save" class="btn-primary">Opslaan</button>
+              <button id="pm-cancel" class="btn-sec">Annuleren</button>
+              <button id="pm-save" style="background:#0f172a;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;">Opslaan</button>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <script type="module" src="./main.js?v=fix10"></script>
+    <script>
+      // Tab wisselen
+      function switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach((b,i) =>
+          b.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+        document.getElementById('tab-login').classList.toggle('active', tab==='login');
+        document.getElementById('tab-register').classList.toggle('active', tab==='register');
+        document.getElementById('auth-error').classList.remove('show');
+      }
+      function showAuthError(msg) {
+        const el = document.getElementById('auth-error');
+        el.textContent = msg; el.classList.add('show');
+      }
+      function setLoading(btnId, loading) {
+        const btn = document.getElementById(btnId);
+        if (btn) btn.disabled = loading;
+      }
+      // Enter toets in velden
+      ['login-email','login-password'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', e => {
+          if (e.key === 'Enter') document.getElementById('loginEmailBtn')?.click();
+        });
+      });
+      ['reg-name','reg-email','reg-password'].forEach(id => {
+        document.getElementById(id)?.addEventListener('keydown', e => {
+          if (e.key === 'Enter') document.getElementById('registerBtn')?.click();
+        });
+      });
+    </script>
+
+    <script type="module" src="./main.js?v=fix15"></script>
   </body>
 </html>
