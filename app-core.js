@@ -1,5 +1,5 @@
-// app-core.js — Hornet Mapper NL — Fix 11
-// Fixes: bearingBetween syntax, modal DOM-binding na boot(), map dubbele init guard
+// app-core.js — Hornet Mapper NL — Fix 13
+// Fixes: bearingBetween syntax, modal DOM-binding, map dubbele init guard, createdBy polygoon, auth import
 import {
   setActiveScope, listenToCloudChanges,
   saveMarkerToCloud, deleteMarkerFromCloud,
@@ -7,6 +7,7 @@ import {
   saveSectorToCloud, deleteSectorFromCloud,
   savePolygonToCloud, deletePolygonFromCloud
 } from "./sync-engine.js";
+import { auth } from "./firebase.js";
 
 // ======================= Helpers =======================
 function $(id) { return document.getElementById(id); }
@@ -545,7 +546,9 @@ function initPolygon(layer){
 }
 function persistPolygon(layer){
   const id=layer._props?.id||genId('poly'); layer._props.id=id;
-  savePolygonToCloud({id,label:layer._props.label||'',color:layer._props.color||'#0aa879',latlngs:layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}))});
+  // createdBy alleen zetten bij nieuw polygoon, niet overschrijven bij update
+  if(!layer._props.createdBy) layer._props.createdBy = auth.currentUser?.uid||null;
+  savePolygonToCloud({id,createdBy:layer._props.createdBy,label:layer._props.label||'',color:layer._props.color||'#0aa879',latlngs:layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}))});
 }
 
 // ======================= Unified contextmenu =======================
@@ -667,7 +670,7 @@ function upsertPolygonFromCloud(doc){
   const existing=polygonsGroup.getLayers().find(x=>x._props?.id===doc.id);
   if(existing) polygonsGroup.removeLayer(existing);
   const lp=L.polygon((doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng))).addTo(polygonsGroup);
-  lp._props={id:doc.id,label:doc.label||'',color:doc.color||'#0aa879'};
+  lp._props={id:doc.id,createdBy:doc.createdBy||null,label:doc.label||'',color:doc.color||'#0aa879'};
   initPolygon(lp);
 }
 function deletePolygonFromCloudLocal(id){ const p=polygonsGroup.getLayers().find(x=>x._props?.id===id); if(p) polygonsGroup.removeLayer(p); }

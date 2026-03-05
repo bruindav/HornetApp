@@ -1,37 +1,63 @@
-// Fix 12 — vereenvoudigde rechten passend bij gebruik
+// Fix 13 — drie rollen: admin, manager, volunteer
+// Datastructuur roles/{uid}:
+//   role: 'admin' | 'manager' | 'volunteer'
+//   zones: ['Zeist', 'Bilthoven']   ← toegewezen gebieden (voor manager en volunteer)
+//
+// Polygonen/{docId} bevatten:
+//   createdBy: uid van de maker     ← voor manager: alleen eigen polygonen wijzigen
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isSignedIn() { return request.auth != null; }
-    function userDoc() { return get(/databases/{database}/documents/roles/{request.auth.uid}); }
-    function userRole() { return userDoc().data.role; }
-    function isAdmin() { return isSignedIn() && userRole() == 'admin'; }
-    function isVolunteer() { return isSignedIn() && (userRole() == 'volunteer' || userRole() == 'admin'); }
+    // ── Hulpfuncties ──────────────────────────────────────────────
+    function isSignedIn()  { return request.auth != null; }
+    function uid()         { return request.auth.uid; }
+    function roleDoc()     { return get(/databases/{database}/documents/roles/$(uid())); }
+    function userRole()    { return roleDoc().data.role; }
+    function userZones()   { return roleDoc().data.zones; }
 
-    // Markers, lines, sectors: elke ingelogde vrijwilliger of admin mag schrijven
+    function isAdmin()     { return isSignedIn() && userRole() == 'admin'; }
+    function isManager()   { return isSignedIn() && userRole() == 'manager'; }
+    function isVolunteer() { return isSignedIn() && userRole() == 'volunteer'; }
+
+    // Mag schrijven in dit gebied (group = bv. 'Zeist')?
+    function canWriteInGroup(group) {
+      return isAdmin()
+          || ( (isManager() || isVolunteer()) && group in userZones() );
+    }
+
+    // ── Markers, lijnen, sectoren ─────────────────────────────────
+    // Pad: /maps/{year}/{group}/data/markers/{docId}
+    // group = plaatsnaam, bv. Zeist
     match /maps/{year}/{group}/data/markers/{docId} {
-      allow read: if true;
-      allow create, update, delete: if isVolunteer();
+      allow read:             if true;
+      allow create, update, delete: if canWriteInGroup(group);
     }
     match /maps/{year}/{group}/data/lines/{docId} {
-      allow read: if true;
-      allow create, update, delete: if isVolunteer();
+      allow read:             if true;
+      allow create, update, delete: if canWriteInGroup(group);
     }
     match /maps/{year}/{group}/data/sectors/{docId} {
-      allow read: if true;
-      allow create, update, delete: if isVolunteer();
+      allow read:             if true;
+      allow create, update, delete: if canWriteInGroup(group);
     }
 
-    // Polygonen (gebieden): alleen admin mag aanpassen
+    // ── Polygonen (gebieden) ──────────────────────────────────────
+    // Admin: alles
+    // Manager: aanmaken altijd, wijzigen/verwijderen alleen eigen polygonen
     match /maps/{year}/{group}/data/polygons/{docId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() || isManager();
+      allow update, delete:
+        if isAdmin()
+        || ( isManager() && resource.data.createdBy == uid() );
     }
 
-    // Rollen: gebruikers mogen hun eigen rol lezen, admin mag alles schrijven
-    match /roles/{uid} {
-      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+    // ── Rollen ───────────────────────────────────────────────────
+    // Gebruiker mag eigen rol lezen, admin mag alles schrijven
+    match /roles/{userId} {
+      allow read:  if isSignedIn() && (request.auth.uid == userId || isAdmin());
       allow write: if isAdmin();
     }
   }
