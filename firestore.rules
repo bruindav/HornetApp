@@ -1,4 +1,4 @@
-
+// Fix 12 — vereenvoudigde rechten passend bij gebruik
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -6,34 +6,32 @@ service cloud.firestore {
     function isSignedIn() { return request.auth != null; }
     function userDoc() { return get(/databases/{database}/documents/roles/{request.auth.uid}); }
     function userRole() { return userDoc().data.role; }
-    function userZones() { return userDoc().data.zones; }
     function isAdmin() { return isSignedIn() && userRole() == 'admin'; }
-    function canWriteZone(z) { return isAdmin() || (isSignedIn() && z in userZones()); }
+    function isVolunteer() { return isSignedIn() && (userRole() == 'volunteer' || userRole() == 'admin'); }
 
+    // Markers, lines, sectors: elke ingelogde vrijwilliger of admin mag schrijven
     match /maps/{year}/{group}/data/markers/{docId} {
       allow read: if true;
-      allow create: if canWriteZone(request.resource.data.zoneId);
-      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
-      allow delete: if canWriteZone(resource.data.zoneId);
+      allow create, update, delete: if isVolunteer();
     }
     match /maps/{year}/{group}/data/lines/{docId} {
       allow read: if true;
-      allow create: if canWriteZone(request.resource.data.zoneId);
-      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
-      allow delete: if canWriteZone(resource.data.zoneId);
+      allow create, update, delete: if isVolunteer();
     }
     match /maps/{year}/{group}/data/sectors/{docId} {
       allow read: if true;
-      allow create: if canWriteZone(request.resource.data.zoneId);
-      allow update: if canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId);
-      allow delete: if canWriteZone(resource.data.zoneId);
+      allow create, update, delete: if isVolunteer();
     }
+
+    // Polygonen (gebieden): alleen admin mag aanpassen
     match /maps/{year}/{group}/data/polygons/{docId} {
       allow read: if true;
       allow create, update, delete: if isAdmin();
     }
+
+    // Rollen: gebruikers mogen hun eigen rol lezen, admin mag alles schrijven
     match /roles/{uid} {
-      allow read: if isSignedIn() && request.auth.uid == uid || isAdmin();
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if isAdmin();
     }
   }
