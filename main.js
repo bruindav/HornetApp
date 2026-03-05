@@ -1,4 +1,4 @@
-// main.js — Fix 15 — Google + email/wachtwoord login + registratie + auto-pending
+// main.js — Fix 16 — Google + email/wachtwoord + admin overlay
 import { auth, loginWithGoogle, loginWithEmail, registerWithEmail } from './firebase.js';
 import { onAuthStateChanged, signOut }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -8,23 +8,26 @@ import { app } from './firebase.js';
 
 const db = getFirestore(app);
 
-// ── Foutmeldingen vertalen ──────────────────────────────────────────
 function friendlyError(code) {
   const map = {
-    'auth/invalid-email':            'Ongeldig e-mailadres.',
-    'auth/user-not-found':           'Geen account gevonden met dit e-mailadres.',
-    'auth/wrong-password':           'Onjuist wachtwoord.',
-    'auth/invalid-credential':       'E-mail of wachtwoord klopt niet.',
-    'auth/email-already-in-use':     'Dit e-mailadres is al in gebruik.',
-    'auth/weak-password':            'Wachtwoord moet minimaal 6 tekens zijn.',
-    'auth/too-many-requests':        'Te veel pogingen. Probeer later opnieuw.',
-    'auth/popup-closed-by-user':     'Inloggen geannuleerd.',
-    'auth/network-request-failed':   'Netwerkfout. Controleer je internetverbinding.',
+    'auth/invalid-email':          'Ongeldig e-mailadres.',
+    'auth/user-not-found':         'Geen account gevonden met dit e-mailadres.',
+    'auth/wrong-password':         'Onjuist wachtwoord.',
+    'auth/invalid-credential':     'E-mail of wachtwoord klopt niet.',
+    'auth/email-already-in-use':   'Dit e-mailadres is al in gebruik.',
+    'auth/weak-password':          'Wachtwoord moet minimaal 6 tekens zijn.',
+    'auth/too-many-requests':      'Te veel pogingen. Probeer later opnieuw.',
+    'auth/popup-closed-by-user':   'Inloggen geannuleerd.',
+    'auth/network-request-failed': 'Netwerkfout. Controleer je verbinding.',
   };
   return map[code] || 'Er is een fout opgetreden. Probeer opnieuw.';
 }
 
-// ── Schermen wisselen ──────────────────────────────────────────────
+function showAuthError(msg) {
+  const el = document.getElementById('auth-error');
+  if (el) { el.textContent = msg; el.classList.add('show'); }
+}
+
 function showLogin() {
   document.getElementById('login-screen')?.classList.remove('hidden');
   document.getElementById('app-shell')?.classList.add('hidden');
@@ -38,27 +41,31 @@ function renderHeader(user) {
   if (who) who.textContent = user?.displayName || user?.email || '–';
 }
 
-// ── Admin knop tonen ───────────────────────────────────────────────
+// Admin knop toevoegen aan header (alleen voor admins)
 async function renderAdminLink(uid) {
   try {
     const snap = await getDoc(doc(db, 'roles', uid));
     if (snap.exists() && snap.data().role === 'admin') {
-      const hdr = document.querySelector('header');
-      if (hdr && !document.getElementById('admin-link')) {
-        const a = document.createElement('a');
-        a.id = 'admin-link';
-        a.href = '/admin.html';
-        a.textContent = '⚙️ Beheer';
-        a.style.cssText = 'color:#94a3b8;text-decoration:none;font-size:13px;';
-        a.onmouseover = () => a.style.color = '#fff';
-        a.onmouseout  = () => a.style.color = '#94a3b8';
-        hdr.insertBefore(a, document.getElementById('logoutBtn'));
+      if (!document.getElementById('admin-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'admin-btn';
+        btn.textContent = '⚙️ Beheer';
+        btn.style.cssText = 'background:none;border:1px solid #475569;color:#94a3b8;border-radius:4px;padding:4px 10px;font-size:13px;cursor:pointer;';
+        btn.onmouseover = () => btn.style.color = '#fff';
+        btn.onmouseout  = () => btn.style.color = '#94a3b8';
+        btn.addEventListener('click', async () => {
+          const { openAdminOverlay } = await import('./admin.js');
+          openAdminOverlay();
+        });
+        const hdr = document.querySelector('header');
+        const logout = document.getElementById('logoutBtn');
+        if (hdr && logout) hdr.insertBefore(btn, logout);
       }
     }
   } catch {}
 }
 
-// ── Nieuwe gebruiker registreren als pending ───────────────────────
+// Nieuwe gebruiker automatisch als pending registreren
 async function autoRegisterUser(user) {
   try {
     const ref = doc(db, 'roles', user.uid);
@@ -77,7 +84,6 @@ async function autoRegisterUser(user) {
   }
 }
 
-// ── App boot (eenmalig) ────────────────────────────────────────────
 let _bootPromise = null;
 async function startAppOnce() {
   if (_bootPromise) return _bootPromise;
@@ -88,9 +94,7 @@ async function startAppOnce() {
   return _bootPromise;
 }
 
-// ── Login/registreer knoppen ───────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-
   // Email inloggen
   document.getElementById('loginEmailBtn')?.addEventListener('click', async () => {
     const email    = document.getElementById('login-email')?.value?.trim();
@@ -122,14 +126,13 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('registerBtn').disabled = true;
     try {
       await registerWithEmail(name, email, password);
-      // onAuthStateChanged handelt de rest af
     } catch (e) {
       showAuthError(friendlyError(e.code));
       document.getElementById('registerBtn').disabled = false;
     }
   });
 
-  // Google registreren (zelfde als inloggen met Google)
+  // Google registreren
   document.getElementById('registerGoogleBtn')?.addEventListener('click', async () => {
     try { await loginWithGoogle(); }
     catch (e) { showAuthError(friendlyError(e.code)); }
@@ -141,12 +144,6 @@ window.addEventListener('DOMContentLoaded', () => {
     signOut(auth);
   });
 });
-
-// ── Auth state ────────────────────────────────────────────────────
-function showAuthError(msg) {
-  const el = document.getElementById('auth-error');
-  if (el) { el.textContent = msg; el.classList.add('show'); }
-}
 
 onAuthStateChanged(auth, async (user) => {
   if (user) {
