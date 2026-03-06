@@ -1,16 +1,7 @@
-// firestore.rules — Fix 26
-// Wijziging t.o.v. Fix 25:
-// roles/{uid} read rule hersteld zodat admin de volledige collectie
-// kan lezen (nodig voor gebruikersbeheer panel), maar zonder circulaire
-// isAdmin() aanroep. Oplossing: aparte adminDoc() functie die alleen
-// wordt aangeroepen vanuit niet-circulaire context, plus een directe
-// token-claim check als fallback.
-// De roles collectie list/read door admin werkt nu via:
-//   allow read: if eigen doc || isAdmin()
-// isAdmin() gebruikt get() op het eigen doc — dit is niet circulair
-// want de rule voor roles/{uid} matched op een specifiek uid, terwijl
-// isAdmin() get() doet op het uid van de ingelogde user. Firebase
-// evalueert deze niet als circulair als ze op verschillende paden vallen.
+// firestore.rules — Fix 27
+// Wijziging t.o.v. Fix 26:
+// - mail collectie toegevoegd: alleen admin mag schrijven (voor welkomst-emails
+//   via Firebase Trigger Email extensie). Lezen geblokkeerd voor iedereen.
 
 rules_version = '2';
 service cloud.firestore {
@@ -58,13 +49,16 @@ service cloud.firestore {
     }
 
     match /roles/{uid} {
-      // Eigen doc lezen altijd toegestaan.
-      // Admin mag alle docs lezen (voor gebruikersbeheer panel).
-      // isAdmin() doet get() op roles/{ingelogde uid} — dat is een
-      // ander pad dan roles/{uid} die hier gematcht wordt, dus
-      // geen circulaire evaluatie.
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
       allow write: if isAdmin();
+    }
+
+    // Mail collectie voor Firebase Trigger Email extensie.
+    // Alleen admin mag documenten aanmaken (= email versturen).
+    // Lezen geblokkeerd — de extensie leest intern via service account.
+    match /mail/{docId} {
+      allow read: if false;
+      allow create: if isAdmin();
     }
   }
 }
