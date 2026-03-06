@@ -1,4 +1,4 @@
-// admin.js — Fix 21 — uitgebreide foutmelding + getDocs ipv onSnapshot voor debug
+// admin.js — Fix 24 — weiger knop toegevoegd
 import { auth } from './firebase.js';
 import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -131,6 +131,7 @@ function renderTable(users) {
             <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Beheerder</option>
             <option value="admin"     ${u.role==='admin'    ?'selected':''}>⭐ Admin</option>
           </select>
+          ${isPending ? `<button class="adm-btn-reject" onclick="adminRejectUser('${u.uid}', '${u.displayName||u.email||''}')">✕ Weigeren</button>` : ''}
         </td>
         <td><div class="adm-zones">${zoneTags}${zoneAdd}</div></td>
       </tr>`;
@@ -142,6 +143,18 @@ function renderTable(users) {
       <tbody>${rows}</tbody>
     </table>`);
 }
+
+window.adminRejectUser = async (uid, name) => {
+  if (!confirm(`Gebruiker "${name}" weigeren en verwijderen?`)) return;
+  try {
+    const { deleteDoc, doc: firestoreDoc } = await import(
+      'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
+    );
+    await deleteDoc(firestoreDoc(db, 'roles', uid));
+  } catch (e) {
+    alert(`Weigeren mislukt: ${e.message}`);
+  }
+};
 
 window.adminSetRole = async (uid, role) => {
   try {

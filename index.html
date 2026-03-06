@@ -1,4 +1,4 @@
-<!-- index.html — Fix 21 — cache busting alle versies -->
+<!-- index.html — Fix 24 — weiger knop stijl -->
 <!DOCTYPE html>
 <html lang="nl">
   <head>
@@ -263,6 +263,12 @@
         background: #0f172a; color: #fff; border: none;
         border-radius: 4px; padding: 3px 8px; cursor: pointer; font-size: 12px;
       }
+      .adm-btn-reject {
+        display: block; margin-top: 6px;
+        background: none; border: 1px solid #fca5a5; color: #ef4444;
+        border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 12px;
+      }
+      .adm-btn-reject:hover { background: #fef2f2; }
       /* ── Overige ── */
       .hidden { display:none !important; }
       .ctx-menu { position:fixed; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:8px; box-shadow:0 6px 24px rgba(15,23,42,.15); z-index:9999; }
@@ -469,6 +475,6 @@
       });
     </script>
 
-    <script type="module" src="./main.js?v=fix21"></script>
+    <script type="module" src="./main.js?v=fix24"></script>
   </body>
 </html>
