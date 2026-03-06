@@ -1,5 +1,8 @@
-// sync-engine.js — Fix 12
+// sync-engine.js — Fix 13
 // Firestore sync voor HornetApp
+// Wijziging t.o.v. Fix 12: zoneId wordt nu automatisch meegegeven
+// aan alle saveDoc-aanroepen, zodat Firestore rules canWriteZone() correct
+// kunnen evalueren voor zowel admin als vrijwilligers.
 
 import { app } from './firebase.js';
 import {
@@ -25,6 +28,11 @@ export function setActiveScope(year, group) {
   _unsubscribers.forEach(fn => { try { fn(); } catch {} });
   _unsubscribers = [];
   return { base: _base };
+}
+
+// Geeft de huidige actieve group/zone terug
+export function getActiveGroup() {
+  return _group;
 }
 
 // ======================= Realtime listeners =======================
@@ -79,17 +87,25 @@ async function deleteDocument(colName, id) {
 }
 
 // ======================= Markers =======================
-export function saveMarkerToCloud(data)   { return saveDoc('markers', data.id, data); }
+export function saveMarkerToCloud(data) {
+  return saveDoc('markers', data.id, { ...data, zoneId: data.zoneId || _group });
+}
 export function deleteMarkerFromCloud(id) { return deleteDocument('markers', id); }
 
 // ======================= Lines =======================
-export function saveLineToCloud(data)   { return saveDoc('lines', data.id, data); }
+export function saveLineToCloud(data) {
+  return saveDoc('lines', data.id, { ...data, zoneId: data.zoneId || _group });
+}
 export function deleteLineFromCloud(id) { return deleteDocument('lines', id); }
 
 // ======================= Sectors =======================
-export function saveSectorToCloud(data)   { return saveDoc('sectors', data.id, data); }
+export function saveSectorToCloud(data) {
+  return saveDoc('sectors', data.id, { ...data, zoneId: data.zoneId || _group });
+}
 export function deleteSectorFromCloud(id) { return deleteDocument('sectors', id); }
 
 // ======================= Polygons =======================
-export function savePolygonToCloud(data)   { return saveDoc('polygons', data.id, data); }
+export function savePolygonToCloud(data) {
+  return saveDoc('polygons', data.id, { ...data, zoneId: data.zoneId || _group });
+}
 export function deletePolygonFromCloud(id) { return deleteDocument('polygons', id); }
