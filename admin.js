@@ -1,17 +1,22 @@
-// admin.js — Fix 26
-// Wijzigingen t.o.v. Fix 24:
-// - Verwijder-knop voor geaccepteerde gebruikers (niet voor eigen account)
-// - Welkomst-email via Firebase Trigger Email extensie bij pending → actieve rol
-// - displayName bewerkbaar via inline edit-knop
-// - zones worden correct opgeslagen: adminAcceptUser slaat rol + zones tegelijk op
-//   via een apart acceptatie-dialoog, in plaats van via de onchange select
+// admin.js — Fix 27
+// Wijziging t.o.v. Fix 26:
+// - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
+// - sendWelcomeEmail() gebruikt emailjs.send() via CDN
+// - Geen Firestore 'mail' collectie meer nodig
+// - EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY bovenaan instellen
 
 import { auth } from './firebase.js';
-import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, getDoc, deleteDoc }
+import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
 
 const db = getFirestore(app);
+
+// ======================= EmailJS configuratie =======================
+// Vul deze drie waarden in na aanmaken account op emailjs.com
+const EMAILJS_SERVICE_ID  = 'JOUW_SERVICE_ID';   // bv. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'JOUW_TEMPLATE_ID';  // bv. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY  = 'JOUW_PUBLIC_KEY';   // bv. 'user_AbCdEfGh'
 
 const KNOWN_ZONES = [
   'Hoornaar_Zeist',
@@ -111,7 +116,7 @@ function renderTable(users) {
     const isAccepted = ACCEPTED_ROLES.includes(u.role);
     const isSelf     = u.uid === _adminUid;
 
-    // --- Naam-cel met bewerkbaar displayName ---
+    // --- Naam-cel ---
     const nameCell = `
       <td>
         <div style="display:flex;align-items:center;gap:6px">
@@ -123,8 +128,6 @@ function renderTable(users) {
       </td>`;
 
     // --- Rol-cel ---
-    // Pending: toon accepteer-knop (opent dialoog voor rol+zones+naam tegelijk)
-    // Geaccepteerd: toon rol-dropdown + optionele verwijder-knop
     let rolCell;
     if (isPending) {
       rolCell = `
@@ -176,11 +179,7 @@ function renderTable(users) {
 }
 
 // ======================= Accepteer-dialoog =======================
-// Opent een mini-dialoog waarin de admin tegelijk naam, rol én gebieden kiest
-// voordat de gebruiker geaccepteerd wordt. Zo worden alle velden in één
-// setDoc opgeslagen en gaat er niets verloren.
 window.adminOpenAcceptDialog = (uid, email, currentName) => {
-  // Verwijder eventueel eerder dialoog
   document.getElementById('adm-accept-dialog')?.remove();
 
   const zonesOptions = KNOWN_ZONES.map(z =>
@@ -235,7 +234,6 @@ window.adminOpenAcceptDialog = (uid, email, currentName) => {
     const role  = document.getElementById('adm-acc-role').value;
     const zones = [...document.querySelectorAll('#adm-accept-dialog input[name="adz"]:checked')]
                     .map(cb => cb.value);
-
     dlg.remove();
     await adminConfirmAccept(uid, email, name, role, zones);
   });
@@ -243,7 +241,6 @@ window.adminOpenAcceptDialog = (uid, email, currentName) => {
 
 async function adminConfirmAccept(uid, email, name, role, zones) {
   try {
-    // Alles in één setDoc zodat zones nooit verloren gaan
     await setDoc(doc(db, 'roles', uid), { role, zones, displayName: name }, { merge: true });
     await sendWelcomeEmail(email, name, role, zones);
   } catch (e) {
@@ -251,46 +248,47 @@ async function adminConfirmAccept(uid, email, name, role, zones) {
   }
 }
 
-// ======================= Welkomst-email =======================
+// ======================= Welkomst-email via EmailJS =======================
 async function sendWelcomeEmail(email, displayName, role, zones) {
   if (!email) return;
+
+  // EmailJS laden via CDN als het nog niet geladen is
+  if (!window.emailjs) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+    window.emailjs.init(EMAILJS_PUBLIC_KEY);
+  }
+
   const roleLabels = { volunteer: 'Vrijwilliger', manager: 'Beheerder', admin: 'Admin' };
   const roleLabel  = roleLabels[role] || role;
   const name       = displayName || email;
-  const zonesHtml  = zones.length
-    ? zones.map(z => `<strong>${z.replace('Hoornaar_','')}</strong>`).join(', ')
-    : '<em>nog geen gebied toegewezen</em>';
   const zonesText  = zones.length
-    ? zones.map(z => `• ${z.replace('Hoornaar_','')}`).join('\n')
+    ? zones.map(z => z.replace('Hoornaar_', '')).join(', ')
     : '(nog geen gebied toegewezen)';
 
   try {
-    await addDoc(collection(db, 'mail'), {
-      to: email,
-      message: {
-        subject: 'Toegang verleend – HornetApp',
-        text: `Hallo ${name},\n\nJe toegang tot HornetApp is goedgekeurd.\n\nJouw rol: ${roleLabel}\nJouw gebied(en):\n${zonesText}\n\nJe kunt nu inloggen via de app.\n\nMet vriendelijke groet,\nHet HornetApp-team`,
-        html: `
-          <p>Hallo <strong>${name}</strong>,</p>
-          <p>Je toegang tot <strong>HornetApp</strong> is goedgekeurd.</p>
-          <table style="border-collapse:collapse;margin:12px 0">
-            <tr><td style="padding:4px 12px 4px 0;color:#64748b">Rol</td><td><strong>${roleLabel}</strong></td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#64748b;vertical-align:top">Gebied(en)</td><td>${zonesHtml}</td></tr>
-          </table>
-          <p>Je kunt nu inloggen via de app.</p>
-          <p style="color:#64748b;font-size:13px">Met vriendelijke groet,<br>Het HornetApp-team</p>`,
-      },
+    await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+      to_email:    email,
+      to_name:     name,
+      user_role:   roleLabel,
+      user_zones:  zonesText,
     });
     console.log(`[admin] welkomstmail verstuurd naar ${email}`);
   } catch (e) {
-    console.error('[admin] welkomstmail mislukt:', e.code, e.message);
+    console.error('[admin] welkomstmail mislukt:', e);
+    // Geen alert — email mislukken mag de acceptatie niet blokkeren
   }
 }
 
 // ======================= Naam bewerken =======================
 window.adminEditName = async (uid, currentName) => {
   const newName = prompt('Weergavenaam:', currentName);
-  if (newName === null) return; // geannuleerd
+  if (newName === null) return;
   try {
     await setDoc(doc(db, 'roles', uid), { displayName: newName.trim() }, { merge: true });
   } catch (e) {
