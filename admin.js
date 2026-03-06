@@ -1,4 +1,11 @@
-// admin.js — Fix 25 — verwijder knop + welkomst-email via Trigger Email
+// admin.js — Fix 26
+// Wijzigingen t.o.v. Fix 24:
+// - Verwijder-knop voor geaccepteerde gebruikers (niet voor eigen account)
+// - Welkomst-email via Firebase Trigger Email extensie bij pending → actieve rol
+// - displayName bewerkbaar via inline edit-knop
+// - zones worden correct opgeslagen: adminAcceptUser slaat rol + zones tegelijk op
+//   via een apart acceptatie-dialoog, in plaats van via de onchange select
+
 import { auth } from './firebase.js';
 import { getFirestore, collection, doc, setDoc, addDoc, onSnapshot, query, getDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -13,12 +20,12 @@ const KNOWN_ZONES = [
   'Hoornaar_Utrecht',
 ];
 
-// Rollen die als "geaccepteerd" gelden (niet pending)
 const ACCEPTED_ROLES = ['volunteer', 'manager', 'admin'];
 
 let _unsubUsers = null;
-let _adminUid   = null; // uid van ingelogde admin, zodat die niet verwijderd kan worden
+let _adminUid   = null;
 
+// ======================= Overlay =======================
 function createOverlay() {
   if (document.getElementById('admin-overlay')) return;
   const el = document.createElement('div');
@@ -58,9 +65,7 @@ export async function openAdminOverlay() {
   try {
     const mySnap = await getDoc(doc(db, 'roles', uid));
     myRole = mySnap.data()?.role;
-    console.log('[admin] eigen rol:', myRole, '| uid:', uid);
   } catch (e) {
-    console.error('[admin] eigen rol lezen mislukt:', e.code, e.message);
     setAdminBody(`<p style="color:red;padding:12px">Fout bij rolcheck: ${e.code} — ${e.message}</p>`);
     return;
   }
@@ -70,7 +75,6 @@ export async function openAdminOverlay() {
     return;
   }
 
-  console.log('[admin] rol OK, roles collectie ophalen...');
   startListening();
 }
 
@@ -81,19 +85,16 @@ function closeAdminOverlay() {
 
 function startListening() {
   if (_unsubUsers) _unsubUsers();
-  const rolesRef = collection(db, 'roles');
-  _unsubUsers = onSnapshot(query(rolesRef), snap => {
-    console.log('[admin] snapshot ontvangen, docs:', snap.docs.length);
-    const users = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-    renderTable(users);
+  _unsubUsers = onSnapshot(query(collection(db, 'roles')), snap => {
+    renderTable(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
   }, err => {
-    console.error('[admin] onSnapshot fout:', err.code, err.message);
     setAdminBody(`<p style="color:red;padding:12px">Fout: ${err.code} — ${err.message}</p>`);
   });
 }
 
+// ======================= Tabel =======================
 function renderTable(users) {
-  if (users.length === 0) {
+  if (!users.length) {
     setAdminBody('<p style="color:#64748b;padding:12px">Nog geen gebruikers.</p>');
     return;
   }
@@ -110,50 +111,61 @@ function renderTable(users) {
     const isAccepted = ACCEPTED_ROLES.includes(u.role);
     const isSelf     = u.uid === _adminUid;
 
+    // --- Naam-cel met bewerkbaar displayName ---
+    const nameCell = `
+      <td>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span id="dn-text-${u.uid}"><strong>${u.displayName || '<em style="color:#94a3b8">geen naam</em>'}</strong></span>
+          <button class="adm-btn-icon" title="Naam bewerken" onclick="adminEditName('${u.uid}','${(u.displayName||'').replace(/'/g,"\\'")}')">✏️</button>
+        </div>
+        <div class="adm-muted">${u.email || u.uid}</div>
+        ${isSelf ? '<div style="color:#0aa879;font-size:11px">(jouw account)</div>' : ''}
+      </td>`;
+
+    // --- Rol-cel ---
+    // Pending: toon accepteer-knop (opent dialoog voor rol+zones+naam tegelijk)
+    // Geaccepteerd: toon rol-dropdown + optionele verwijder-knop
+    let rolCell;
+    if (isPending) {
+      rolCell = `
+        <td>
+          <span style="color:#f59e0b;font-weight:600">⏳ Pending</span>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button class="adm-btn-accept" onclick="adminOpenAcceptDialog('${u.uid}','${u.email||''}','${(u.displayName||'').replace(/'/g,"\\'")}')">✓ Accepteren</button>
+            <button class="adm-btn-reject" onclick="adminRejectUser('${u.uid}','${u.displayName||u.email||''}')">✕ Weigeren</button>
+          </div>
+        </td>`;
+    } else {
+      const deleteBtn = isAccepted && !isSelf
+        ? `<button class="adm-btn-delete" onclick="adminDeleteUser('${u.uid}','${u.displayName||u.email||''}')">🗑️ Verwijderen</button>`
+        : '';
+      rolCell = `
+        <td>
+          <select class="adm-sel" onchange="adminSetRole('${u.uid}', this.value)">
+            <option value="volunteer" ${u.role==='volunteer'?'selected':''}>👤 Vrijwilliger</option>
+            <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Beheerder</option>
+            <option value="admin"     ${u.role==='admin'    ?'selected':''}>⭐ Admin</option>
+          </select>
+          <div style="margin-top:6px">${deleteBtn}</div>
+        </td>`;
+    }
+
+    // --- Zones-cel ---
     const zoneTags = zones.map(z => `
-      <span class="adm-tag">${z}
+      <span class="adm-tag">${z.replace('Hoornaar_','')}
         <button class="adm-tag-rm" onclick="adminRemoveZone('${u.uid}','${z}')">×</button>
       </span>`).join('');
-
     const available = KNOWN_ZONES.filter(z => !zones.includes(z));
     const zoneAdd = available.length
       ? `<div class="adm-zone-add">
            <select id="zadd-${u.uid}">
-             ${available.map(z => `<option value="${z}">${z.replace('Hoornaar_','')}</option>`).join('')}
+             ${available.map(z=>`<option value="${z}">${z.replace('Hoornaar_','')}</option>`).join('')}
            </select>
            <button onclick="adminAddZone('${u.uid}')">+ Gebied</button>
          </div>`
       : '<span class="adm-muted">Alle gebieden toegewezen</span>';
 
-    // Acties onderaan de rol-kolom
-    const rejectBtn  = isPending
-      ? `<button class="adm-btn-reject" onclick="adminRejectUser('${u.uid}','${u.displayName||u.email||''}')">✕ Weigeren</button>`
-      : '';
-    // Verwijder-knop: alleen voor geaccepteerde gebruikers, nooit voor jezelf
-    const deleteBtn  = isAccepted && !isSelf
-      ? `<button class="adm-btn-delete" onclick="adminDeleteUser('${u.uid}','${u.displayName||u.email||''}')">🗑️ Verwijderen</button>`
-      : '';
-
-    return `
-      <tr class="${isPending ? 'adm-row-pending' : ''}">
-        <td>
-          <strong>${u.displayName || '—'}</strong>
-          <div class="adm-muted">${u.email || u.uid}</div>
-          ${isSelf ? '<div class="adm-muted" style="color:#0aa879">(jouw account)</div>' : ''}
-        </td>
-        <td>
-          <select class="adm-sel" onchange="adminSetRole('${u.uid}','${u.email||''}','${u.displayName||''}', this.value, ${JSON.stringify(zones)})">
-            <option value="pending"   ${(u.role||'pending')==='pending'  ?'selected':''}>⏳ Pending</option>
-            <option value="volunteer" ${u.role==='volunteer'?'selected':''}>👤 Vrijwilliger</option>
-            <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Beheerder</option>
-            <option value="admin"     ${u.role==='admin'    ?'selected':''}>⭐ Admin</option>
-          </select>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-            ${rejectBtn}${deleteBtn}
-          </div>
-        </td>
-        <td><div class="adm-zones">${zoneTags}${zoneAdd}</div></td>
-      </tr>`;
+    return `<tr class="${isPending?'adm-row-pending':''}">${nameCell}${rolCell}<td><div class="adm-zones">${zoneTags}${zoneAdd}</div></td></tr>`;
   }).join('');
 
   setAdminBody(`
@@ -163,16 +175,94 @@ function renderTable(users) {
     </table>`);
 }
 
+// ======================= Accepteer-dialoog =======================
+// Opent een mini-dialoog waarin de admin tegelijk naam, rol én gebieden kiest
+// voordat de gebruiker geaccepteerd wordt. Zo worden alle velden in één
+// setDoc opgeslagen en gaat er niets verloren.
+window.adminOpenAcceptDialog = (uid, email, currentName) => {
+  // Verwijder eventueel eerder dialoog
+  document.getElementById('adm-accept-dialog')?.remove();
+
+  const zonesOptions = KNOWN_ZONES.map(z =>
+    `<label style="display:block;margin:3px 0">
+      <input type="checkbox" name="adz" value="${z}"> ${z.replace('Hoornaar_','')}
+     </label>`
+  ).join('');
+
+  const dlg = document.createElement('div');
+  dlg.id = 'adm-accept-dialog';
+  dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10001;display:grid;place-items:center';
+  dlg.innerHTML = `
+    <div style="background:#fff;border-radius:10px;padding:24px;min-width:320px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+      <h3 style="margin:0 0 16px">Gebruiker accepteren</h3>
+      <div style="color:#64748b;font-size:13px;margin-bottom:16px">${email}</div>
+
+      <label style="display:block;margin-bottom:12px">
+        <span style="font-size:13px;color:#475569">Naam (weergavenaam)</span>
+        <input id="adm-acc-name" type="text" value="${currentName}"
+          placeholder="Volledige naam"
+          style="display:block;width:100%;box-sizing:border-box;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+      </label>
+
+      <label style="display:block;margin-bottom:12px">
+        <span style="font-size:13px;color:#475569">Rol</span>
+        <select id="adm-acc-role" style="display:block;width:100%;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px">
+          <option value="volunteer">👤 Vrijwilliger</option>
+          <option value="manager">🗂️ Beheerder</option>
+          <option value="admin">⭐ Admin</option>
+        </select>
+      </label>
+
+      <div style="margin-bottom:16px">
+        <span style="font-size:13px;color:#475569">Gebied(en)</span>
+        <div style="margin-top:6px;padding:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px">
+          ${zonesOptions}
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button onclick="document.getElementById('adm-accept-dialog').remove()"
+          style="padding:8px 16px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+        <button id="adm-acc-confirm"
+          style="padding:8px 16px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">✓ Accepteren</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(dlg);
+
+  document.getElementById('adm-acc-confirm').addEventListener('click', async () => {
+    const name  = document.getElementById('adm-acc-name').value.trim();
+    const role  = document.getElementById('adm-acc-role').value;
+    const zones = [...document.querySelectorAll('#adm-accept-dialog input[name="adz"]:checked')]
+                    .map(cb => cb.value);
+
+    dlg.remove();
+    await adminConfirmAccept(uid, email, name, role, zones);
+  });
+};
+
+async function adminConfirmAccept(uid, email, name, role, zones) {
+  try {
+    // Alles in één setDoc zodat zones nooit verloren gaan
+    await setDoc(doc(db, 'roles', uid), { role, zones, displayName: name }, { merge: true });
+    await sendWelcomeEmail(email, name, role, zones);
+  } catch (e) {
+    alert(`Accepteren mislukt: ${e.message}`);
+  }
+}
+
 // ======================= Welkomst-email =======================
 async function sendWelcomeEmail(email, displayName, role, zones) {
-  if (!email) { console.warn('[admin] geen email adres, welkomstmail overgeslagen'); return; }
-
+  if (!email) return;
   const roleLabels = { volunteer: 'Vrijwilliger', manager: 'Beheerder', admin: 'Admin' };
   const roleLabel  = roleLabels[role] || role;
+  const name       = displayName || email;
+  const zonesHtml  = zones.length
+    ? zones.map(z => `<strong>${z.replace('Hoornaar_','')}</strong>`).join(', ')
+    : '<em>nog geen gebied toegewezen</em>';
   const zonesText  = zones.length
-    ? zones.map(z => `• ${z.replace('Hoornaar_', '')}`).join('\n')
+    ? zones.map(z => `• ${z.replace('Hoornaar_','')}`).join('\n')
     : '(nog geen gebied toegewezen)';
-  const name = displayName || email;
 
   try {
     await addDoc(collection(db, 'mail'), {
@@ -185,8 +275,7 @@ async function sendWelcomeEmail(email, displayName, role, zones) {
           <p>Je toegang tot <strong>HornetApp</strong> is goedgekeurd.</p>
           <table style="border-collapse:collapse;margin:12px 0">
             <tr><td style="padding:4px 12px 4px 0;color:#64748b">Rol</td><td><strong>${roleLabel}</strong></td></tr>
-            <tr><td style="padding:4px 12px 4px 0;color:#64748b;vertical-align:top">Gebied(en)</td>
-                <td>${zones.length ? zones.map(z=>`<strong>${z.replace('Hoornaar_','')}</strong>`).join(', ') : '<em>nog geen gebied toegewezen</em>'}</td></tr>
+            <tr><td style="padding:4px 12px 4px 0;color:#64748b;vertical-align:top">Gebied(en)</td><td>${zonesHtml}</td></tr>
           </table>
           <p>Je kunt nu inloggen via de app.</p>
           <p style="color:#64748b;font-size:13px">Met vriendelijke groet,<br>Het HornetApp-team</p>`,
@@ -198,27 +287,27 @@ async function sendWelcomeEmail(email, displayName, role, zones) {
   }
 }
 
-// ======================= Window-functies (aangeroepen vanuit HTML) =======================
-
-// Rol wijzigen — stuur welkomstmail als van pending → geaccepteerde rol
-window.adminSetRole = async (uid, email, displayName, newRole, zones) => {
+// ======================= Naam bewerken =======================
+window.adminEditName = async (uid, currentName) => {
+  const newName = prompt('Weergavenaam:', currentName);
+  if (newName === null) return; // geannuleerd
   try {
-    const snap = await getDoc(doc(db, 'roles', uid));
-    const oldRole = snap.data()?.role || 'pending';
-    await setDoc(doc(db, 'roles', uid), { role: newRole }, { merge: true });
+    await setDoc(doc(db, 'roles', uid), { displayName: newName.trim() }, { merge: true });
+  } catch (e) {
+    alert(`Naam opslaan mislukt: ${e.message}`);
+  }
+};
 
-    // Welkomstmail sturen als gebruiker voor het eerst geaccepteerd wordt
-    const wassPending = !oldRole || oldRole === 'pending';
-    const isNowAccepted = ACCEPTED_ROLES.includes(newRole);
-    if (wassPending && isNowAccepted) {
-      await sendWelcomeEmail(email, displayName, newRole, zones);
-    }
+// ======================= Rol wijzigen (al geaccepteerde gebruiker) =======================
+window.adminSetRole = async (uid, newRole) => {
+  try {
+    await setDoc(doc(db, 'roles', uid), { role: newRole }, { merge: true });
   } catch (e) {
     alert(`Rol instellen mislukt: ${e.message}`);
   }
 };
 
-// Pending gebruiker weigeren en verwijderen
+// ======================= Verwijderen =======================
 window.adminRejectUser = async (uid, name) => {
   if (!confirm(`Gebruiker "${name}" weigeren en verwijderen?`)) return;
   try {
@@ -228,10 +317,9 @@ window.adminRejectUser = async (uid, name) => {
   }
 };
 
-// Geaccepteerde gebruiker verwijderen (niet jezelf)
 window.adminDeleteUser = async (uid, name) => {
   if (uid === _adminUid) { alert('Je kunt jezelf niet verwijderen.'); return; }
-  if (!confirm(`Gebruiker "${name}" definitief verwijderen? Dit verwijdert hun toegang maar niet hun kaartdata.`)) return;
+  if (!confirm(`Gebruiker "${name}" definitief verwijderen?\nDit verwijdert hun toegang maar niet hun kaartdata.`)) return;
   try {
     await deleteDoc(doc(db, 'roles', uid));
   } catch (e) {
@@ -239,16 +327,16 @@ window.adminDeleteUser = async (uid, name) => {
   }
 };
 
+// ======================= Zones =======================
 window.adminAddZone = async (uid) => {
   const sel = document.getElementById(`zadd-${uid}`);
   if (!sel) return;
   const zone = sel.value;
   try {
-    const snap = await getDoc(doc(db, 'roles', uid));
+    const snap  = await getDoc(doc(db, 'roles', uid));
     const zones = Array.isArray(snap.data()?.zones) ? snap.data().zones : [];
-    if (!zones.includes(zone)) {
+    if (!zones.includes(zone))
       await setDoc(doc(db, 'roles', uid), { zones: [...zones, zone] }, { merge: true });
-    }
   } catch (e) {
     alert(`Gebied toevoegen mislukt: ${e.message}`);
   }
@@ -256,7 +344,7 @@ window.adminAddZone = async (uid) => {
 
 window.adminRemoveZone = async (uid, zone) => {
   try {
-    const snap = await getDoc(doc(db, 'roles', uid));
+    const snap  = await getDoc(doc(db, 'roles', uid));
     const zones = (snap.data()?.zones || []).filter(z => z !== zone);
     await setDoc(doc(db, 'roles', uid), { zones }, { merge: true });
   } catch (e) {
