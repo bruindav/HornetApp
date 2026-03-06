@@ -1,13 +1,13 @@
-// app-core.js — Hornet Mapper NL — Fix 13
-// Fixes: bearingBetween syntax, modal DOM-binding, map dubbele init guard, createdBy polygoon, auth import
-import {
-  setActiveScope, listenToCloudChanges,
-  saveMarkerToCloud, deleteMarkerFromCloud,
-  saveLineToCloud, deleteLineFromCloud,
-  saveSectorToCloud, deleteSectorFromCloud,
-  savePolygonToCloud, deletePolygonFromCloud
-} from "./sync-engine.js";
+// app-core.js — Hornet Mapper NL — Fix 22
+// Fixes: sync-engine lazy loaded zodat Firestore pas start na rolcheck
+// Fix 22 — sync-engine lazy loaded in boot() zodat Firestore niet start voor rolcheck
+// auth en sync functies worden pas geladen nadat rol gecontroleerd is
 import { auth } from "./firebase.js";
+let setActiveScope, listenToCloudChanges,
+    saveMarkerToCloud, deleteMarkerFromCloud,
+    saveLineToCloud, deleteLineFromCloud,
+    saveSectorToCloud, deleteSectorFromCloud,
+    savePolygonToCloud, deletePolygonFromCloud;
 
 // ======================= Helpers =======================
 function $(id) { return document.getElementById(id); }
@@ -699,7 +699,20 @@ function activateScope(year,group,reload=false){
 }
 
 // ======================= Boot =======================
-export function boot(){
+export async function boot(){
+  // Lazy load sync-engine — pas na rolcheck aangeroepen vanuit main.js
+  const sync = await import('./sync-engine.js');
+  setActiveScope        = sync.setActiveScope;
+  listenToCloudChanges  = sync.listenToCloudChanges;
+  saveMarkerToCloud     = sync.saveMarkerToCloud;
+  deleteMarkerFromCloud = sync.deleteMarkerFromCloud;
+  saveLineToCloud       = sync.saveLineToCloud;
+  deleteLineFromCloud   = sync.deleteLineFromCloud;
+  saveSectorToCloud     = sync.saveSectorToCloud;
+  deleteSectorFromCloud = sync.deleteSectorFromCloud;
+  savePolygonToCloud    = sync.savePolygonToCloud;
+  deletePolygonFromCloud= sync.deletePolygonFromCloud;
+
   initMap();
   initUIBindings();
   const selYear=$('sel-year'), selGroup=$('sel-group');
