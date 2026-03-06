@@ -1,5 +1,4 @@
-// app-core.js — Fix 22
-// app-core.js — Fix 23
+// app-core.js — Fix 24
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -10,7 +9,7 @@
 // 
 // ----------------------------------------------------------------------------
 import { auth } from './firebase.js';
-import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
 const _db = getFirestore(app);
 
@@ -787,19 +786,35 @@ function boot(){
   });
   activateScope(saved.year, saved.group, /*reload=*/true);
   applyFilters();
-  // displayName ophalen uit roles/{uid} voor default invulling bij icoon plaatsen
-  _loadCurrentDisplayName();
+  // Roles doc controleren: aanmaken als pending bij eerste login, daarna displayName laden
+  _initUserRole();
 }
 
-async function _loadCurrentDisplayName() {
+async function _initUserRole() {
   try {
-    const uid = auth.currentUser?.uid;
+    const uid   = auth.currentUser?.uid;
+    const email = auth.currentUser?.email;
     if (!uid) return;
-    const snap = await getDoc(doc(_db, 'roles', uid));
-    const name = snap.data()?.displayName;
-    if (name) { _currentDisplayName = name; console.log('[app] displayName geladen:', name); }
+
+    const ref  = doc(_db, 'roles', uid);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+      // Eerste login — pending aanmaken zodat admin hem kan accepteren
+      await setDoc(ref, {
+        role:        'pending',
+        email:       email || '',
+        displayName: auth.currentUser?.displayName || '',
+        createdAt:   new Date().toISOString(),
+      });
+      console.log('[app] nieuw roles doc aangemaakt als pending voor', email);
+    } else {
+      // Al bestaand — displayName laden voor icoon-modal
+      const name = snap.data()?.displayName;
+      if (name) { _currentDisplayName = name; console.log('[app] displayName geladen:', name); }
+    }
   } catch (e) {
-    console.warn('[app] displayName ophalen mislukt:', e.message);
+    console.warn('[app] _initUserRole mislukt:', e.message);
   }
 }
 

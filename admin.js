@@ -1,4 +1,4 @@
-// admin.js — Fix 27
+// admin.js — Fix 28
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -8,15 +8,18 @@
 import { auth } from './firebase.js';
 import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, deleteDoc }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFunctions, httpsCallable }
+  from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
 import { app } from './firebase.js';
 
-const db = getFirestore(app);
+const db        = getFirestore(app);
+const functions = getFunctions(app, 'europe-west4');
 
 // ======================= EmailJS configuratie =======================
 // Vul deze drie waarden in na aanmaken account op emailjs.com
-const EMAILJS_SERVICE_ID  = 'service_am7yhzo';   // bv. 'service_abc123'
-const EMAILJS_TEMPLATE_ID = 'template_8jyfjkf';  // bv. 'template_xyz789'
-const EMAILJS_PUBLIC_KEY  = 'grly1relpuAh_73z7';   // bv. 'user_AbCdEfGh'
+const EMAILJS_SERVICE_ID  = 'JOUW_SERVICE_ID';   // bv. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'JOUW_TEMPLATE_ID';  // bv. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY  = 'JOUW_PUBLIC_KEY';   // bv. 'user_AbCdEfGh'
 
 const KNOWN_ZONES = [
   'Hoornaar_Zeist',
@@ -309,6 +312,10 @@ window.adminSetRole = async (uid, newRole) => {
 window.adminRejectUser = async (uid, name) => {
   if (!confirm(`Gebruiker "${name}" weigeren en verwijderen?`)) return;
   try {
+    // Verwijder uit Firebase Auth via Cloud Function
+    const deleteAuthUser = httpsCallable(functions, 'deleteAuthUser');
+    await deleteAuthUser({ uid });
+    // Verwijder Firestore roles doc
     await deleteDoc(doc(db, 'roles', uid));
   } catch (e) {
     alert(`Weigeren mislukt: ${e.message}`);
@@ -317,8 +324,12 @@ window.adminRejectUser = async (uid, name) => {
 
 window.adminDeleteUser = async (uid, name) => {
   if (uid === _adminUid) { alert('Je kunt jezelf niet verwijderen.'); return; }
-  if (!confirm(`Gebruiker "${name}" definitief verwijderen?\nDit verwijdert hun toegang maar niet hun kaartdata.`)) return;
+  if (!confirm(`Gebruiker "${name}" definitief verwijderen?\nDit verwijdert hun account volledig.`)) return;
   try {
+    // 1. Verwijder uit Firebase Auth via Cloud Function
+    const deleteAuthUser = httpsCallable(functions, 'deleteAuthUser');
+    await deleteAuthUser({ uid });
+    // 2. Verwijder Firestore roles doc
     await deleteDoc(doc(db, 'roles', uid));
   } catch (e) {
     alert(`Verwijderen mislukt: ${e.message}`);
