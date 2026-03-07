@@ -1,4 +1,4 @@
-// main.js — Fix 33
+// main.js — Fix 34
 // Auth-gated bootstrap met email/wachtwoord + Google login
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -20,6 +20,11 @@ async function startAppOnce(){
   window.__hornetAppBooted = true;
   const mod = await import('./app-core.js');
   mod.boot();
+}
+
+function reloadApp(){
+  // Na uitloggen/inloggen: harde reload om kaart-herinitialisatie te voorkomen
+  location.reload();
 }
 
 function showError(msg) {
@@ -98,7 +103,10 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 
   // Uitloggen
-  document.getElementById('logoutBtn')?.addEventListener('click', () => signOut(auth));
+  document.getElementById('logoutBtn')?.addEventListener('click', async () => {
+    await signOut(auth);
+    reloadApp();
+  });
 });
 
 function firebaseErrorNL(code) {
@@ -123,6 +131,6 @@ onAuthStateChanged(auth, (user) => {
     startAppOnce();
   } else {
     showLogin();
-    window.__hornetAppBooted = false;
+    // Niet resetten — bij opnieuw inloggen herladen we de pagina via logoutBtn
   }
 });
