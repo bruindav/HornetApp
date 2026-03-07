@@ -1,4 +1,4 @@
-// app-core.js — Fix 25
+// app-core.js — Fix 33
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -145,6 +145,14 @@ function initUIBindings(){
     applyFilters();
   });
   // Cache reset
+  // Beheer knop (alleen zichtbaar voor admin, wordt getoond vanuit _initUserRole)
+  const btnAdmin = $('btn-admin');
+  if (btnAdmin) {
+    on(btnAdmin, 'click', async () => {
+      const { openAdminOverlay } = await import('./admin.js');
+      openAdminOverlay();
+    });
+  }
   on(req('btn-reset-cache'), 'click', async()=>{
     try{
       if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
@@ -810,6 +818,10 @@ async function _initUserRole() {
       if (data?.displayName) {
         _currentDisplayName = data.displayName;
         console.log('[app] displayName geladen:', data.displayName);
+      }
+      // Beheer knop tonen als admin
+      if (data?.role === 'admin') {
+        $('btn-admin')?.classList.remove('hidden');
       }
       // Zones laden en dropdown vullen
       const rawZones = Array.isArray(data?.zones) ? data.zones : [];
