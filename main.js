@@ -1,4 +1,4 @@
-// main.js — Fix 34
+// main.js — Fix 35
 // Auth-gated bootstrap met email/wachtwoord + Google login
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -59,7 +59,9 @@ window.addEventListener('DOMContentLoaded', () => {
       clearError();
       try {
         const { loginWithGoogle } = await import('./firebase.js');
-        await loginWithGoogle();
+        const forceSelect = sessionStorage.getItem('force_account_select') === '1';
+        sessionStorage.removeItem('force_account_select');
+        await loginWithGoogle(forceSelect);
       } catch(e) { showError(firebaseErrorNL(e.code)); }
     });
   });
@@ -105,6 +107,8 @@ window.addEventListener('DOMContentLoaded', () => {
   // Uitloggen
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     await signOut(auth);
+    // Forceer account-kiezer bij volgende Google login
+    sessionStorage.setItem('force_account_select', '1');
     reloadApp();
   });
 });
