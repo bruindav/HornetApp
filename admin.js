@@ -1,4 +1,4 @@
-// admin.js — Fix 28A incl email id's
+// admin.js — Fix 29
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -17,15 +17,15 @@ const functions = getFunctions(app, 'europe-west4');
 
 // ======================= EmailJS configuratie =======================
 // Vul deze drie waarden in na aanmaken account op emailjs.com
-const EMAILJS_SERVICE_ID  = 'service_am7yhzo';   // bv. 'service_abc123'
-const EMAILJS_TEMPLATE_ID = 'template_8jyfjkf';  // bv. 'template_xyz789'
-const EMAILJS_PUBLIC_KEY  = 'grly1relpuAh_73z7';   // bv. 'user_AbCdEfGh'
+const EMAILJS_SERVICE_ID  = 'JOUW_SERVICE_ID';   // bv. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'JOUW_TEMPLATE_ID';  // bv. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY  = 'JOUW_PUBLIC_KEY';   // bv. 'user_AbCdEfGh'
 
 const KNOWN_ZONES = [
-  'Hoornaar_Zeist',
-  'Hoornaar_Bilthoven',
-  'Hoornaar_Driebergen',
-  'Hoornaar_Utrecht',
+  'Zeist',
+  'Bilthoven',
+  'Driebergen',
+  'Utrecht',
 ];
 
 const ACCEPTED_ROLES = ['volunteer', 'manager', 'admin'];

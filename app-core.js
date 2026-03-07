@@ -1,4 +1,4 @@
-// app-core.js — Fix 24
+// app-core.js — Fix 25
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -136,25 +136,6 @@ function initUIBindings(){
   on(req('hard-debounce'),'change', e=>{
     DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
   });
-  // 🔍 Zoek overlay
-  const floatingSearchBtn = req('floating-search-btn');
-  const searchOverlay = req('search-overlay');
-  const searchClose = req('search-close');
-  const searchBtn = req('search-btn');
-  const placeInput = req('place-input');
-  on(floatingSearchBtn, 'click', ()=>{
-    if(!searchOverlay || !placeInput) return;
-    searchOverlay.classList.add('active');
-    searchOverlay.setAttribute('aria-hidden','false');
-    placeInput.focus();
-  });
-  on(searchClose, 'click', ()=>{
-    if(!searchOverlay) return;
-    searchOverlay.classList.remove('active');
-    searchOverlay.setAttribute('aria-hidden','true');
-  });
-  on(placeInput, 'keydown', (e)=>{ if(e.key==='Enter') searchPlaceNL(); });
-  on(searchBtn, 'click', searchPlaceNL);
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
   on(req('reset-filters'), 'click', ()=>{
@@ -162,12 +143,6 @@ function initUIBindings(){
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
     const fdb = $('f_date_before'); if (fdb) fdb.value = '';
     applyFilters();
-  });
-  // Zelftest
-  on(req('btn-selftest'), 'click', async()=>{
-    try{ await geocodePhoton('Utrecht'); setStatus(statusGeo,'Photon OK','ok'); }catch{ setStatus(statusGeo,'Photon NOK','err'); }
-    const key = $('mapsco-key')?.value?.trim() || '';
-    try{ await geocodeMapsCo('Utrecht', key); setStatus(statusGeo,'Maps.co OK','ok'); }catch{ setStatus(statusGeo,'Maps.co NOK','err'); }
   });
   // Cache reset
   on(req('btn-reset-cache'), 'click', async()=>{
@@ -745,7 +720,28 @@ function deletePolygonFromCloudLocal(id){
 // ======================= Scope & opstart =======================
 const LS_SCOPE = "hornet_scope_v610"; // {year, group}
 const DEFAULT_YEAR = String(new Date().getFullYear());
-const DEFAULT_GROUP = "Hoornaar_Zeist";
+const DEFAULT_GROUP = "Zeist";
+
+// Zones: interne sleutel → weergavenaam + kaartcentrum
+const ZONE_META = {
+  'Zeist':       { label: 'Zeist',       lat: 52.0893, lon: 5.2425, zoom: 13 },
+  'Bilthoven':   { label: 'Bilthoven',   lat: 52.1267, lon: 5.1986, zoom: 13 },
+  'Driebergen':  { label: 'Driebergen',  lat: 52.0561, lon: 5.2867, zoom: 13 },
+  'Utrecht':     { label: 'Utrecht',     lat: 52.0907, lon: 5.1214, zoom: 13 },
+};
+// Achterwaartse compatibiliteit: oude sleutels met Hoornaar_ prefix
+const ZONE_ALIAS = {
+  'Hoornaar_Zeist':      'Zeist',
+  'Hoornaar_Bilthoven':  'Bilthoven',
+  'Hoornaar_Driebergen': 'Driebergen',
+  'Hoornaar_Utrecht':    'Utrecht',
+};
+function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
+function zoomToZone(zone) {
+  const z = normalizeZone(zone);
+  const meta = ZONE_META[z];
+  if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
+}
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
 function activateScope(year, group, reload=false){
@@ -786,7 +782,7 @@ function boot(){
   });
   activateScope(saved.year, saved.group, /*reload=*/true);
   applyFilters();
-  // Roles doc controleren: aanmaken als pending bij eerste login, daarna displayName laden
+  // Roles doc controleren: aanmaken als pending bij eerste login, daarna displayName + zones laden
   _initUserRole();
 }
 
@@ -809,13 +805,53 @@ async function _initUserRole() {
       });
       console.log('[app] nieuw roles doc aangemaakt als pending voor', email);
     } else {
-      // Al bestaand — displayName laden voor icoon-modal
-      const name = snap.data()?.displayName;
-      if (name) { _currentDisplayName = name; console.log('[app] displayName geladen:', name); }
+      const data = snap.data();
+      // displayName laden voor icoon-modal
+      if (data?.displayName) {
+        _currentDisplayName = data.displayName;
+        console.log('[app] displayName geladen:', data.displayName);
+      }
+      // Zones laden en dropdown vullen
+      const rawZones = Array.isArray(data?.zones) ? data.zones : [];
+      const zones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
+      if (zones.length) {
+        _fillZoneDropdown(zones);
+        // Inzoomen op eerste zone
+        zoomToZone(zones[0]);
+      }
     }
   } catch (e) {
     console.warn('[app] _initUserRole mislukt:', e.message);
   }
+}
+
+function _fillZoneDropdown(zones) {
+  const sel = $('sel-group');
+  if (!sel) return;
+  // Vervang input+datalist door een select met alleen de toegestane zones
+  const parent = sel.parentElement;
+  // Verwijder oude datalist indien aanwezig
+  document.getElementById('groups')?.remove();
+  // Bouw nieuwe select
+  const newSel = document.createElement('select');
+  newSel.id = 'sel-group';
+  newSel.className = sel.className || '';
+  zones.forEach(z => {
+    const opt = document.createElement('option');
+    opt.value = z;
+    opt.textContent = ZONE_META[z]?.label || z;
+    newSel.appendChild(opt);
+  });
+  sel.replaceWith(newSel);
+  // Herstel opgeslagen keuze indien die in de lijst staat
+  const saved = readScope();
+  const savedNorm = saved?.group ? normalizeZone(saved.group) : null;
+  if (savedNorm && zones.includes(savedNorm)) {
+    newSel.value = savedNorm;
+  } else {
+    newSel.value = zones[0];
+  }
+  console.log('[app] zone dropdown gevuld:', zones);
 }
 
 export { boot };
