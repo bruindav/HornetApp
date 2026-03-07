@@ -1,4 +1,4 @@
-// app-core.js — Fix 35
+// app-core.js — Fix 36
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -15,6 +15,8 @@ const _db = getFirestore(app);
 
 // displayName van ingelogde gebruiker (opgehaald uit roles/{uid})
 let _currentDisplayName = '';
+let _currentRole   = '';
+let _currentZones  = [];   // genormaliseerde zones van ingelogde gebruiker
 
 import {
   setActiveScope,
@@ -760,6 +762,13 @@ function zoomToZone(zone) {
   const meta = ZONE_META[z];
   if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
 }
+function updateHeaderScope(zone, year) {
+  const label = ZONE_META[normalizeZone(zone)]?.label || zone;
+  const el = document.getElementById('hdr-scope');
+  const wrap = document.getElementById('hdr-scope-wrap');
+  if (el) el.textContent = `${label} (${year || DEFAULT_YEAR})`;
+  if (wrap) wrap.classList.remove('hidden');
+}
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
 function activateScope(year, group, reload=false){
@@ -780,6 +789,8 @@ function activateScope(year, group, reload=false){
     allMarkers=[]; allLines=[]; allSectors=[];
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
+  zoomToZone(group);
+  updateHeaderScope(group, year);
 }
 // ======================= DOMContentLoaded: alles starten =======================
 function boot(){
@@ -829,17 +840,24 @@ async function _initUserRole() {
         _currentDisplayName = data.displayName;
         console.log('[app] displayName geladen:', data.displayName);
       }
+      // Rol en zones opslaan
+      _currentRole  = data?.role || '';
+      const rawZones = Array.isArray(data?.zones) ? data.zones : [];
+      _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
+
       // Beheer knop tonen als admin
-      if (data?.role === 'admin') {
+      if (_currentRole === 'admin') {
         $('btn-admin')?.classList.remove('hidden');
       }
+      // Geoman tekenen: alleen tonen voor admin en manager
+      if (_currentRole !== 'admin' && _currentRole !== 'manager') {
+        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false }); } catch{}
+      }
       // Zones laden en dropdown vullen
-      const rawZones = Array.isArray(data?.zones) ? data.zones : [];
-      const zones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
-      if (zones.length) {
-        _fillZoneDropdown(zones);
+      if (_currentZones.length) {
+        _fillZoneDropdown(_currentZones);
         // Inzoomen op eerste zone
-        zoomToZone(zones[0]);
+        zoomToZone(_currentZones[0]);
       }
     }
   } catch (e) {

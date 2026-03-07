@@ -21,7 +21,8 @@
       header { position: sticky; top:0; z-index: 5; background:#0f172a; color:#fff; padding:10px 16px; display:flex; align-items:center; gap:16px; }
       header .spacer { flex:1; }
       .app { display:flex; min-height: calc(100vh - var(--header-h)); }
-      .sidebar { width: 300px; background:#f1f5f9; border-right:1px solid #cbd5e1; padding:12px; overflow:auto; }
+      .sidebar { width: 300px; background:#f1f5f9; border-right:1px solid #cbd5e1; padding:12px; overflow:auto; transition: width 0.25s ease, padding 0.25s ease, opacity 0.25s ease; }
+      .sidebar-collapsed .sidebar { width: 0; padding: 0; overflow: hidden; opacity: 0; }
       .content { flex:1; position:relative; }
       #map { position: absolute; inset: 0; }
       .hidden { display:none !important; }
@@ -90,7 +91,10 @@
         <button id="toggle-sidebar">☰</button>
         <strong>HornetApp</strong>
         <div class="spacer"></div>
-        <div>Gebruiker: <span id="hdr-user">–</span></div>
+        <div style="display:flex;gap:16px;align-items:center;font-size:13px">
+          <span>👤 <span id="hdr-user">–</span></span>
+          <span id="hdr-scope-wrap" class="hidden">📍 <span id="hdr-scope">–</span></span>
+        </div>
         <button id="btn-admin" class="hidden" style="margin-left:12px">⚙️ Beheer</button>
         <button id="logoutBtn" style="margin-left:12px">Uitloggen</button>
         <button id="btn-reset-cache" title="Reset cache & herladen" style="margin-left:8px">↺</button>
