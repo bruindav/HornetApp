@@ -39,11 +39,48 @@
   <body>
     <!-- Login screen -->
     <section id="login-screen" class="login">
-      <div class="card">
-        <h2>HornetApp – inloggen</h2>
-        <p>Log in om de kaart en tools te gebruiken.</p>
-        <button id="loginBtn">Inloggen met Google</button>
-        <p class="status"><span id="status-sw">SW:</span> · <span id="status-geo">Geo:</span></p>
+      <div class="card" style="min-width:320px;max-width:420px;width:90%">
+        <h2 style="margin:0 0 4px">🐝 HornetApp</h2>
+        <p style="margin:0 0 20px;color:#64748b;font-size:14px">Aziatische hoornaar monitoring</p>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:20px">
+          <button id="tab-login" class="active" style="flex:1;padding:8px;border:0;background:none;cursor:pointer;font-weight:600;color:#0aa879;border-bottom:2px solid #0aa879;margin-bottom:-2px">Inloggen</button>
+          <button id="tab-register" style="flex:1;padding:8px;border:0;background:none;cursor:pointer;color:#64748b">Registreren</button>
+        </div>
+
+        <!-- Foutmelding -->
+        <div id="login-error" class="hidden" style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px"></div>
+
+        <!-- Inloggen panel -->
+        <div id="panel-login">
+          <div class="grid">
+            <input id="login-email" type="email" placeholder="E-mailadres" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="login-pass" type="password" placeholder="Wachtwoord" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <button id="btn-login-email" style="padding:9px;background:#0aa879;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Inloggen</button>
+            <button id="btn-forgot" style="background:none;border:0;color:#64748b;font-size:13px;cursor:pointer;text-align:left;padding:0">Wachtwoord vergeten?</button>
+            <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0"/>
+            <button class="btn-google" style="padding:9px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"/> Inloggen met Google
+            </button>
+          </div>
+        </div>
+
+        <!-- Registreren panel -->
+        <div id="panel-register" class="hidden">
+          <div class="grid">
+            <input id="reg-email" type="email" placeholder="E-mailadres" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="reg-pass" type="password" placeholder="Wachtwoord (min. 6 tekens)" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="reg-pass2" type="password" placeholder="Wachtwoord herhalen" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <button id="btn-register-email" style="padding:9px;background:#0aa879;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Account aanmaken</button>
+            <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0"/>
+            <button class="btn-google" style="padding:9px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"/> Registreren met Google
+            </button>
+          </div>
+        </div>
+
+        <p class="status" style="margin-top:16px"><span id="status-sw">SW:</span> · <span id="status-geo">Geo:</span></p>
       </div>
     </section>
 
