@@ -146,15 +146,23 @@ function initUIBindings(){
   });
   // Cache reset
   // Beheer knop — altijd binden (knop is hidden maar bestaat in DOM)
-  on(req('btn-admin'), 'click', async () => {
-    try {
-      const { openAdminOverlay } = await import('./admin.js');
-      await openAdminOverlay();
-    } catch(e) {
-      console.error('[app] admin overlay fout:', e);
-      alert('Beheer kon niet worden geopend: ' + e.message);
-    }
-  });
+  const _btnAdmin = document.getElementById('btn-admin');
+  console.log('[app] btn-admin element gevonden:', _btnAdmin);
+  if (_btnAdmin) {
+    _btnAdmin.addEventListener('click', async () => {
+      console.log('[app] Beheer knop geklikt');
+      try {
+        const { openAdminOverlay } = await import('./admin.js');
+        console.log('[app] openAdminOverlay geïmporteerd, aanroepen...');
+        await openAdminOverlay();
+      } catch(e) {
+        console.error('[app] admin overlay fout:', e);
+        alert('Beheer kon niet worden geopend: ' + e.message);
+      }
+    });
+  } else {
+    console.warn('[app] btn-admin NIET GEVONDEN in DOM bij initUIBindings');
+  }
   on(req('btn-reset-cache'), 'click', async()=>{
     try{
       if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }

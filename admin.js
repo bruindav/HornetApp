@@ -1,4 +1,4 @@
-// admin.js — Fix 30 met id's  
+// admin.js — Fix 35
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -17,9 +17,9 @@ const functions = getFunctions(app, 'europe-west4');
 
 // ======================= EmailJS configuratie =======================
 // Vul deze drie waarden in na aanmaken account op emailjs.com
-const EMAILJS_SERVICE_ID  = 'service_am7yhzo';   // bv. 'service_abc123'
-const EMAILJS_TEMPLATE_ID = 'template_8jyfjkf';  // bv. 'template_xyz789'
-const EMAILJS_PUBLIC_KEY  = 'grly1relpuAh_73z7';   // bv. 'user_AbCdEfGh'
+const EMAILJS_SERVICE_ID  = 'JOUW_SERVICE_ID';   // bv. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'JOUW_TEMPLATE_ID';  // bv. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY  = 'JOUW_PUBLIC_KEY';   // bv. 'user_AbCdEfGh'
 
 const KNOWN_ZONES = [
   'Zeist',
@@ -36,6 +36,51 @@ let _adminUid   = null;
 // ======================= Overlay =======================
 function createOverlay() {
   if (document.getElementById('admin-overlay')) return;
+
+  // Injecteer CSS zodat overlay altijd werkt ongeacht app.css
+  if (!document.getElementById('admin-css')) {
+    const style = document.createElement('style');
+    style.id = 'admin-css';
+    style.textContent = `
+      #admin-overlay {
+        display: none;
+        position: fixed; inset: 0; z-index: 9000;
+        background: rgba(0,0,0,.5);
+        align-items: flex-start; justify-content: center;
+        padding-top: 60px;
+      }
+      #admin-overlay.open { display: flex; }
+      #admin-panel {
+        background: #fff; border-radius: 10px; width: 90%; max-width: 860px;
+        max-height: 80vh; display: flex; flex-direction: column;
+        box-shadow: 0 8px 32px rgba(0,0,0,.25);
+      }
+      #admin-header {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 14px 18px; border-bottom: 1px solid #e2e8f0; font-size: 16px;
+      }
+      #admin-body { overflow-y: auto; flex: 1; padding: 8px; }
+      #admin-footer { padding: 10px 18px; color: #64748b; font-size: 12px; border-top: 1px solid #e2e8f0; margin: 0; }
+      #admin-close { background: none; border: 0; font-size: 18px; cursor: pointer; color: #64748b; }
+      .adm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      .adm-table th { text-align: left; padding: 8px 10px; background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+      .adm-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+      .adm-row-pending { background: #fffbeb; }
+      .adm-muted { color: #94a3b8; font-size: 12px; }
+      .adm-sel { padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 12px; }
+      .adm-tag { display: inline-flex; align-items: center; gap: 3px; background: #e0f2fe; color: #0369a1; border-radius: 4px; padding: 2px 6px; font-size: 12px; margin: 2px; }
+      .adm-tag-rm { background: none; border: 0; cursor: pointer; color: #64748b; font-size: 14px; line-height: 1; padding: 0 2px; }
+      .adm-zone-add { display: flex; gap: 4px; margin-top: 4px; }
+      .adm-zone-add select { font-size: 12px; padding: 3px; border: 1px solid #cbd5e1; border-radius: 4px; }
+      .adm-zone-add button { font-size: 12px; padding: 3px 8px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; background: #f8fafc; }
+      .adm-btn-accept { background: #0aa879; color: #fff; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+      .adm-btn-reject { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+      .adm-btn-delete { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
+      .adm-btn-icon { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 2px; }
+    `;
+    document.head.appendChild(style);
+  }
+
   const el = document.createElement('div');
   el.id = 'admin-overlay';
   el.innerHTML = `
