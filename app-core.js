@@ -1,4 +1,4 @@
-// app-core.js — Fix 36
+// app-core.js — Fix 37
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -797,16 +797,18 @@ function boot(){
   initMap();
   initUIBindings();
   const selYear = $('sel-year');
-  const selGroup = $('sel-group');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
   if(selYear && ![...selYear.options].some(o=>o.value===saved.year)){
     selYear.insertAdjacentHTML('afterbegin', `<option value="${saved.year}">${saved.year}</option>`);
   }
   if(selYear) selYear.value = saved.year;
-  if(selGroup) selGroup.value = saved.group;
+  // sel-group NIET als vaste variabele opslaan: _fillZoneDropdown() vervangt het element later
+  const getSelGroup = () => $('sel-group');
+  const getSelYear  = () => $('sel-year');
+  if(getSelGroup()) getSelGroup().value = saved.group;
   on(req('apply-scope'), 'click', ()=>{
-    const y = selYear?.value || DEFAULT_YEAR;
-    const g = selGroup?.value || DEFAULT_GROUP;
+    const y = getSelYear()?.value || DEFAULT_YEAR;
+    const g = getSelGroup()?.value || DEFAULT_GROUP;
     activateScope(y, g, /*reload=*/true);
   });
   activateScope(saved.year, saved.group, /*reload=*/true);
