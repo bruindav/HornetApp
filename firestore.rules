@@ -1,7 +1,7 @@
-// firestore.rules — Fix 27
-// Wijziging t.o.v. Fix 26:
-// - mail collectie toegevoegd: alleen admin mag schrijven (voor welkomst-emails
-//   via Firebase Trigger Email extensie). Lezen geblokkeerd voor iedereen.
+// firestore.rules — Fix 29
+// Wijziging t.o.v. Fix 27:
+// - mail collectie VERWIJDERD (emails gaan nu via EmailJS, niet via Firestore)
+// - Verder identiek aan Fix 27
 
 rules_version = '2';
 service cloud.firestore {
@@ -50,15 +50,11 @@ service cloud.firestore {
 
     match /roles/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow write: if isAdmin();
-    }
-
-    // Mail collectie voor Firebase Trigger Email extensie.
-    // Alleen admin mag documenten aanmaken (= email versturen).
-    // Lezen geblokkeerd — de extensie leest intern via service account.
-    match /mail/{docId} {
-      allow read: if false;
-      allow create: if isAdmin();
+      // Admin mag alles schrijven.
+      // Eigen gebruiker mag ALLEEN zijn eigen doc aanmaken als het nog niet bestaat
+      // (eerste login → pending). Bestaande docs mag alleen admin aanpassen.
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update, delete: if isAdmin();
     }
   }
 }
