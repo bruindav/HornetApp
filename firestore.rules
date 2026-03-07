@@ -1,6 +1,7 @@
-// firestore.rules — Fix 38
-// Wijziging t.o.v. Fix 30:
-// - polygons: ook manager mag aanmaken/bewerken/verwijderen binnen eigen zones
+// firestore.rules — Fix 39
+// Wijziging t.o.v. Fix 38:
+// - canWriteZone: ook Hoornaar_ prefix variant accepteren voor achterwaartse compatibiliteit
+// - polygons: manager mag schrijven binnen eigen zones
 
 rules_version = '2';
 service cloud.firestore {
@@ -17,8 +18,21 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.zones;
     }
 
+    // Normaliseer zone: strip Hoornaar_ prefix als aanwezig
+    function normalizeZ(z) {
+      return z == null ? z :
+             z == 'Hoornaar_Zeist'      ? 'Zeist'      :
+             z == 'Hoornaar_Bilthoven'  ? 'Bilthoven'  :
+             z == 'Hoornaar_Driebergen' ? 'Driebergen' :
+             z == 'Hoornaar_Utrecht'    ? 'Utrecht'    : z;
+    }
     function canWriteZone(z) {
-      return isAdmin() || (isSignedIn() && z != null && z in userZones());
+      if (!isSignedIn() || z == null) return false;
+      if (isAdmin()) return true;
+      let zones = userZones();
+      // Check beide varianten: korte naam én Hoornaar_ prefix
+      return z in zones || normalizeZ(z) in zones ||
+             ('Hoornaar_' + z) in zones;
     }
 
     match /maps/{year}/{group}/data/markers/{docId} {

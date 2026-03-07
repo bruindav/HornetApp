@@ -1,4 +1,4 @@
-// app-core.js — Fix 37
+// app-core.js — Fix 39
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -762,12 +762,22 @@ function zoomToZone(zone) {
   const meta = ZONE_META[z];
   if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
 }
+const ROL_LABEL = {
+  admin:     '🔑 Admin',
+  manager:   '🛠 Beheerder',
+  volunteer: '👷 Vrijwilliger',
+  pending:   '⏳ In afwachting',
+};
 function updateHeaderScope(zone, year) {
   const label = ZONE_META[normalizeZone(zone)]?.label || zone;
   const el = document.getElementById('hdr-scope');
   const wrap = document.getElementById('hdr-scope-wrap');
   if (el) el.textContent = `${label} (${year || DEFAULT_YEAR})`;
   if (wrap) wrap.classList.remove('hidden');
+}
+function updateHeaderRole(role) {
+  const el = document.getElementById('hdr-role');
+  if (el) el.textContent = ROL_LABEL[role] || role;
 }
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
@@ -844,6 +854,7 @@ async function _initUserRole() {
       }
       // Rol en zones opslaan
       _currentRole  = data?.role || '';
+      updateHeaderRole(_currentRole);
       const rawZones = Array.isArray(data?.zones) ? data.zones : [];
       _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
 
