@@ -1,7 +1,6 @@
-// firestore.rules — Fix 30
-// Wijziging t.o.v. Fix 28:
-// - mail collectie VERWIJDERD (emails gaan nu via EmailJS, niet via Firestore)
-// - roles: eigen gebruiker mag eigen doc aanmaken (pending bij eerste login)
+// firestore.rules — Fix 38
+// Wijziging t.o.v. Fix 30:
+// - polygons: ook manager mag aanmaken/bewerken/verwijderen binnen eigen zones
 
 rules_version = '2';
 service cloud.firestore {
@@ -45,7 +44,9 @@ service cloud.firestore {
 
     match /maps/{year}/{group}/data/polygons/{docId} {
       allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin() || canWriteZone(request.resource.data.zoneId);
+      allow update: if isAdmin() || (canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId));
+      allow delete: if isAdmin() || canWriteZone(resource.data.zoneId);
     }
 
     match /roles/{uid} {

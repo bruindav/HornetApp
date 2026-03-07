@@ -1,4 +1,4 @@
-// sync-engine.js — Fix 13
+// sync-engine.js — Fix 38
 // Firestore sync voor HornetApp
 // Wijziging t.o.v. Fix 12: zoneId wordt nu automatisch meegegeven
 // aan alle saveDoc-aanroepen, zodat Firestore rules canWriteZone() correct
@@ -21,10 +21,19 @@ let _base  = '';
 let _unsubscribers = [];
 
 // ======================= Scope =======================
+// Zone alias: oude Hoornaar_ prefix → korte naam voor zoneId in documenten
+const _ZONE_ALIAS = {
+  'Hoornaar_Zeist':      'Zeist',
+  'Hoornaar_Bilthoven':  'Bilthoven',
+  'Hoornaar_Driebergen': 'Driebergen',
+  'Hoornaar_Utrecht':    'Utrecht',
+};
+function _normalizeZone(z) { return _ZONE_ALIAS[z] || z; }
+
 export function setActiveScope(year, group) {
   _year  = year;
-  _group = group;
-  _base  = `maps/${year}/${group}/data`;
+  _group = _normalizeZone(group);   // zoneId altijd kort (Zeist, niet Hoornaar_Zeist)
+  _base  = `maps/${year}/${group}/data`;  // Firestore pad ongewijzigd
   _unsubscribers.forEach(fn => { try { fn(); } catch {} });
   _unsubscribers = [];
   return { base: _base };
