@@ -1,7 +1,7 @@
-// firestore.rules — Fix 29
-// Wijziging t.o.v. Fix 27:
+// firestore.rules — Fix 30
+// Wijziging t.o.v. Fix 28:
 // - mail collectie VERWIJDERD (emails gaan nu via EmailJS, niet via Firestore)
-// - Verder identiek aan Fix 27
+// - roles: eigen gebruiker mag eigen doc aanmaken (pending bij eerste login)
 
 rules_version = '2';
 service cloud.firestore {
