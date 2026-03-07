@@ -1,7 +1,6 @@
-// firestore.rules — Fix 39
-// Wijziging t.o.v. Fix 38:
-// - canWriteZone: ook Hoornaar_ prefix variant accepteren voor achterwaartse compatibiliteit
-// - polygons: manager mag schrijven binnen eigen zones
+// firestore.rules — Fix 40
+// Wijziging t.o.v. Fix 39:
+// - canWriteZone: geldige Firestore Rules syntax (geen let, geen string +)
 
 rules_version = '2';
 service cloud.firestore {
@@ -18,21 +17,19 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.zones;
     }
 
-    // Normaliseer zone: strip Hoornaar_ prefix als aanwezig
-    function normalizeZ(z) {
-      return z == null ? z :
-             z == 'Hoornaar_Zeist'      ? 'Zeist'      :
-             z == 'Hoornaar_Bilthoven'  ? 'Bilthoven'  :
-             z == 'Hoornaar_Driebergen' ? 'Driebergen' :
-             z == 'Hoornaar_Utrecht'    ? 'Utrecht'    : z;
-    }
     function canWriteZone(z) {
-      if (!isSignedIn() || z == null) return false;
-      if (isAdmin()) return true;
-      let zones = userZones();
-      // Check beide varianten: korte naam én Hoornaar_ prefix
-      return z in zones || normalizeZ(z) in zones ||
-             ('Hoornaar_' + z) in zones;
+      return isSignedIn() && z != null && (
+        isAdmin() ||
+        z in userZones() ||
+        (z == 'Zeist'      && 'Hoornaar_Zeist'      in userZones()) ||
+        (z == 'Bilthoven'  && 'Hoornaar_Bilthoven'  in userZones()) ||
+        (z == 'Driebergen' && 'Hoornaar_Driebergen' in userZones()) ||
+        (z == 'Utrecht'    && 'Hoornaar_Utrecht'     in userZones()) ||
+        (z == 'Hoornaar_Zeist'      && 'Zeist'      in userZones()) ||
+        (z == 'Hoornaar_Bilthoven'  && 'Bilthoven'  in userZones()) ||
+        (z == 'Hoornaar_Driebergen' && 'Driebergen' in userZones()) ||
+        (z == 'Hoornaar_Utrecht'    && 'Utrecht'     in userZones())
+      );
     }
 
     match /maps/{year}/{group}/data/markers/{docId} {
@@ -65,9 +62,6 @@ service cloud.firestore {
 
     match /roles/{uid} {
       allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      // Admin mag alles schrijven.
-      // Eigen gebruiker mag ALLEEN zijn eigen doc aanmaken als het nog niet bestaat
-      // (eerste login → pending). Bestaande docs mag alleen admin aanpassen.
       allow create: if isSignedIn() && request.auth.uid == uid;
       allow update, delete: if isAdmin();
     }
