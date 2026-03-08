@@ -1,4 +1,4 @@
-// app-core.js — Fix 51
+// app-core.js — Fix 53
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -86,12 +86,30 @@ function initMap(){
   // Geoman toolbar
   map.pm.addControls({
     position:'topleft',
-    drawMarker:false, drawPolyline:false, drawRectangle:true, drawPolygon:true,
+    drawMarker:false, drawPolyline:false, drawRectangle:false, drawPolygon:true,
     drawCircle:false, drawCircleMarker:false,
-    editMode:true, dragMode:true, cutPolygon:false, removalMode:true
+    editMode:false, dragMode:false, cutPolygon:false, removalMode:false, rotateMode:false
   });
-  // Polygoon sluiten met dubbelklik (hoeft niet op eerste punt te klikken)
-  map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true });
+  // Polygoon sluiten: dubbelklik OF eerste punt aanklikken
+  // Eerste punt krijgt visueel een andere kleur via CSS + pm:drawstart event
+  map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
+
+  // Eerste punt markeren bij starten polygoon tekenen
+  map.on('pm:drawstart', ({ workingLayer }) => {
+    if (!workingLayer) return;
+    workingLayer.on('pm:vertexadded', (ev) => {
+      // Eerste vertex (index 0) een rode kleur geven
+      const markers = workingLayer._markers || [];
+      if (markers.length === 1 && markers[0]) {
+        const el = markers[0].getElement?.();
+        if (el) {
+          el.style.background = '#e53e3e';
+          el.style.borderColor = '#c53030';
+          el.title = 'Eerste punt — klik hier of dubbelklik om te sluiten';
+        }
+      }
+    });
+  });
   // Create polygonen → initialiseren + opslaan naar cloud
   map.on('pm:create', (e)=>{
     const layer=e.layer;
@@ -1042,7 +1060,7 @@ async function _initUserRole() {
       }
       // Geoman tekenen: alleen tonen voor admin en manager
       if (!canEdit()) {
-        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, position:'topleft' }); } catch{}
+        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, rotateMode:false, position:'topleft' }); } catch{}
       }
       // Zones laden en dropdown vullen, daarna scope activeren met eerste/opgeslagen zone
       if (_currentZones.length) {
