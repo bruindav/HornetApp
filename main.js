@@ -1,4 +1,4 @@
-// main.js — Fix 43
+// main.js — Fix 63
 // Auth-gated bootstrap met email/wachtwoord + Google login
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -6,10 +6,19 @@ import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/
 function showLogin(){
   document.getElementById('login-screen')?.classList.remove('hidden');
   document.getElementById('app-shell')?.classList.add('hidden');
+  document.getElementById('pending-screen')?.classList.add('hidden');
 }
 function showApp(){
   document.getElementById('login-screen')?.classList.add('hidden');
+  document.getElementById('pending-screen')?.classList.add('hidden');
   document.getElementById('app-shell')?.classList.remove('hidden');
+}
+function showPending(email){
+  document.getElementById('login-screen')?.classList.add('hidden');
+  document.getElementById('app-shell')?.classList.add('hidden');
+  document.getElementById('pending-screen')?.classList.remove('hidden');
+  const emailEl = document.getElementById('pending-email');
+  if(emailEl) emailEl.textContent = email || '';
 }
 function renderHeader(user){
   // Naam wordt gevuld vanuit Firestore via updateHeaderRole in app-core.js
@@ -104,11 +113,15 @@ window.addEventListener('DOMContentLoaded', () => {
     } catch(e) { showError(firebaseErrorNL(e.code)); }
   });
 
-  // Uitloggen
+  // Uitloggen (header)
   document.getElementById('logoutBtn')?.addEventListener('click', async () => {
     await signOut(auth);
-    // Forceer account-kiezer bij volgende Google login
     sessionStorage.setItem('force_account_select', '1');
+    reloadApp();
+  });
+  // Uitloggen (pending scherm)
+  document.getElementById('pending-logout')?.addEventListener('click', async () => {
+    await signOut(auth);
     reloadApp();
   });
 });

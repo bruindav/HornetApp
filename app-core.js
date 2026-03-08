@@ -1226,49 +1226,74 @@ async function _initUserRole() {
     if (!uid) return;
 
     const ref  = doc(_db, 'roles', uid);
-    const snap = await getDoc(ref);
+    let snap = await getDoc(ref);
 
     if (!snap.exists()) {
       // Eerste login — pending aanmaken zodat admin hem kan accepteren
+      console.log('[app] nieuw account, pending aanmaken voor', email);
       await setDoc(ref, {
         role:        'pending',
         email:       email || '',
         displayName: auth.currentUser?.displayName || '',
         createdAt:   new Date().toISOString(),
       });
-      console.log('[app] nieuw roles doc aangemaakt als pending voor', email);
-    } else {
-      const data = snap.data();
-      // displayName laden voor icoon-modal
-      if (data?.displayName) {
-        _currentDisplayName = data.displayName;
-        console.log('[app] displayName geladen:', data.displayName);
+      // Opnieuw ophalen ter verificatie
+      snap = await getDoc(ref);
+      if (!snap.exists()) {
+        console.error('[app] pending aanmaken mislukt — doc bestaat nog steeds niet');
+        _showPendingScreen(email);
+        return;
       }
-      // Rol en zones opslaan
-      _currentRole  = data?.role || '';
-      updateHeaderRole(_currentRole, data?.displayName || auth.currentUser?.displayName || '');
-      const rawZones = Array.isArray(data?.zones) ? data.zones : [];
-      _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
-
-      // Beheer knop tonen als admin
-      if (_currentRole === 'admin') {
-        $('btn-admin')?.classList.remove('hidden');
-      }
-      // Geoman tekenen: alleen tonen voor admin en manager
-      if (!canEdit()) {
-        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, rotateMode:false, position:'topleft' }); } catch{}
-      }
-      // Zones laden en dropdown vullen, daarna scope activeren met eerste/opgeslagen zone
-      if (_currentZones.length) {
-        const activeZone = _fillZoneDropdown(_currentZones);
-        const year = $('sel-year')?.value || DEFAULT_YEAR;
-        // Activeer scope met de juiste zone (triggert zoom + header update)
-        activateScope(year, activeZone, /*reload=*/true);
-      }
+      console.log('[app] pending aangemaakt en geverifieerd voor', email);
     }
+
+    const data = snap.data();
+
+    // ── PENDING: kaart blokkeren, pending scherm tonen ──────────────────────
+    if (!data?.role || data.role === 'pending') {
+      console.log('[app] rol is pending — kaart blokkeren');
+      _showPendingScreen(email);
+      return; // stop hier — geen kaart laden
+    }
+
+    // displayName laden
+    if (data?.displayName) {
+      _currentDisplayName = data.displayName;
+    }
+    // Rol en zones opslaan
+    _currentRole  = data?.role || '';
+    updateHeaderRole(_currentRole, data?.displayName || auth.currentUser?.displayName || '');
+    const rawZones = Array.isArray(data?.zones) ? data.zones : [];
+    _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
+
+    // Beheer knop tonen als admin
+    if (_currentRole === 'admin') {
+      $('btn-admin')?.classList.remove('hidden');
+    }
+    // Geoman tekenen: alleen tonen voor admin en manager
+    if (!canEdit()) {
+      try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, rotateMode:false, position:'topleft' }); } catch{}
+    }
+    // Zones laden en dropdown vullen, daarna scope activeren
+    if (_currentZones.length) {
+      const activeZone = _fillZoneDropdown(_currentZones);
+      const year = $('sel-year')?.value || DEFAULT_YEAR;
+      activateScope(year, activeZone, /*reload=*/true);
+    }
+
   } catch (e) {
     console.warn('[app] _initUserRole mislukt:', e.message);
+    // Bij netwerk/permission fout: toon pending scherm als veilige fallback
+    _showPendingScreen(auth.currentUser?.email);
   }
+}
+
+function _showPendingScreen(email) {
+  // Kaart verbergen, pending scherm tonen via main.js functie
+  document.getElementById('app-shell')?.classList.add('hidden');
+  document.getElementById('pending-screen')?.classList.remove('hidden');
+  const emailEl = document.getElementById('pending-email');
+  if(emailEl) emailEl.textContent = email ? `Ingelogd als: ${email}` : '';
 }
 
 function _fillZoneDropdown(zones) {
