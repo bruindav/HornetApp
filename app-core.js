@@ -1,4 +1,4 @@
-// app-core.js — Fix 66
+// app-core.js — Fix 67
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1257,7 +1257,10 @@ async function loadReport(days) {
 
   try {
     const year     = $('sel-year')?.value || DEFAULT_YEAR;
-    const zones    = Object.keys(ZONE_META);
+    // Admin ziet alle zones, manager alleen zijn eigen toegewezen zones
+    const zones = (_currentRole === 'admin')
+      ? Object.keys(ZONE_META)
+      : _currentZones.filter(z => ZONE_META[z]);
     const dateFrom = getDateFrom(days);
 
     const periodLabel = days===7?'afgelopen week':days===14?'afgelopen 2 weken':days===30?'afgelopen maand':'afgelopen jaar';
