@@ -1,4 +1,4 @@
-// app-core.js — Fix 59
+// app-core.js — Fix 60
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -240,7 +240,8 @@ async function geocodePhoton(q){
   return {lat:f.geometry.coordinates[1], lon:f.geometry.coordinates[0], provider:'photon'};
 }
 async function geocodeMapsCo(q,key){
-  const r=await fetch(`https://geocode.maps.co/search?q=${encodeURIComponent(q)}${key?`&api_key=${encodeURIComponent(key)}`:''}`,
+  const apiPart = key ? '&api_key='+encodeURIComponent(key) : '';
+  const r=await fetch('https://geocode.maps.co/search?q='+encodeURIComponent(q)+apiPart,
     {headers:{'Accept':'application/json'}});
   if(!r.ok) throw 0;
   const j=await r.json(); if(!Array.isArray(j)||j.length===0) throw 0;
