@@ -1,4 +1,4 @@
-// app-core.js — Fix 65
+// app-core.js — Fix 66
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1223,6 +1223,32 @@ async function _loadZoneManagers() {
 // ======================= Overzicht rapport =======================
 let _reportDays = 7; // huidig geselecteerd aantal dagen
 
+// Punt-in-polygoon check (ray casting)
+function pointInPolygon(lat, lng, latlngs) {
+  let inside = false;
+  const x = lng, y = lat;
+  for (let i = 0, j = latlngs.length - 1; i < latlngs.length; j = i++) {
+    const xi = latlngs[i].lng, yi = latlngs[i].lat;
+    const xj = latlngs[j].lng, yj = latlngs[j].lat;
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+
+function emptyCount() { return { waarnemingen:0, lokpotten:0, nesten:0, geruimd:0 }; }
+function addCount(c, type) {
+  if (type==='hoornaar') c.waarnemingen++;
+  else if (type==='lokpot') c.lokpotten++;
+  else if (type==='nest') c.nesten++;
+  else if (type==='nest_geruimd') c.geruimd++;
+}
+function rowTotal(c) { return c.waarnemingen+c.lokpotten+c.nesten+c.geruimd; }
+
+function renderCountCells(c) {
+  const v = (n, col) => `<td style="text-align:center;padding:3px 4px;color:${n?col:'#cbd5e1'}">${n||'–'}</td>`;
+  return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40');
+}
+
 async function loadReport(days) {
   _reportDays = days;
   const el = document.getElementById('report-content');
@@ -1230,80 +1256,119 @@ async function loadReport(days) {
   el.innerHTML = '<span style="color:#94a3b8">Laden...</span>';
 
   try {
-    const year = $('sel-year')?.value || DEFAULT_YEAR;
-    const zones = Object.keys(ZONE_META);
-    const dateFrom = getDateFrom(days); // 'YYYY-MM-DD'
+    const year     = $('sel-year')?.value || DEFAULT_YEAR;
+    const zones    = Object.keys(ZONE_META);
+    const dateFrom = getDateFrom(days);
 
-    // Per zone markers ophalen uit Firestore
-    const results = [];
+    const periodLabel = days===7?'afgelopen week':days===14?'afgelopen 2 weken':days===30?'afgelopen maand':'afgelopen jaar';
+
+    let html = `<div style="color:#64748b;font-size:11px;margin-bottom:8px">${periodLabel}</div>`;
+
+    const HDR = `<table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead><tr style="border-bottom:2px solid #e2e8f0;color:#94a3b8">
+        <th style="text-align:left;padding:3px 4px">Gebied / Polygoon</th>
+        <th style="text-align:center;padding:3px 4px" title="Waarnemingen">🐝</th>
+        <th style="text-align:center;padding:3px 4px" title="Lokpotten">🪤</th>
+        <th style="text-align:center;padding:3px 4px" title="Nesten">🪹</th>
+        <th style="text-align:center;padding:3px 4px" title="Geruimd">✅</th>
+      </tr></thead><tbody>`;
+
+    let totAll = emptyCount();
+    let anyData = false;
+
     for (const zone of zones) {
-      const base = `maps/${year}/${zone}/data`;
-      const snap = await getDocs(collection(_db, base, 'markers'));
-      let waarnemingen = 0, lokpotten = 0, nesten = 0, geruimd = 0;
-      snap.forEach(d => {
+      const base = 'maps/' + year + '/' + zone + '/data';
+
+      // Polygonen en markers parallel ophalen
+      const [markerSnap, polySnap] = await Promise.all([
+        getDocs(collection(_db, base, 'markers')),
+        getDocs(collection(_db, base, 'polygons'))
+      ]);
+
+      // Markers filteren op periode
+      const markers = [];
+      markerSnap.forEach(d => {
         const data = d.data();
         if (dateFrom && data.date && data.date < dateFrom) return;
-        if (data.type === 'hoornaar')      waarnemingen++;
-        else if (data.type === 'lokpot')   lokpotten++;
-        else if (data.type === 'nest')     nesten++;
-        else if (data.type === 'nest_geruimd') geruimd++;
+        markers.push(data);
       });
-      results.push({ zone, waarnemingen, lokpotten, nesten, geruimd });
+
+      // Polygonen opbouwen
+      const polys = [];
+      polySnap.forEach(d => {
+        const data = d.data();
+        if (data.latlngs && data.latlngs.length > 2) {
+          polys.push({ label: data.label || '(geen naam)', latlngs: data.latlngs, count: emptyCount() });
+        }
+      });
+      const zoneCount = emptyCount();
+      const outsideCount = emptyCount(); // markers buiten alle polygonen
+
+      // Markers toewijzen aan polygoon of 'buiten'
+      markers.forEach(m => {
+        let matched = false;
+        for (const poly of polys) {
+          if (pointInPolygon(m.lat, m.lng, poly.latlngs)) {
+            addCount(poly.count, m.type);
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) addCount(outsideCount, m.type);
+        addCount(zoneCount, m.type);
+      });
+
+      if (rowTotal(zoneCount) === 0 && polys.length === 0) continue;
+      anyData = true;
+
+      // Zone kopregel
+      html += `<tr style="background:#f1f5f9">
+        <td colspan="5" style="padding:5px 4px;font-weight:700;color:#1e293b;font-size:12px">${zone}</td>
+      </tr>`;
+
+      // Polygoon rijen
+      polys.forEach(poly => {
+        if (rowTotal(poly.count) === 0) return; // skip lege polygonen
+        html += `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:3px 4px 3px 12px;color:#475569">↳ ${poly.label}</td>
+          ${renderCountCells(poly.count)}
+        </tr>`;
+      });
+
+      // Buiten polygonen (indien van toepassing)
+      if (rowTotal(outsideCount) > 0) {
+        html += `<tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:3px 4px 3px 12px;color:#94a3b8;font-style:italic">↳ buiten polygonen</td>
+          ${renderCountCells(outsideCount)}
+        </tr>`;
+      }
+
+      // Zone subtotaal
+      html += `<tr style="border-bottom:2px solid #e2e8f0">
+        <td style="padding:3px 4px;color:#64748b;font-size:11px">totaal ${zone}</td>
+        ${renderCountCells(zoneCount)}
+      </tr>`;
+
+      // Optellen bij eindtotaal
+      totAll.waarnemingen+=zoneCount.waarnemingen; totAll.lokpotten+=zoneCount.lokpotten;
+      totAll.nesten+=zoneCount.nesten; totAll.geruimd+=zoneCount.geruimd;
     }
 
-    // Render tabel
-    const anyData = results.some(r => r.waarnemingen+r.lokpotten+r.nesten+r.geruimd > 0);
     if (!anyData) {
       el.innerHTML = '<span style="color:#94a3b8;font-size:12px">Geen gegevens in deze periode.</span>';
       return;
     }
 
-    const periodLabel = days === 7 ? 'afgelopen week'
-      : days === 14 ? 'afgelopen 2 weken'
-      : days === 30 ? 'afgelopen maand'
-      : 'afgelopen jaar';
-
-    let html = `<div style="color:#64748b;font-size:11px;margin-bottom:8px">${periodLabel}</div>`;
-    html += `<table style="width:100%;border-collapse:collapse;font-size:11px">
-      <thead>
-        <tr style="border-bottom:1px solid #e2e8f0;color:#94a3b8">
-          <th style="text-align:left;padding:3px 4px;font-weight:600">Gebied</th>
-          <th style="text-align:center;padding:3px 4px" title="Waarnemingen">🐝</th>
-          <th style="text-align:center;padding:3px 4px" title="Lokpotten">🪤</th>
-          <th style="text-align:center;padding:3px 4px" title="Nesten">🪹</th>
-          <th style="text-align:center;padding:3px 4px" title="Geruimd">✅</th>
-        </tr>
-      </thead>
-      <tbody>`;
-
-    // Totaalrij
-    let totW=0, totL=0, totN=0, totG=0;
-    results.forEach(r => {
-      const rowTotal = r.waarnemingen+r.lokpotten+r.nesten+r.geruimd;
-      const bg = rowTotal > 0 ? '' : 'opacity:.4';
-      html += `<tr style="border-bottom:1px solid #f1f5f9;${bg}">
-        <td style="padding:4px;font-weight:600;color:#334155">${r.zone}</td>
-        <td style="text-align:center;padding:4px;color:${r.waarnemingen?'#cc2222':'#94a3b8'}">${r.waarnemingen||'–'}</td>
-        <td style="text-align:center;padding:4px;color:${r.lokpotten?'#2d6b50':'#94a3b8'}">${r.lokpotten||'–'}</td>
-        <td style="text-align:center;padding:4px;color:${r.nesten?'#334466':'#94a3b8'}">${r.nesten||'–'}</td>
-        <td style="text-align:center;padding:4px;color:${r.geruimd?'#1a7a40':'#94a3b8'}">${r.geruimd||'–'}</td>
-      </tr>`;
-      totW+=r.waarnemingen; totL+=r.lokpotten; totN+=r.nesten; totG+=r.geruimd;
-    });
-
-    html += `<tr style="border-top:2px solid #e2e8f0;font-weight:700;color:#1e293b">
-        <td style="padding:4px">Totaal</td>
-        <td style="text-align:center;padding:4px">${totW||'–'}</td>
-        <td style="text-align:center;padding:4px">${totL||'–'}</td>
-        <td style="text-align:center;padding:4px">${totN||'–'}</td>
-        <td style="text-align:center;padding:4px">${totG||'–'}</td>
-      </tr>`;
+    html += `<tr style="font-weight:700;color:#1e293b;background:#f8fafc">
+      <td style="padding:5px 4px">Totaal</td>
+      ${renderCountCells(totAll)}
+    </tr>`;
     html += '</tbody></table>';
-    el.innerHTML = html;
+    el.innerHTML = HDR + html;
 
   } catch(e) {
     console.warn('[rapport] fout:', e);
-    el.innerHTML = '<span style="color:#ef4444;font-size:12px">Laden mislukt.</span>';
+    el.innerHTML = '<span style="color:#ef4444;font-size:12px">Laden mislukt: ' + e.message + '</span>';
   }
 }
 
