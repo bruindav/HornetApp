@@ -1,4 +1,4 @@
-// admin.js — Fix 35
+// admin.js — Fix 51
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -17,9 +17,9 @@ const functions = getFunctions(app, 'europe-west4');
 
 // ======================= EmailJS configuratie =======================
 // Vul deze drie waarden in na aanmaken account op emailjs.com
-const EMAILJS_SERVICE_ID  = 'service_am7yhzo';   // bv. 'service_abc123'
-const EMAILJS_TEMPLATE_ID = 'template_8jyfjkf';  // bv. 'template_xyz789'
-const EMAILJS_PUBLIC_KEY  = 'grly1relpuAh_73z7';   // bv. 'user_AbCdEfGh'
+const EMAILJS_SERVICE_ID  = 'JOUW_SERVICE_ID';   // bv. 'service_abc123'
+const EMAILJS_TEMPLATE_ID = 'JOUW_TEMPLATE_ID';  // bv. 'template_xyz789'
+const EMAILJS_PUBLIC_KEY  = 'JOUW_PUBLIC_KEY';   // bv. 'user_AbCdEfGh'
 
 const KNOWN_ZONES = [
   'Zeist',
@@ -227,14 +227,28 @@ function renderTable(users) {
 }
 
 // ======================= Accepteer-dialoog =======================
-window.adminOpenAcceptDialog = (uid, email, currentName) => {
+window.adminOpenAcceptDialog = async (uid, email, currentName) => {
   document.getElementById('adm-accept-dialog')?.remove();
 
-  const zonesOptions = KNOWN_ZONES.map(z =>
-    `<label style="display:block;margin:3px 0">
-      <input type="checkbox" name="adz" value="${z}"> ${z.replace('Hoornaar_','')}
-     </label>`
-  ).join('');
+  // Laad huidige beheerders per zone voor hint
+  let managerMap = {};
+  try {
+    const allRoles = await getDocs(collection(db, 'roles'));
+    allRoles.forEach(d => {
+      const data = d.data();
+      if (data.role === 'manager' && Array.isArray(data.zones)) {
+        data.zones.forEach(z => { if (!managerMap[z]) managerMap[z] = data.displayName || data.email || '?'; });
+      }
+    });
+  } catch{}
+
+  const zonesOptions = KNOWN_ZONES.map(z => {
+    const mgr = managerMap[z];
+    const hint = mgr ? `<span style="font-size:11px;color:#94a3b8;margin-left:4px">(${mgr})</span>` : '';
+    return `<label style="display:block;margin:3px 0">
+      <input type="checkbox" name="adz" value="${z}"> ${z.replace('Hoornaar_','')}${hint}
+     </label>`;
+  }).join('');
 
   const dlg = document.createElement('div');
   dlg.id = 'adm-accept-dialog';
@@ -387,8 +401,46 @@ window.adminAddZone = async (uid) => {
   if (!sel) return;
   const zone = sel.value;
   try {
-    const snap  = await getDoc(doc(db, 'roles', uid));
-    const zones = Array.isArray(snap.data()?.zones) ? snap.data().zones : [];
+    // Controleer of dit gebied al aan een andere manager is toegewezen
+    const thisSnap = await getDoc(doc(db, 'roles', uid));
+    const thisRole = thisSnap.data()?.role || '';
+
+    if (thisRole === 'manager') {
+      // Zoek alle andere managers met dit gebied
+      const allSnap = await getDocs(collection(db, 'roles'));
+      const conflictManagers = [];
+      allSnap.forEach(d => {
+        if (d.id === uid) return; // skip zichzelf
+        const data = d.data();
+        if (data.role === 'manager' && Array.isArray(data.zones) && data.zones.includes(zone)) {
+          conflictManagers.push(data.displayName || data.email || d.id);
+        }
+      });
+      if (conflictManagers.length > 0) {
+        const namen = conflictManagers.join(', ');
+        const doorgaan = confirm(
+          `⚠️ Gebied "${zone.replace('Hoornaar_','')}" is al toegewezen aan: ${namen}.
+
+` +
+          `Bij doorgaan wordt dit gebied bij hen verwijderd en alleen aan deze beheerder toegewezen.
+
+Doorgaan?`
+        );
+        if (!doorgaan) return;
+        // Verwijder zone bij conflicterende managers
+        for (const d of allSnap.docs) {
+          if (d.id === uid) continue;
+          const data = d.data();
+          if (data.role === 'manager' && Array.isArray(data.zones) && data.zones.includes(zone)) {
+            const newZones = data.zones.filter(z => z !== zone);
+            await setDoc(doc(db, 'roles', d.id), { zones: newZones }, { merge: true });
+          }
+        }
+      }
+    }
+
+    // Zone toevoegen aan de huidige gebruiker
+    const zones = Array.isArray(thisSnap.data()?.zones) ? thisSnap.data().zones : [];
     if (!zones.includes(zone))
       await setDoc(doc(db, 'roles', uid), { zones: [...zones, zone] }, { merge: true });
   } catch (e) {

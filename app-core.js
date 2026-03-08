@@ -1,4 +1,4 @@
-// app-core.js — Fix 50
+// app-core.js — Fix 51
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -20,8 +20,10 @@ let _currentZones  = [];   // genormaliseerde zones van ingelogde gebruiker
 let _zoneManagers  = {};   // { 'Zeist': 'Jan de Vries', ... } — geladen bij boot
 function canEdit()   { return _currentRole === 'admin' || _currentRole === 'manager'; }  // polygonen/gebieden
 function getZoneManagerName(zoneId) {
-  const z = normalizeZone(zoneId || '') || normalizeZone($('sel-group')?.value || '');
-  return _zoneManagers[z] || null;
+  const z = normalizeZone(zoneId || '') || normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
+  const name = _zoneManagers[z] || null;
+  if(!name) console.log('[app] geen beheerder gevonden voor zone:', z, 'managers:', _zoneManagers);
+  return name;
 }
 function canWrite()  { return _currentRole === 'admin' || _currentRole === 'manager' || _currentRole === 'volunteer'; }  // iconen
 
@@ -689,7 +691,10 @@ function initPolygon(layer){
 function persistPolygon(layer){
   const id = layer._props?.id || genId('poly'); layer._props.id = id;
   const latlngs = layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}));
-  const doc = { id, label:layer._props.label||'', color:layer._props.color||'#0aa879', latlngs };
+  // zoneId meeopslaan — nodig voor beheerder-opzoeken en zone filtering
+  const zoneId = layer._props.zoneId || normalizeZone($('sel-group')?.value || '');
+  if(!layer._props.zoneId) layer._props.zoneId = zoneId;
+  const doc = { id, label:layer._props.label||'', color:layer._props.color||'#0aa879', latlngs, zoneId };
   savePolygonToCloud(doc);
 }
 // ======================= Unified contextmenu =======================
