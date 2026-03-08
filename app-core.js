@@ -1,4 +1,4 @@
-// app-core.js — Fix 58
+// app-core.js — Fix 59
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -300,7 +300,7 @@ function makeDotIcon(color, letter='', size=12){
   });
 }
 const ICONS = {
-  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?`🐝${a?` ×${a}`:''}` :'🐝','#aa2222','#cc3333',sz),
+  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?('🐝'+(a?' ×'+a:'')):'🐝','#aa2222','#cc3333',sz),
   nest:        (sz='full')=>makeDivIcon(sz==='full'?'🪹 Nest'          :'🪹','#334466','#556688',sz),
   nest_geruimd:(sz='full')=>makeDivIcon(sz==='full'?'✅ Geruimd'        :'✅','#1a5c35','#2d8a52',sz),
   lokpot:      (sz='full')=>makeDivIcon(sz==='full'?'🪤 Lokpot'         :'🪤','#1e4d3b','#2d7a5e',sz),
@@ -533,8 +533,7 @@ function attachMarkerPopup(marker){
   if(m.by)   tipLines.push(`Door: ${m.by}`);
   if(m.type==='lokpot' && m.sender) tipLines.push(`Zender: ${m.sender==='ja'?'Ja':'Nee'}`);
   if(m.note) tipLines.push(m.note);
-  marker.bindTooltip(tipLines.join('
-'), {direction:'top', offset:[0,-8], className:'marker-tip'});
+  marker.bindTooltip(tipLines.join('\n'), {direction:'top', offset:[0,-8], className:'marker-tip'});
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
