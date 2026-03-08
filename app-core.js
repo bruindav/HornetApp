@@ -1,4 +1,4 @@
-// app-core.js — Fix 43
+// app-core.js — Fix 44
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -797,7 +797,12 @@ function updateHeaderRole(role, name) {
   if (el) el.textContent = ROL_LABEL[role] || role;
   // Naam in sidebar tonen (id=hdr-user)
   const sidebarName = document.getElementById('hdr-user');
-  if (sidebarName) sidebarName.textContent = name || _currentDisplayName || auth.currentUser?.displayName || auth.currentUser?.email || '–';
+  const sidebarBlock = document.getElementById('sidebar-userblock');
+  const displayName = name || _currentDisplayName || auth.currentUser?.displayName || auth.currentUser?.email || '';
+  if (sidebarName && displayName) {
+    sidebarName.textContent = displayName;
+    if (sidebarBlock) sidebarBlock.style.display = '';
+  }
 }
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
@@ -815,6 +820,10 @@ function activateScope(year, group, reload=false){
     onPolygonDelete: deletePolygonFromCloudLocal
   });
   if(reload){
+    // Eerst polygon labels verwijderen (zijn losse tooltips op de map)
+    polygonsGroup.getLayers().forEach(layer => {
+      if(layer._labelTooltip){ try{ map.removeLayer(layer._labelTooltip); }catch{} layer._labelTooltip = null; }
+    });
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
     allMarkers=[]; allLines=[]; allSectors=[];
   }
