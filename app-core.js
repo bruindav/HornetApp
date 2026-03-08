@@ -1,4 +1,4 @@
-// app-core.js — Fix 56
+// app-core.js — Fix 58
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -114,6 +114,9 @@ function initMap(){
   // Polygoon sluiten: dubbelklik OF eerste punt aanklikken
   // Eerste punt krijgt visueel een andere kleur via CSS + pm:drawstart event
   map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
+
+  // Icoon grootte aanpassen bij zoom
+  map.on('zoomend', refreshAllMarkerIcons);
 
   // Eerste punt markeren bij starten polygoon tekenen
   map.on('pm:drawstart', ({ workingLayer }) => {
@@ -263,20 +266,81 @@ async function searchPlaceNL(){
   }
 }
 // ======================= Iconen =======================
-function makeDivIcon(html,bg='#1e293b',border='#334155'){
+// Zoom drempels:
+//   >= 15 : volledig icoon met emoji + tekst
+//   13–14 : klein icoon, alleen emoji
+//   11–12 : gekleurde stip met letter
+//   <= 10 : kleine stip, geen tekst
+const ZOOM_FULL  = 15;
+const ZOOM_SMALL = 13;
+const ZOOM_DOT   = 11;
+
+function makeDivIcon(html, bg='#1e293b', border='#334155', size='full'){
+  if(size==='full'){
+    return L.divIcon({
+      className:'custom-div-icon',
+      html:`<div style="background:${bg};color:#fff;border:2px solid ${border};border-radius:12px;padding:4px 6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);white-space:nowrap">${html}</div>`,
+      iconSize:[36,24], iconAnchor:[18,12]
+    });
+  } else { // small: alleen emoji, geen label
+    return L.divIcon({
+      className:'custom-div-icon',
+      html:`<div style="background:${bg};color:#fff;border:2px solid ${border};border-radius:10px;padding:3px 5px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.3)">${html}</div>`,
+      iconSize:[26,22], iconAnchor:[13,11]
+    });
+  }
+}
+function makeDotIcon(color, letter='', size=12){
+  const s = size+'px';
+  const fs = Math.round(size*0.55)+'px';
   return L.divIcon({
-    className:'custom-div-icon',
-    html:`<div style="background:${bg};color:#fff;border:2px solid ${border};border-radius:12px;padding:4px 6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);">${html}</div>`,
-    iconSize:[32,22], iconAnchor:[16,11]
+    className:'dot-icon',
+    html:`<div style="width:${s};height:${s};background:${color};border:2px solid rgba(0,0,0,.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:700;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4);line-height:1">${letter}</div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2]
   });
 }
 const ICONS = {
-  hoornaar:(a)=>makeDivIcon(`🐝${a?` x${a}`:''}`,'#933','#b55'),
-  nest:()=>makeDivIcon('🪹','#445','#667'),
-  nest_geruimd:()=>makeDivIcon('✅','#264','#396'),
-  lokpot:()=>makeDivIcon('🪤','#274','#396'),
-  pending:()=>makeDivIcon('➕','#333','#555')
+  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?`🐝${a?` ×${a}`:''}` :'🐝','#aa2222','#cc3333',sz),
+  nest:        (sz='full')=>makeDivIcon(sz==='full'?'🪹 Nest'          :'🪹','#334466','#556688',sz),
+  nest_geruimd:(sz='full')=>makeDivIcon(sz==='full'?'✅ Geruimd'        :'✅','#1a5c35','#2d8a52',sz),
+  lokpot:      (sz='full')=>makeDivIcon(sz==='full'?'🪤 Lokpot'         :'🪤','#1e4d3b','#2d7a5e',sz),
+  pending:     (sz='full')=>makeDivIcon(sz==='full'?'⏳'                :'⏳','#555','#777',sz),
 };
+// Stip-iconen: kleur + één letter als herkenbaarheid
+const DOTS = {
+  hoornaar: (tiny)=>makeDotIcon('#cc2222', tiny?'':'W', tiny?8:13), // rood  W=Waarneming
+  nest:     (tiny)=>makeDotIcon('#334466', tiny?'':'N', tiny?8:13), // blauw N=Nest
+  nest_geruimd:(tiny)=>makeDotIcon('#1a7a40', tiny?'':'G', tiny?8:13), // groen G=Geruimd
+  lokpot:   (tiny)=>makeDotIcon('#2d6b50', tiny?'':'L', tiny?8:13), // donkergroen L=Lokpot
+  pending:  (tiny)=>makeDotIcon('#888888', tiny?'':'?', tiny?8:13),
+};
+
+// Geeft juist icoon terug op basis van huidig zoomniveau
+function getIconForMarker(meta){
+  const zoom = map?.getZoom() || 14;
+  const type = meta?.type || 'pending';
+  if(zoom >= ZOOM_FULL){
+    // Volledig icoon met emoji + label
+    if(type==='hoornaar') return ICONS.hoornaar(meta.aantal,'full');
+    return ICONS[type]?.('full') || ICONS.pending('full');
+  } else if(zoom >= ZOOM_SMALL){
+    // Klein icoon: alleen emoji
+    if(type==='hoornaar') return ICONS.hoornaar(meta.aantal,'small');
+    return ICONS[type]?.('small') || ICONS.pending('small');
+  } else if(zoom >= ZOOM_DOT){
+    // Stip met letter
+    return (DOTS[type]||DOTS.pending)(false);
+  } else {
+    // Heel kleine stip, geen letter
+    return (DOTS[type]||DOTS.pending)(true);
+  }
+}
+// Alle markers bijwerken bij zoom
+function refreshAllMarkerIcons(){
+  allMarkers.forEach(m => {
+    if(markersGroup.hasLayer(m)) m.setIcon(getIconForMarker(m._meta||{}));
+  });
+}
 // ======================= Contextmenu infra =======================
 let contextMenuEl=null;
 function closeContextMenu(){
@@ -478,20 +542,16 @@ function applyPropsToMarker(marker, vals){
   if(vals.by) m.by=vals.by; else delete m.by;
   if(vals.note!==undefined){ if(vals.note) m.note=vals.note; else delete m.note; }
   if(vals.sender!==undefined){ m.sender=vals.sender; }
-  if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; marker.setIcon(ICONS.hoornaar(m.aantal)); }
-  else if(m.type==='nest'){ marker.setIcon(ICONS.nest()); }
-  else if(m.type==='nest_geruimd'){ marker.setIcon(ICONS.nest_geruimd()); }
-  else if(m.type==='lokpot'){ marker.setIcon(ICONS.lokpot()); }
+  if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; }
+  marker.setIcon(getIconForMarker(m));
   marker._meta=m; attachMarkerPopup(marker);
 }
 function placeMarkerAt(latlng, type='pending'){
   const id = genId('mk'); let marker;
   const draggable = canWrite();
-  if(type==='hoornaar'){ marker=L.marker(latlng,{icon:ICONS.hoornaar(),draggable}); marker._meta={id,type}; }
-  else if(type==='nest'){ marker=L.marker(latlng,{icon:ICONS.nest(),draggable}); marker._meta={id,type}; }
-  else if(type==='nest_geruimd'){ marker=L.marker(latlng,{icon:ICONS.nest_geruimd(),draggable}); marker._meta={id,type}; }
-  else if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{icon:ICONS.lokpot(),draggable}); marker._meta={id,type,potId}; }
-  else { marker=L.marker(latlng,{icon:ICONS.pending(),draggable}); marker._meta={id,type:'pending'}; }
+  if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{draggable}); marker._meta={id,type,potId}; }
+  else { marker=L.marker(latlng,{draggable}); marker._meta={id,type:(type||'pending')}; }
+  marker.setIcon(getIconForMarker(marker._meta));
   marker.on('contextmenu',e=>{
     e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;
@@ -861,14 +921,9 @@ function applyFilters(){
 function upsertMarkerFromCloud(doc){
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
-    m = L.marker([doc.lat, doc.lng], { draggable: canWrite(), icon: (()=>{
-      if(doc.type==='hoornaar') return ICONS.hoornaar(doc.aantal);
-      if(doc.type==='nest') return ICONS.nest();
-      if(doc.type==='nest_geruimd') return ICONS.nest_geruimd();
-      if(doc.type==='lokpot') return ICONS.lokpot();
-      return ICONS.pending();
-    })() });
+    m = L.marker([doc.lat, doc.lng], { draggable: canWrite() });
     m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'', sender: doc.sender||null };
+    m.setIcon(getIconForMarker(m._meta));
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
     if(canWrite()){
       m.on('drag', () => {
@@ -899,10 +954,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
     m._meta.note = doc.note||'';
     m._meta.sender = doc.sender||null;
-    if(doc.type==='hoornaar') m.setIcon(ICONS.hoornaar(m._meta.aantal));
-    if(doc.type==='nest') m.setIcon(ICONS.nest());
-    if(doc.type==='nest_geruimd') m.setIcon(ICONS.nest_geruimd());
-    if(doc.type==='lokpot') m.setIcon(ICONS.lokpot());
+    m.setIcon(getIconForMarker(m._meta));
   }
   attachMarkerPopup(m);
   applyFilters();
