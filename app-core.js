@@ -1,4 +1,4 @@
-// app-core.js — Fix 41
+// app-core.js — Fix 43
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -81,6 +81,8 @@ function initMap(){
     drawCircle:false, drawCircleMarker:false,
     editMode:true, dragMode:true, cutPolygon:false, removalMode:true
   });
+  // Polygoon sluiten met dubbelklik (hoeft niet op eerste punt te klikken)
+  map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true });
   // Create polygonen → initialiseren + opslaan naar cloud
   map.on('pm:create', (e)=>{
     const layer=e.layer;
@@ -559,7 +561,7 @@ function refreshPolygonLabel(layer){
   const lbl=layer._props?.label||''; const col=layer._props?.color||'#0aa879';
   // Label alleen tonen als polygon in actieve of eigen zone zit
   const zoneId = layer._props?.zoneId || '';
-  const activeZone = normalizeZone(getActiveGroup?.() || DEFAULT_GROUP);
+  const activeZone = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
   const inZone = !zoneId || normalizeZone(zoneId) === activeZone ||
                  _currentZones.includes(normalizeZone(zoneId));
   if(lbl){
@@ -793,8 +795,8 @@ function updateHeaderRole(role, name) {
   // Rol in header tonen
   const el = document.getElementById('hdr-role');
   if (el) el.textContent = ROL_LABEL[role] || role;
-  // Naam in sidebar tonen
-  const sidebarName = document.getElementById('sidebar-username');
+  // Naam in sidebar tonen (id=hdr-user)
+  const sidebarName = document.getElementById('hdr-user');
   if (sidebarName) sidebarName.textContent = name || _currentDisplayName || auth.currentUser?.displayName || auth.currentUser?.email || '–';
 }
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }

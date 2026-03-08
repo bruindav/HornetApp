@@ -1,5 +1,5 @@
-// Fix 21b — cache versie verhoogd naar v21
-const CACHE = 'hornet-v21';
+// service-worker.js — Fix 43
+const CACHE = 'hornet-v43-fix43';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -10,6 +10,7 @@ self.addEventListener('install', (event) => {
       '/app.css',
       '/favicon.ico',
       '/manifest.webmanifest',
+      // bewust geen main.js hier, zodat we geen oude versie pinnen
     ]))
   );
 });
@@ -24,16 +25,23 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
+
   if (req.destination === 'script') {
+    // network-first voor scripts (zoals main.js)
     event.respondWith((async () => {
-      try { return await fetch(req); }
-      catch {
-        const cached = await caches.open(CACHE).then(c => c.match(req));
+      try {
+        const fresh = await fetch(req);
+        return fresh;
+      } catch {
+        const cache = await caches.open(CACHE);
+        const cached = await cache.match(req);
         return cached || Response.error();
       }
     })());
     return;
   }
+
+  // default: cache-first
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     const cached = await cache.match(req);

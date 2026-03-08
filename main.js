@@ -1,4 +1,4 @@
-// main.js — Fix 35
+// main.js — Fix 43
 // Auth-gated bootstrap met email/wachtwoord + Google login
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -12,8 +12,8 @@ function showApp(){
   document.getElementById('app-shell')?.classList.remove('hidden');
 }
 function renderHeader(user){
-  const who = document.getElementById('hdr-user');
-  if (who) who.textContent = user?.displayName || user?.email || user?.uid || 'Onbekend';
+  // Naam wordt gevuld vanuit Firestore via updateHeaderRole in app-core.js
+  // Hier alleen de hdr-role alvast leegmaken zodat er geen oude waarde staat
 }
 async function startAppOnce(){
   if (window.__hornetAppBooted) return;
