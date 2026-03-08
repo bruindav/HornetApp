@@ -1,4 +1,4 @@
-// app-core.js — Fix 64
+// app-core.js — Fix 65
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1220,6 +1220,115 @@ async function _loadZoneManagers() {
   }
 }
 
+// ======================= Overzicht rapport =======================
+let _reportDays = 7; // huidig geselecteerd aantal dagen
+
+async function loadReport(days) {
+  _reportDays = days;
+  const el = document.getElementById('report-content');
+  if (!el) return;
+  el.innerHTML = '<span style="color:#94a3b8">Laden...</span>';
+
+  try {
+    const year = $('sel-year')?.value || DEFAULT_YEAR;
+    const zones = Object.keys(ZONE_META);
+    const dateFrom = getDateFrom(days); // 'YYYY-MM-DD'
+
+    // Per zone markers ophalen uit Firestore
+    const results = [];
+    for (const zone of zones) {
+      const base = `maps/${year}/${zone}/data`;
+      const snap = await getDocs(collection(_db, base, 'markers'));
+      let waarnemingen = 0, lokpotten = 0, nesten = 0, geruimd = 0;
+      snap.forEach(d => {
+        const data = d.data();
+        if (dateFrom && data.date && data.date < dateFrom) return;
+        if (data.type === 'hoornaar')      waarnemingen++;
+        else if (data.type === 'lokpot')   lokpotten++;
+        else if (data.type === 'nest')     nesten++;
+        else if (data.type === 'nest_geruimd') geruimd++;
+      });
+      results.push({ zone, waarnemingen, lokpotten, nesten, geruimd });
+    }
+
+    // Render tabel
+    const anyData = results.some(r => r.waarnemingen+r.lokpotten+r.nesten+r.geruimd > 0);
+    if (!anyData) {
+      el.innerHTML = '<span style="color:#94a3b8;font-size:12px">Geen gegevens in deze periode.</span>';
+      return;
+    }
+
+    const periodLabel = days === 7 ? 'afgelopen week'
+      : days === 14 ? 'afgelopen 2 weken'
+      : days === 30 ? 'afgelopen maand'
+      : 'afgelopen jaar';
+
+    let html = `<div style="color:#64748b;font-size:11px;margin-bottom:8px">${periodLabel}</div>`;
+    html += `<table style="width:100%;border-collapse:collapse;font-size:11px">
+      <thead>
+        <tr style="border-bottom:1px solid #e2e8f0;color:#94a3b8">
+          <th style="text-align:left;padding:3px 4px;font-weight:600">Gebied</th>
+          <th style="text-align:center;padding:3px 4px" title="Waarnemingen">🐝</th>
+          <th style="text-align:center;padding:3px 4px" title="Lokpotten">🪤</th>
+          <th style="text-align:center;padding:3px 4px" title="Nesten">🪹</th>
+          <th style="text-align:center;padding:3px 4px" title="Geruimd">✅</th>
+        </tr>
+      </thead>
+      <tbody>`;
+
+    // Totaalrij
+    let totW=0, totL=0, totN=0, totG=0;
+    results.forEach(r => {
+      const rowTotal = r.waarnemingen+r.lokpotten+r.nesten+r.geruimd;
+      const bg = rowTotal > 0 ? '' : 'opacity:.4';
+      html += `<tr style="border-bottom:1px solid #f1f5f9;${bg}">
+        <td style="padding:4px;font-weight:600;color:#334155">${r.zone}</td>
+        <td style="text-align:center;padding:4px;color:${r.waarnemingen?'#cc2222':'#94a3b8'}">${r.waarnemingen||'–'}</td>
+        <td style="text-align:center;padding:4px;color:${r.lokpotten?'#2d6b50':'#94a3b8'}">${r.lokpotten||'–'}</td>
+        <td style="text-align:center;padding:4px;color:${r.nesten?'#334466':'#94a3b8'}">${r.nesten||'–'}</td>
+        <td style="text-align:center;padding:4px;color:${r.geruimd?'#1a7a40':'#94a3b8'}">${r.geruimd||'–'}</td>
+      </tr>`;
+      totW+=r.waarnemingen; totL+=r.lokpotten; totN+=r.nesten; totG+=r.geruimd;
+    });
+
+    html += `<tr style="border-top:2px solid #e2e8f0;font-weight:700;color:#1e293b">
+        <td style="padding:4px">Totaal</td>
+        <td style="text-align:center;padding:4px">${totW||'–'}</td>
+        <td style="text-align:center;padding:4px">${totL||'–'}</td>
+        <td style="text-align:center;padding:4px">${totN||'–'}</td>
+        <td style="text-align:center;padding:4px">${totG||'–'}</td>
+      </tr>`;
+    html += '</tbody></table>';
+    el.innerHTML = html;
+
+  } catch(e) {
+    console.warn('[rapport] fout:', e);
+    el.innerHTML = '<span style="color:#ef4444;font-size:12px">Laden mislukt.</span>';
+  }
+}
+
+function initReportSection() {
+  const section = document.getElementById('report-section');
+  if (!section) return;
+  // Alleen tonen voor admin en manager
+  if (_currentRole !== 'admin' && _currentRole !== 'manager') return;
+  section.style.display = 'block';
+
+  // Periode knoppen
+  section.querySelectorAll('.rpt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      section.querySelectorAll('.rpt-btn').forEach(b => {
+        b.style.background = '#fff'; b.style.color = '#1e293b';
+      });
+      btn.style.background = '#0aa879'; btn.style.color = '#fff';
+      loadReport(parseInt(btn.dataset.days, 10));
+    });
+  });
+
+  // Eerste load
+  loadReport(_reportDays);
+}
+
 async function _initUserRole() {
   try {
     const uid   = auth.currentUser?.uid;
@@ -1275,6 +1384,9 @@ async function _initUserRole() {
     if (!canEdit()) {
       try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, rotateMode:false, position:'topleft' }); } catch{}
     }
+    // Overzicht rapport tonen (admin/manager)
+    initReportSection();
+
     // Zones laden en dropdown vullen, daarna scope activeren
     if (_currentZones.length) {
       const activeZone = _fillZoneDropdown(_currentZones);
