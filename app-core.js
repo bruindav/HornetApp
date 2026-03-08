@@ -1,4 +1,4 @@
-// app-core.js — Fix 53
+// app-core.js — Fix 54
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -75,9 +75,30 @@ const polygonsGroup = L.featureGroup();
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
   map = L.map('map', { zoomControl: true }).setView([52.1, 5.3], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
-  }).addTo(map);
+  });
+  const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+    maxZoom:19, attribution:'© Esri — satelliet'
+  });
+  osmLayer.addTo(map);
+  // Kaartwissel knop (rechtsonder)
+  let _satMode = false;
+  const mapToggleBtn = L.control({ position: 'bottomright' });
+  mapToggleBtn.onAdd = () => {
+    const btn = L.DomUtil.create('button', 'map-toggle-btn');
+    btn.innerHTML = '🛰️ Satelliet';
+    btn.title = 'Wissel kaart/satelliet';
+    btn.style.cssText = 'padding:6px 10px;border:2px solid #fff;border-radius:6px;background:#1e293b;color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+    L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation);
+    L.DomEvent.on(btn, 'click', () => {
+      _satMode = !_satMode;
+      if (_satMode) { map.removeLayer(osmLayer); satLayer.addTo(map); btn.innerHTML = '🗺️ Kaart'; }
+      else { map.removeLayer(satLayer); osmLayer.addTo(map); btn.innerHTML = '🛰️ Satelliet'; }
+    });
+    return btn;
+  };
+  mapToggleBtn.addTo(map);
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -87,7 +108,7 @@ function initMap(){
   map.pm.addControls({
     position:'topleft',
     drawMarker:false, drawPolyline:false, drawRectangle:false, drawPolygon:true,
-    drawCircle:false, drawCircleMarker:false,
+    drawCircle:false, drawCircleMarker:false, drawText:false,
     editMode:false, dragMode:false, cutPolygon:false, removalMode:false, rotateMode:false
   });
   // Polygoon sluiten: dubbelklik OF eerste punt aanklikken
@@ -323,36 +344,38 @@ function openMarkerContextMenu(marker, x, y){
 }
 function openLineContextMenu(line, x, y){
   closeContextMenu();
+  const note = line._meta?.note || '';
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Zichtlijn</h4>
-  <button data-act="color">🎨 Kleur bewerken</button>
+  <button data-act="color">🎨 Kleur</button>
+  <button data-act="note">📝 Opmerking</button>
   <button data-act="delete">🗑️ Verwijderen</button>`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     if(act==='delete'){ deleteSightLine(line,true); }
-    else if(act==='color'){ openLineColorPicker(line, x, y); }
+    else if(act==='color'){ openColorModal(line._meta?.color||'#ffcc00', col=>{ setSightLineColor(line,col,true); }); }
+    else if(act==='note'){ openLineNoteModal(line); }
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
-function openLineColorPicker(line, x, y){
-  closeContextMenu();
-  const curr=line._meta?.color||'#ffcc00';
-  const el=document.createElement('div'); el.className='ctx-menu';
-  el.innerHTML=`<h4>Lijnkleur</h4>
-  <input id="lc_hex" type="color" value="${curr}" style="width:100%;height:36px;border:0;background:transparent" />
-  <div class="actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
-  <button data-act="cancel" class="btn-secondary">Annuleren</button>
-  <button data-act="save" class="btn-primary">Opslaan</button>
-  </div>`;
-  el.addEventListener('click',ev=>{
-    const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
-    if(act==='cancel'){ closeContextMenu(); return; }
-    if(act==='save'){ const color=el.querySelector('#lc_hex').value; setSightLineColor(line,color,true); closeContextMenu(); }
-  });
-  document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
-  document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
+function openLineNoteModal(line){
+  const modal = document.getElementById('line-note-modal');
+  const inp   = document.getElementById('lnm-note');
+  const save  = document.getElementById('lnm-save');
+  const cancel= document.getElementById('lnm-cancel');
+  if(!modal) return;
+  if(inp) inp.value = line._meta?.note || '';
+  modal.classList.remove('hidden');
+  function cleanup(){ if(save) save.onclick=null; if(cancel) cancel.onclick=null; modal.classList.add('hidden'); }
+  if(cancel) cancel.onclick = ()=>cleanup();
+  if(save) save.onclick = ()=>{
+    line._meta = line._meta || {};
+    line._meta.note = inp?.value?.trim() || '';
+    persistLine(line);
+    cleanup();
+  };
 }
 // ======================= Modal (icon properties) =======================
 // prop-modal elementen worden in openPropModal opgezocht
@@ -370,8 +393,10 @@ function openPropModal({type, init={}, onSave}){
   const titles = { hoornaar:'🐝 Waarneming', nest:'🪹 Nest', nest_geruimd:'✅ Nest geruimd', lokpot:'🪤 Lokpot' };
   if(pmTitle) pmTitle.textContent = titles[type] || 'Icoon eigenschappen';
   // Velden vullen
+  const pmNote2 = document.getElementById('pm-note');
   if(pmDate2) pmDate2.value = init.date || nowISODate();
   if(pmBy2) pmBy2.value = init.by || _currentDisplayName || '';
+  if(pmNote2) pmNote2.value = init.note || '';
   const onlyH = document.querySelector('.only-hoornaar');
   if(onlyH) onlyH.style.display = (type==='hoornaar' ? 'grid' : 'none');
   if(type==='hoornaar' && pmAmount2) pmAmount2.value = (init.aantal!=null ? init.aantal : '');
@@ -386,7 +411,8 @@ function openPropModal({type, init={}, onSave}){
   }
   if(pmCancel2) pmCancel2.onclick = ()=>cleanup();
   if(pmSave2) pmSave2.onclick = ()=>{
-    const vals={ date: pmDate2?.value || nowISODate(), by: pmBy2?.value || '' };
+    const pmNote3 = document.getElementById('pm-note');
+    const vals={ date: pmDate2?.value || nowISODate(), by: pmBy2?.value || '', note: pmNote3?.value?.trim()||'' };
     if(type==='hoornaar' && pmAmount2){ const a=parseInt(pmAmount2.value,10); if(!isNaN(a)) vals.aantal=a; }
     onSave && onSave(vals); cleanup();
   };
@@ -408,18 +434,29 @@ function openColorModal(currentColor, onSave){
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
   const m=marker._meta||{}; let txt='';
-  if(m.type==='hoornaar'){ txt+= m.aantal?`Waarneming (x${m.aantal})`:'Waarneming'; }
-  else if(m.type==='nest'){ txt+='Nest'; }
-  else if(m.type==='nest_geruimd'){ txt+='Nest geruimd'; }
-  else if(m.type==='lokpot'){ txt='Lokpot'; }
-  else { txt='Nieuw icoon'; }
-  if(m.date) txt+=`<br>Datum: ${m.date}`; if(m.by) txt+=`<br>Door: ${m.by}`;
-  marker.bindPopup(txt);
+  if(m.type==='hoornaar'){ txt+= m.aantal?`<strong>Waarneming (x${m.aantal})</strong>`:'<strong>Waarneming</strong>'; }
+  else if(m.type==='nest'){ txt+='<strong>Nest</strong>'; }
+  else if(m.type==='nest_geruimd'){ txt+='<strong>Nest geruimd</strong>'; }
+  else if(m.type==='lokpot'){ txt='<strong>Lokpot</strong>'; }
+  else { txt='<strong>Nieuw icoon</strong>'; }
+  if(m.date) txt+=`<br><span style="color:#64748b;font-size:12px">Datum: ${m.date}</span>`;
+  if(m.by)   txt+=`<br><span style="color:#64748b;font-size:12px">Door: ${m.by}</span>`;
+  if(m.note) txt+=`<br><span style="color:#374151;font-size:12px;font-style:italic">${m.note}</span>`;
+  marker.unbindPopup();
+  marker.bindPopup(txt, {maxWidth:220});
+  // Hover tooltip (korte versie)
+  marker.unbindTooltip();
+  let tip = m.type==='hoornaar'?(m.aantal?`Waarneming ×${m.aantal}`:'Waarneming')
+           :m.type==='nest'?'Nest':m.type==='nest_geruimd'?'Nest geruimd':m.type==='lokpot'?'Lokpot':'Icoon';
+  if(m.note) tip += `
+${m.note}`;
+  marker.bindTooltip(tip, {direction:'top', offset:[0,-8], className:'marker-tip'});
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
   if(vals.date) m.date=vals.date; else delete m.date;
   if(vals.by) m.by=vals.by; else delete m.by;
+  if(vals.note!==undefined){ if(vals.note) m.note=vals.note; else delete m.note; }
   if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; marker.setIcon(ICONS.hoornaar(m.aantal)); }
   else if(m.type==='nest'){ marker.setIcon(ICONS.nest()); }
   else if(m.type==='nest_geruimd'){ marker.setIcon(ICONS.nest_geruimd()); }
@@ -481,7 +518,7 @@ function persistMarker(marker){
   const doc = {
     id:m.id, type:m.type, lat:ll.lat, lng:ll.lng,
     date:m.date||null, by:m.by||null, aantal:m.aantal!=null? m.aantal:null,
-    potId:m.potId||null
+    potId:m.potId||null, note:m.note||null
   };
   saveMarkerToCloud(doc);
 }
@@ -557,7 +594,7 @@ function attachSightLineInteractivity(line){
     const constrained=destinationPoint(pot,dist,brg);
     handle.setLatLng(constrained); line.setLatLngs([pot,constrained]);
     line._meta.bearing=brg; line._meta.distance=dist;
-    if(line.getTooltip()) line.setTooltipContent(`${dist} m`);
+    if(line.getTooltip()){ line.setTooltipContent(`${dist} m`); line.getTooltip().setLatLng(constrained); }
     if(line._sector){ circlesGroup.removeLayer(line._sector); line._sector=null; }
     const rInner=Math.max(1,dist-25), rOuter=dist+25;
     const sector=createSectorLayer({
@@ -587,7 +624,8 @@ function startSightLine(lokpotMarker){
       potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg
     };
     registerLine(line);
-    line.bindTooltip(`${dist} m`,{permanent:true,direction:'center',className:'line-label'});
+    const endPt = destinationPoint(potLatLng, dist, brg);
+    line.bindTooltip(`${dist} m`,{permanent:true,direction:'right',offset:[8,0],className:'line-label'}).setLatLng(endPt);
     const rInner=Math.max(1,dist-25), rOuter=dist+25;
     const sector=createSectorLayer({
       id: genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
@@ -605,6 +643,7 @@ function persistLine(line){
     id:m.id, type:'flight',
     pot:m.pot||null, potId:m.potId||null,
     distance:m.distance||0, color:m.color||'#ffcc00', bearing:m.bearing||0,
+    note: m.note||'',
     latlngs: ll.map(p=>({lat:p.lat,lng:p.lng}))
   };
   saveLineToCloud(doc);
@@ -629,7 +668,7 @@ function movePotLines(potId, newLatLng) {
     // Handle meeverplaatsen
     if(line._handle) line._handle.setLatLng(newEnd);
     // Tooltip positie
-    if(line.getTooltip()) line.setTooltipContent(`${dist} m`);
+    if(line.getTooltip()){ line.setTooltipContent(`${dist} m`); line.getTooltip().setLatLng(constrained); }
     // Sector meeverplaatsen
     if(line._sector) {
       const sm = line._sector._meta || {};
@@ -804,7 +843,7 @@ function upsertMarkerFromCloud(doc){
       if(doc.type==='lokpot') return ICONS.lokpot();
       return ICONS.pending();
     })() });
-    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null };
+    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'' };
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
     if(canWrite()){
       m.on('drag', () => {
@@ -833,6 +872,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.date = doc.date||null;
     m._meta.by = doc.by||null;
     m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
+    m._meta.note = doc.note||'';
     if(doc.type==='hoornaar') m.setIcon(ICONS.hoornaar(m._meta.aantal));
     if(doc.type==='nest') m.setIcon(ICONS.nest());
     if(doc.type==='nest_geruimd') m.setIcon(ICONS.nest_geruimd());
@@ -852,7 +892,8 @@ function upsertLineFromCloud(doc){
     l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:3}).addTo(linesGroup);
     l._meta = { ...doc };
     registerLine(l);
-    l.bindTooltip(`${doc.distance||0} m`,{permanent:true,direction:'center',className:'line-label'});
+    const _ll = l.getLatLngs(); const _endPt = _ll[_ll.length-1];
+    l.bindTooltip(`${doc.distance||0} m`,{permanent:true,direction:'right',offset:[8,0],className:'line-label'}).setLatLng(_endPt);
     attachSightLineInteractivity(l);
   } else {
     l.setLatLngs(latlngs);

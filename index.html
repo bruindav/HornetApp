@@ -148,6 +148,9 @@
             <div class="only-hoornaar">
               <label style="font-size:13px">Aantal <input id="pm-amount" type="number" min="0" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
             </div>
+            <label id="pm-note-row" style="font-size:13px;display:block">
+              Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
+            </label>
             <label id="pm-color-row" class="hidden" style="font-size:13px;display:flex;align-items:center;gap:8px">
               Kleur gebied <input id="pm-color" type="color" style="width:48px;height:32px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;padding:2px"/>
             </label>
@@ -167,6 +170,18 @@
           <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
             <button id="cm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
             <button id="cm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zichtlijn opmerking modal -->
+      <div id="line-note-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 style="margin:0 0 12px;font-size:15px">📝 Opmerking zichtlijn</h3>
+          <textarea id="lnm-note" rows="4" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Bijv. wat je hebt waargenomen..."></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button id="lnm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+            <button id="lnm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
           </div>
         </div>
       </div>
