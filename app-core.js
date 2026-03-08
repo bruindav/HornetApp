@@ -1,4 +1,4 @@
-// app-core.js — Fix 67
+// app-core.js — Fix 68
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -196,6 +196,10 @@ function initUIBindings(){
   });
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
+  // Live update bij checkbox wijziging
+  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending'].forEach(id => {
+    const el = $(id); if(el) el.addEventListener('change', applyFilters);
+  });
   on(req('reset-filters'), 'click', ()=>{
     ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending']
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
@@ -976,18 +980,28 @@ function applyFilters(){
   allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
   allLines.forEach(line=>{
     const meta=line._meta||{}; const should = visiblePotIds.has(meta.potId);
+    // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
     if(!should && onMap) linesGroup.removeLayer(line);
+    // Handle
     if(line._handle){
-      const showH = should; const inH = handlesGroup.hasLayer(line._handle);
-      if(showH && !inH) handlesGroup.addLayer(line._handle);
-      if(!showH && inH) handlesGroup.removeLayer(line._handle);
+      const inH = handlesGroup.hasLayer(line._handle);
+      if(should && !inH) handlesGroup.addLayer(line._handle);
+      if(!should && inH) handlesGroup.removeLayer(line._handle);
     }
+    // Sector
     if(line._sector){
-      const showS = should; const inS = circlesGroup.hasLayer(line._sector);
-      if(showS && !inS) circlesGroup.addLayer(line._sector);
-      if(!showS && inS) circlesGroup.removeLayer(line._sector);
+      const inS = circlesGroup.hasLayer(line._sector);
+      if(should && !inS) circlesGroup.addLayer(line._sector);
+      if(!should && inS) circlesGroup.removeLayer(line._sector);
+    }
+    // Afstandslabel
+    if(line._distLabel){
+      const zoom = map?.getZoom() || 14;
+      const showDist = should && zoom >= ZOOM_LINES;
+      const dle = line._distLabel.getElement?.();
+      if(dle) dle.style.visibility = showDist ? '' : 'hidden';
     }
   });
 }
@@ -1257,7 +1271,7 @@ async function loadReport(days) {
 
   try {
     const year     = $('sel-year')?.value || DEFAULT_YEAR;
-    // Admin ziet alle zones, manager alleen zijn eigen toegewezen zones
+    // Admin ziet alle zones, manager/volunteer alleen eigen toegewezen zones
     const zones = (_currentRole === 'admin')
       ? Object.keys(ZONE_META)
       : _currentZones.filter(z => ZONE_META[z]);
@@ -1378,8 +1392,8 @@ async function loadReport(days) {
 function initReportSection() {
   const section = document.getElementById('report-section');
   if (!section) return;
-  // Alleen tonen voor admin en manager
-  if (_currentRole !== 'admin' && _currentRole !== 'manager') return;
+  // Tonen voor admin, manager en volunteer
+  if (_currentRole !== 'admin' && _currentRole !== 'manager' && _currentRole !== 'volunteer') return;
   section.style.display = 'block';
 
   // Periode knoppen
