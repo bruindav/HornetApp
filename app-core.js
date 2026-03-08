@@ -1,4 +1,4 @@
-// app-core.js — Fix 54
+// app-core.js — Fix 55
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -560,6 +560,7 @@ function deleteSightLine(line, fromMenu=false){
   const id = line._meta?.id;
   if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
   if(line._sector){ const sid=line._sector._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(line._sector); line._sector=null; }
+  if(line._distLabel){ try{ map.removeLayer(line._distLabel); }catch{} line._distLabel=null; }
   if(line.getTooltip()) line.unbindTooltip();
   linesGroup.removeLayer(line); allLines = allLines.filter(l=>l!==line);
   if(fromMenu && id){ deleteLineFromCloud(id); }
@@ -594,7 +595,7 @@ function attachSightLineInteractivity(line){
     const constrained=destinationPoint(pot,dist,brg);
     handle.setLatLng(constrained); line.setLatLngs([pot,constrained]);
     line._meta.bearing=brg; line._meta.distance=dist;
-    if(line.getTooltip()){ line.setTooltipContent(`${dist} m`); line.getTooltip().setLatLng(constrained); }
+    if(line._distLabel){ line._distLabel.setContent(`${dist} m`).setLatLng(constrained); }
     if(line._sector){ circlesGroup.removeLayer(line._sector); line._sector=null; }
     const rInner=Math.max(1,dist-25), rOuter=dist+25;
     const sector=createSectorLayer({
@@ -624,8 +625,11 @@ function startSightLine(lokpotMarker){
       potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg
     };
     registerLine(line);
-    const endPt = destinationPoint(potLatLng, dist, brg);
-    line.bindTooltip(`${dist} m`,{permanent:true,direction:'right',offset:[8,0],className:'line-label'}).setLatLng(endPt);
+    // Tooltip als losse marker op het eindpunt zodat hij daar vast blijft
+    line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
+      .setContent(`${dist} m`)
+      .setLatLng(endLatLng)
+      .addTo(map);
     const rInner=Math.max(1,dist-25), rOuter=dist+25;
     const sector=createSectorLayer({
       id: genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
@@ -668,7 +672,7 @@ function movePotLines(potId, newLatLng) {
     // Handle meeverplaatsen
     if(line._handle) line._handle.setLatLng(newEnd);
     // Tooltip positie
-    if(line.getTooltip()){ line.setTooltipContent(`${dist} m`); line.getTooltip().setLatLng(constrained); }
+    if(line._distLabel){ line._distLabel.setContent(`${dist} m`).setLatLng(constrained); }
     // Sector meeverplaatsen
     if(line._sector) {
       const sm = line._sector._meta || {};
@@ -893,12 +897,15 @@ function upsertLineFromCloud(doc){
     l._meta = { ...doc };
     registerLine(l);
     const _ll = l.getLatLngs(); const _endPt = _ll[_ll.length-1];
-    l.bindTooltip(`${doc.distance||0} m`,{permanent:true,direction:'right',offset:[8,0],className:'line-label'}).setLatLng(_endPt);
+    l._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
+      .setContent(`${doc.distance||0} m`)
+      .setLatLng(_endPt)
+      .addTo(map);
     attachSightLineInteractivity(l);
   } else {
     l.setLatLngs(latlngs);
     l._meta = { ...l._meta, ...doc };
-    if(l.getTooltip()) l.setTooltipContent(`${doc.distance||0} m`);
+    if(l._distLabel){ const _ull=l.getLatLngs(); l._distLabel.setContent(`${doc.distance||0} m`).setLatLng(_ull[_ull.length-1]); }
   }
   applyFilters();
 }
@@ -1011,7 +1018,8 @@ function activateScope(year, group, reload=false){
       if(layer._labelTooltip){ try{ map.removeLayer(layer._labelTooltip); }catch{} layer._labelTooltip = null; }
     });
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
-    allMarkers=[]; allLines=[]; allSectors=[];
+    allLines.forEach(l=>{ if(l._distLabel){ try{map.removeLayer(l._distLabel);}catch{} } });
+  allMarkers=[]; allLines=[]; allSectors=[];
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
   zoomToZone(group);
