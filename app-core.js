@@ -1,4 +1,4 @@
-// app-core.js — Fix 49
+// app-core.js — Fix 50
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -9,7 +9,7 @@
 // 
 // ----------------------------------------------------------------------------
 import { auth } from './firebase.js';
-import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
 const _db = getFirestore(app);
 
@@ -17,7 +17,12 @@ const _db = getFirestore(app);
 let _currentDisplayName = '';
 let _currentRole   = '';
 let _currentZones  = [];   // genormaliseerde zones van ingelogde gebruiker
+let _zoneManagers  = {};   // { 'Zeist': 'Jan de Vries', ... } — geladen bij boot
 function canEdit()   { return _currentRole === 'admin' || _currentRole === 'manager'; }  // polygonen/gebieden
+function getZoneManagerName(zoneId) {
+  const z = normalizeZone(zoneId || '') || normalizeZone($('sel-group')?.value || '');
+  return _zoneManagers[z] || null;
+}
 function canWrite()  { return _currentRole === 'admin' || _currentRole === 'manager' || _currentRole === 'volunteer'; }  // iconen
 
 import {
@@ -416,7 +421,26 @@ function placeMarkerAt(latlng, type='pending'){
   });
   // Verplaatsen via drag
   if(canWrite()){
-    marker.on('dragend', () => { persistMarker(marker); });
+    marker.on('drag', () => {
+      // Lokpot: lijnen en sectoren live meeverplaatsen
+      if(marker._meta?.type === 'lokpot' && marker._meta?.potId) {
+        const newLL = marker.getLatLng();
+        movePotLines(marker._meta.potId, newLL);
+      }
+    });
+    marker.on('dragend', () => {
+      persistMarker(marker);
+      // Na dragend ook lijnen/sectoren persisteren
+      if(marker._meta?.type === 'lokpot' && marker._meta?.potId) {
+        const newLL = marker.getLatLng();
+        allLines.forEach(l => {
+          if(l._meta?.potId === marker._meta.potId) {
+            l._meta.pot = { lat: newLL.lat, lng: newLL.lng, id: marker._meta.potId };
+            persistLine(l);
+          }
+        });
+      }
+    });
   }
   allMarkers.push(marker); markersGroup.addLayer(marker); attachMarkerPopup(marker);
   return marker;
@@ -572,6 +596,39 @@ function persistSector(sector){
     angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null };
   saveSectorToCloud(doc);
 }
+// Verplaats alle lijnen/sectoren van een pot naar nieuwe positie (live tijdens drag)
+function movePotLines(potId, newLatLng) {
+  allLines.forEach(line => {
+    const m = line._meta || {};
+    if(m.potId !== potId) return;
+    const brg = m.bearing || 0;
+    const dist = m.distance || 100;
+    const newEnd = destinationPoint(newLatLng, dist, brg);
+    // Lijn verplaatsen
+    line.setLatLngs([newLatLng, newEnd]);
+    // Handle meeverplaatsen
+    if(line._handle) line._handle.setLatLng(newEnd);
+    // Tooltip positie
+    if(line.getTooltip()) line.setTooltipContent(`${dist} m`);
+    // Sector meeverplaatsen
+    if(line._sector) {
+      const sm = line._sector._meta || {};
+      circlesGroup.removeLayer(line._sector);
+      const newSector = createSectorLayer({
+        id: sm.id, pot: { lat: newLatLng.lat, lng: newLatLng.lng, id: potId },
+        distance: dist, color: sm.color || '#ffcc00',
+        bearing: brg, rInner: sm.rInner || Math.max(1, dist-25),
+        rOuter: sm.rOuter || dist+25,
+        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45,
+        steps: sm.steps || 36, flightId: m.id
+      }).addTo(circlesGroup);
+      registerSector(newSector);
+      newSector._line = line;
+      line._sector = newSector;
+    }
+  });
+}
+
 function removePotAssociations(potId){
   const toRemoveLines=[]; allLines.forEach(l=>{ const m=l._meta||{}; if(m.potId===potId) toRemoveLines.push(l); });
   toRemoveLines.forEach(l=>{ const id=l._meta?.id; if(id){ deleteLineFromCloud(id); } deleteSightLine(l,false); });
@@ -640,13 +697,19 @@ function openUnifiedContextMenu(opts){
   closeContextMenu();
   const el=document.createElement('div'); el.className='ctx-menu';
   let html='';
-  if(opts.polygonLayer && canEdit()){
-    html += `<h4>Polygoon</h4>
+  if(opts.polygonLayer){
+    const _mgr = getZoneManagerName(opts.polygonLayer._props?.zoneId);
+    const _mgrTxt = _mgr ? ` <span style="font-size:11px;color:#64748b;font-weight:normal">(beheerder: ${_mgr})</span>` : '';
+    if(canEdit()){
+      html += `<h4>Polygoon${_mgrTxt}</h4>
     <button data-act="poly_label">✏️ Label wijzigen</button>
     <button data-act="poly_color">🎨 Kleur wijzigen</button>
     <button data-act="poly_edit">✍️ Vorm bewerken aan/uit</button>
     <button data-act="poly_delete">🗑️ Verwijderen</button>
     <hr/>`;
+    } else {
+      html += `<h4>Polygoon${_mgrTxt}</h4><hr/>`;
+    }
   }
   if(canWrite()){
     html += `<h4>Nieuw icoon</h4>
@@ -720,7 +783,25 @@ function upsertMarkerFromCloud(doc){
     })() });
     m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null };
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
-    if(canWrite()){ try{ m.options.draggable=true; m.dragging?.enable(); }catch{} m.on('dragend',()=>{ persistMarker(m); }); }
+    if(canWrite()){
+      m.on('drag', () => {
+        if(m._meta?.type === 'lokpot' && m._meta?.potId) {
+          movePotLines(m._meta.potId, m.getLatLng());
+        }
+      });
+      m.on('dragend', () => {
+        persistMarker(m);
+        if(m._meta?.type === 'lokpot' && m._meta?.potId) {
+          const newLL = m.getLatLng();
+          allLines.forEach(l => {
+            if(l._meta?.potId === m._meta.potId) {
+              l._meta.pot = { lat: newLL.lat, lng: newLL.lng, id: m._meta.potId };
+              persistLine(l);
+            }
+          });
+        }
+      });
+    }
     allMarkers.push(m); markersGroup.addLayer(m);
   } else {
     m.setLatLng([doc.lat, doc.lng]);
@@ -895,6 +976,28 @@ function boot(){
   applyFilters();
   // Roles doc controleren: aanmaken als pending bij eerste login, daarna displayName + zones laden
   _initUserRole();
+  _loadZoneManagers();
+}
+
+// Laad alle managers uit roles collectie en bouw zone→naam map
+async function _loadZoneManagers() {
+  try {
+    const snap = await getDocs(collection(_db, 'roles'));
+    snap.forEach(d => {
+      const data = d.data();
+      if (data.role === 'manager' && Array.isArray(data.zones)) {
+        data.zones.forEach(z => {
+          const norm = normalizeZone(z);
+          if (norm && !_zoneManagers[norm]) {
+            _zoneManagers[norm] = data.displayName || data.email || '?';
+          }
+        });
+      }
+    });
+    console.log('[app] zone managers geladen:', _zoneManagers);
+  } catch(e) {
+    console.warn('[app] _loadZoneManagers fout:', e);
+  }
 }
 
 async function _initUserRole() {
