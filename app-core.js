@@ -1,4 +1,4 @@
-// app-core.js — Fix 45
+// app-core.js — Fix 47
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -17,6 +17,8 @@ const _db = getFirestore(app);
 let _currentDisplayName = '';
 let _currentRole   = '';
 let _currentZones  = [];   // genormaliseerde zones van ingelogde gebruiker
+function canEdit()   { return _currentRole === 'admin' || _currentRole === 'manager'; }  // polygonen/gebieden
+function canWrite()  { return _currentRole === 'admin' || _currentRole === 'manager' || _currentRole === 'volunteer'; }  // iconen
 
 import {
   setActiveScope,
@@ -246,6 +248,7 @@ function positionMenu(el,x,y){
 function escClose(e){ if(e.key==='Escape') closeContextMenu(); }
 function closeContextMenuOnce(){ closeContextMenu(); }
 function openMapContextMenu(latlng, x, y){
+  if(!canWrite()) return;  // volunteer mag iconen plaatsen, pending/andere niet
   closeContextMenu();
   const el=document.createElement('div');
   el.className='ctx-menu';
@@ -275,7 +278,7 @@ function openMarkerContextMenu(marker, x, y){
   el.innerHTML=`<h4>Icoon</h4>
   <button data-act="edit">✏️ Eigenschappen</button>
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
-  <button data-act="delete">🗑️ Verwijderen</button>`;
+  ${canWrite()?'<button data-act="delete">🗑️ Verwijderen</button>':''}`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
@@ -382,6 +385,11 @@ function placeMarkerAt(latlng, type='pending'){
     if(shouldDebounce()) return;
     openMarkerContextMenu(marker, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
+  // Verplaatsen via drag (alleen voor gebruikers met schrijfrechten)
+  if(canWrite()){
+    marker.dragging?.enable();
+    marker.on('dragend', () => { persistMarker(marker); });
+  }
   allMarkers.push(marker); markersGroup.addLayer(marker); attachMarkerPopup(marker);
   return marker;
 }
@@ -559,11 +567,10 @@ function polygonCentroid(layer){
 }
 function refreshPolygonLabel(layer){
   const lbl=layer._props?.label||''; const col=layer._props?.color||'#0aa879';
-  // Label alleen tonen als polygon in actieve of eigen zone zit
+  // Label tonen als polygon in het actieve geselecteerde gebied zit
   const zoneId = layer._props?.zoneId || '';
   const activeZone = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
-  const inZone = !zoneId || normalizeZone(zoneId) === activeZone ||
-                 _currentZones.includes(normalizeZone(zoneId));
+  const inZone = !zoneId || normalizeZone(zoneId) === activeZone;
   if(lbl){
     const pos = polygonCentroid(layer);
     if(!inZone){
@@ -605,7 +612,7 @@ function openUnifiedContextMenu(opts){
   closeContextMenu();
   const el=document.createElement('div'); el.className='ctx-menu';
   let html='';
-  if(opts.polygonLayer){
+  if(opts.polygonLayer && canEdit()){
     html += `<h4>Polygoon</h4>
     <button data-act="poly_label">✏️ Label wijzigen</button>
     <button data-act="poly_color">🎨 Kleur wijzigen</button>
@@ -613,11 +620,14 @@ function openUnifiedContextMenu(opts){
     <button data-act="poly_delete">🗑️ Verwijderen</button>
     <hr/>`;
   }
-  html += `<h4>Nieuw icoon</h4>
-  <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
-  <button data-act="mk" data-type="nest">🪹 Nest</button>
-  <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
-  <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+  if(canWrite()){
+    html += `<h4>Nieuw icoon</h4>
+    <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
+    <button data-act="mk" data-type="nest">🪹 Nest</button>
+    <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
+    <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+  }
+  if(!html) return; // niets te tonen
   el.innerHTML=html;
   el.addEventListener('click', ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
@@ -682,6 +692,7 @@ function upsertMarkerFromCloud(doc){
     })() });
     m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null };
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
+    if(canWrite()){ try{ m.options.draggable=true; m.dragging?.enable(); }catch{} m.on('dragend',()=>{ persistMarker(m); }); }
     allMarkers.push(m); markersGroup.addLayer(m);
   } else {
     m.setLatLng([doc.lat, doc.lng]);
@@ -897,8 +908,8 @@ async function _initUserRole() {
         $('btn-admin')?.classList.remove('hidden');
       }
       // Geoman tekenen: alleen tonen voor admin en manager
-      if (_currentRole !== 'admin' && _currentRole !== 'manager') {
-        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false }); } catch{}
+      if (!canEdit()) {
+        try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false, position:'topleft' }); } catch{}
       }
       // Zones laden en dropdown vullen, daarna scope activeren met eerste/opgeslagen zone
       if (_currentZones.length) {
