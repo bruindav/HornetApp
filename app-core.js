@@ -1,4 +1,4 @@
-// app-core.js — Fix 60
+// app-core.js — Fix 61
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -116,7 +116,10 @@ function initMap(){
   map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
 
   // Icoon grootte aanpassen bij zoom
-  map.on('zoomend', refreshAllMarkerIcons);
+  map.on('zoomend', () => {
+    refreshAllMarkerIcons();
+    refreshZoomVisibility();
+  });
 
   // Eerste punt markeren bij starten polygoon tekenen
   map.on('pm:drawstart', ({ workingLayer }) => {
@@ -272,9 +275,12 @@ async function searchPlaceNL(){
 //   13–14 : klein icoon, alleen emoji
 //   11–12 : gekleurde stip met letter
 //   <= 10 : kleine stip, geen tekst
-const ZOOM_FULL  = 15;
-const ZOOM_SMALL = 13;
-const ZOOM_DOT   = 11;
+const ZOOM_FULL  = 15;  // volledig icoon + tekst
+const ZOOM_SMALL = 13;  // klein icoon, alleen emoji
+const ZOOM_DOT   = 11;  // stip met letter
+// Labels en zichtlijnen/sectoren alleen op straatniveau
+const ZOOM_LABELS = 14; // polygon labels tonen >= dit niveau
+const ZOOM_LINES  = 14; // zichtlijnen + sectoren tonen >= dit niveau
 
 function makeDivIcon(html, bg='#1e293b', border='#334155', size='full'){
   if(size==='full'){
@@ -340,6 +346,37 @@ function getIconForMarker(meta){
 function refreshAllMarkerIcons(){
   allMarkers.forEach(m => {
     if(markersGroup.hasLayer(m)) m.setIcon(getIconForMarker(m._meta||{}));
+  });
+}
+// Labels en lijnen tonen/verbergen op basis van zoom
+function refreshZoomVisibility(){
+  const zoom = map?.getZoom() || 14;
+  // Polygon labels
+  polygonsGroup.getLayers().forEach(layer => {
+    if(!layer._labelTooltip) return;
+    const el = layer._labelTooltip.getElement?.();
+    if(el) el.style.display = (zoom >= ZOOM_LABELS) ? '' : 'none';
+  });
+  // Zichtlijnen + sectoren + handles + distlabels
+  const showLines = zoom >= ZOOM_LINES;
+  linesGroup.getLayers().forEach(l => {
+    const el = l.getElement?.() || l._path;
+    if(el) el.style.display = showLines ? '' : 'none';
+    // distLabel
+    if(l._distLabel){
+      const dle = l._distLabel.getElement?.();
+      if(dle) dle.style.display = showLines ? '' : 'none';
+    }
+    // handle
+    if(l._handle){
+      const he = l._handle.getElement?.();
+      if(he) he.style.display = showLines ? '' : 'none';
+    }
+  });
+  // Sectoren (circlesGroup)
+  circlesGroup.getLayers().forEach(s => {
+    const el = s._path;
+    if(el) el.style.display = showLines ? '' : 'none';
   });
 }
 // ======================= Contextmenu infra =======================
@@ -812,7 +849,11 @@ function refreshPolygonLabel(layer){
       } else {
         layer._labelTooltip.setContent(lbl).setLatLng(pos);
       }
-      const el = layer._labelTooltip.getElement(); if(el) el.style.borderColor = col;
+      const el = layer._labelTooltip.getElement();
+      if(el){
+        el.style.borderColor = col;
+        el.style.display = ((map?.getZoom()||14) >= ZOOM_LABELS) ? '' : 'none';
+      }
     }
   } else {
     if(layer._labelTooltip){ map.removeLayer(layer._labelTooltip); layer._labelTooltip=null; }
