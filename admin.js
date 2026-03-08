@@ -1,4 +1,4 @@
-// admin.js — Fix 51
+// admin.js — Fix 52
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -6,7 +6,7 @@
 // - EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY bovenaan instellen
 
 import { auth } from './firebase.js';
-import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, deleteDoc }
+import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, deleteDoc, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getFunctions, httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
