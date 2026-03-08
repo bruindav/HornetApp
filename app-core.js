@@ -1,4 +1,4 @@
-// app-core.js — Fix 47
+// app-core.js — Fix 48
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -753,11 +753,8 @@ function upsertPolygonFromCloud(doc){
   if(p){ polygonsGroup.removeLayer(p); }
   const latlngs = (doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng));
   const lp = L.polygon(latlngs).addTo(polygonsGroup);
-  // Label alleen tonen als polygon in een eigen zone van gebruiker zit
-  const docZone = normalizeZone(doc.zoneId || '');
-  const ownZone = _currentZones.length === 0 ||   // admin: altijd tonen
-                  _currentZones.includes(docZone);
-  lp._props = { id: doc.id, label: ownZone ? (doc.label||'') : '', color: doc.color||'#0aa879' };
+  // Label altijd opslaan — refreshPolygonLabel bepaalt zichtbaarheid op basis van actief gebied
+  lp._props = { id: doc.id, label: doc.label||'', color: doc.color||'#0aa879', zoneId: doc.zoneId||'' };
   initPolygon(lp);
 }
 function _removePolygonLayer(p){
