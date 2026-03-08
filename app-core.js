@@ -1,4 +1,4 @@
-// app-core.js — Fix 44
+// app-core.js — Fix 45
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -628,7 +628,7 @@ function openUnifiedContextMenu(opts){
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_color'){ const col=prompt('Kleur (CSS/hex, bv. #ffcc00):', opts.polygonLayer._props?.color||'#0aa879'); if(col===null) return; opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
-      else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } polygonsGroup.removeLayer(opts.polygonLayer); }
+      else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } _removePolygonLayer(opts.polygonLayer); }
     },0);
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el, opts.x||0, opts.y||0);
@@ -749,9 +749,14 @@ function upsertPolygonFromCloud(doc){
   lp._props = { id: doc.id, label: ownZone ? (doc.label||'') : '', color: doc.color||'#0aa879' };
   initPolygon(lp);
 }
+function _removePolygonLayer(p){
+  if(!p) return;
+  if(p._labelTooltip){ try{ map.removeLayer(p._labelTooltip); }catch{} p._labelTooltip = null; }
+  polygonsGroup.removeLayer(p);
+}
 function deletePolygonFromCloudLocal(id){
   const p = polygonsGroup.getLayers().find(x=>x._props?.id===id);
-  if(p){ polygonsGroup.removeLayer(p); }
+  _removePolygonLayer(p);
 }
 // ======================= Scope & opstart =======================
 const LS_SCOPE = "hornet_scope_v610"; // {year, group}
