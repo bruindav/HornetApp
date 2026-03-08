@@ -1,4 +1,4 @@
-// app-core.js — Fix 39
+// app-core.js — Fix 41
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -557,15 +557,25 @@ function polygonCentroid(layer){
 }
 function refreshPolygonLabel(layer){
   const lbl=layer._props?.label||''; const col=layer._props?.color||'#0aa879';
+  // Label alleen tonen als polygon in actieve of eigen zone zit
+  const zoneId = layer._props?.zoneId || '';
+  const activeZone = normalizeZone(getActiveGroup?.() || DEFAULT_GROUP);
+  const inZone = !zoneId || normalizeZone(zoneId) === activeZone ||
+                 _currentZones.includes(normalizeZone(zoneId));
   if(lbl){
     const pos = polygonCentroid(layer);
-    if(!layer._labelTooltip){
-      layer._labelTooltip = L.tooltip({permanent:true,direction:'center',className:'poly-label'}).setContent(lbl).setLatLng(pos);
-      layer._labelTooltip.addTo(map);
+    if(!inZone){
+      // Niet in eigen zone → label verbergen
+      if(layer._labelTooltip){ map.removeLayer(layer._labelTooltip); layer._labelTooltip=null; }
     } else {
-      layer._labelTooltip.setContent(lbl).setLatLng(pos);
+      if(!layer._labelTooltip){
+        layer._labelTooltip = L.tooltip({permanent:true,direction:'center',className:'poly-label'}).setContent(lbl).setLatLng(pos);
+        layer._labelTooltip.addTo(map);
+      } else {
+        layer._labelTooltip.setContent(lbl).setLatLng(pos);
+      }
+      const el = layer._labelTooltip.getElement(); if(el) el.style.borderColor = col;
     }
-    const el = layer._labelTooltip.getElement(); if(el) el.style.borderColor = col;
   } else {
     if(layer._labelTooltip){ map.removeLayer(layer._labelTooltip); layer._labelTooltip=null; }
   }
@@ -730,7 +740,11 @@ function upsertPolygonFromCloud(doc){
   if(p){ polygonsGroup.removeLayer(p); }
   const latlngs = (doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng));
   const lp = L.polygon(latlngs).addTo(polygonsGroup);
-  lp._props = { id: doc.id, label: doc.label||'', color: doc.color||'#0aa879' };
+  // Label alleen tonen als polygon in een eigen zone van gebruiker zit
+  const docZone = normalizeZone(doc.zoneId || '');
+  const ownZone = _currentZones.length === 0 ||   // admin: altijd tonen
+                  _currentZones.includes(docZone);
+  lp._props = { id: doc.id, label: ownZone ? (doc.label||'') : '', color: doc.color||'#0aa879' };
   initPolygon(lp);
 }
 function deletePolygonFromCloudLocal(id){
@@ -775,9 +789,13 @@ function updateHeaderScope(zone, year) {
   if (el) el.textContent = `${label} (${year || DEFAULT_YEAR})`;
   if (wrap) wrap.classList.remove('hidden');
 }
-function updateHeaderRole(role) {
+function updateHeaderRole(role, name) {
+  // Rol in header tonen
   const el = document.getElementById('hdr-role');
   if (el) el.textContent = ROL_LABEL[role] || role;
+  // Naam in sidebar tonen
+  const sidebarName = document.getElementById('sidebar-username');
+  if (sidebarName) sidebarName.textContent = name || _currentDisplayName || auth.currentUser?.displayName || auth.currentUser?.email || '–';
 }
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
 function writeScope(year, group){ localStorage.setItem(LS_SCOPE, JSON.stringify({year,group})); }
@@ -854,7 +872,7 @@ async function _initUserRole() {
       }
       // Rol en zones opslaan
       _currentRole  = data?.role || '';
-      updateHeaderRole(_currentRole);
+      updateHeaderRole(_currentRole, data?.displayName || auth.currentUser?.displayName || '');
       const rawZones = Array.isArray(data?.zones) ? data.zones : [];
       _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
 
@@ -866,11 +884,12 @@ async function _initUserRole() {
       if (_currentRole !== 'admin' && _currentRole !== 'manager') {
         try { map.pm.addControls({ drawRectangle:false, drawPolygon:false, editMode:false, dragMode:false, removalMode:false }); } catch{}
       }
-      // Zones laden en dropdown vullen
+      // Zones laden en dropdown vullen, daarna scope activeren met eerste/opgeslagen zone
       if (_currentZones.length) {
-        _fillZoneDropdown(_currentZones);
-        // Inzoomen op eerste zone
-        zoomToZone(_currentZones[0]);
+        const activeZone = _fillZoneDropdown(_currentZones);
+        const year = $('sel-year')?.value || DEFAULT_YEAR;
+        // Activeer scope met de juiste zone (triggert zoom + header update)
+        activateScope(year, activeZone, /*reload=*/true);
       }
     }
   } catch (e) {
@@ -896,15 +915,13 @@ function _fillZoneDropdown(zones) {
     newSel.appendChild(opt);
   });
   sel.replaceWith(newSel);
-  // Herstel opgeslagen keuze indien die in de lijst staat
+  // Herstel opgeslagen keuze indien die in de lijst staat, anders eerste zone
   const saved = readScope();
   const savedNorm = saved?.group ? normalizeZone(saved.group) : null;
-  if (savedNorm && zones.includes(savedNorm)) {
-    newSel.value = savedNorm;
-  } else {
-    newSel.value = zones[0];
-  }
-  console.log('[app] zone dropdown gevuld:', zones);
+  const activeZone = (savedNorm && zones.includes(savedNorm)) ? savedNorm : zones[0];
+  newSel.value = activeZone;
+  console.log('[app] zone dropdown gevuld:', zones, '→ actief:', activeZone);
+  return activeZone;  // teruggeven zodat aanroeper scope kan activeren
 }
 
 export { boot };
