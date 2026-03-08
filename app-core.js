@@ -1,4 +1,4 @@
-// app-core.js — Fix 62
+// app-core.js — Fix 64
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -374,32 +374,32 @@ function refreshAllMarkerIcons(){
 // Labels en lijnen tonen/verbergen op basis van zoom
 function refreshZoomVisibility(){
   const zoom = map?.getZoom() || 14;
-  // Polygon labels
+  const showLabels = zoom >= ZOOM_LABELS;
+  const showLines  = zoom >= ZOOM_LINES;
+
+  // Polygon labels — via Leaflet add/remove (betrouwbaarder dan display:none op tooltip)
   polygonsGroup.getLayers().forEach(layer => {
     if(!layer._labelTooltip) return;
-    const el = layer._labelTooltip.getElement?.();
-    if(el) el.style.display = (zoom >= ZOOM_LABELS) ? '' : 'none';
+    const onMap = map.hasLayer(layer._labelTooltip);
+    if(showLabels && !onMap) layer._labelTooltip.addTo(map);
+    else if(!showLabels && onMap) map.removeLayer(layer._labelTooltip);
   });
-  // Zichtlijnen + sectoren + handles + distlabels
-  const showLines = zoom >= ZOOM_LINES;
+
+  // Zichtlijnen: opacity via setStyle
   linesGroup.getLayers().forEach(l => {
-    const el = l.getElement?.() || l._path;
-    if(el) el.style.display = showLines ? '' : 'none';
-    // distLabel
+    l.setStyle({ opacity: showLines ? 1 : 0 });
     if(l._distLabel){
       const dle = l._distLabel.getElement?.();
-      if(dle) dle.style.display = showLines ? '' : 'none';
+      if(dle) dle.style.visibility = showLines ? '' : 'hidden';
     }
-    // handle
     if(l._handle){
       const he = l._handle.getElement?.();
-      if(he) he.style.display = showLines ? '' : 'none';
+      if(he) he.style.visibility = showLines ? '' : 'hidden';
     }
   });
-  // Sectoren (circlesGroup)
+  // Sectoren
   circlesGroup.getLayers().forEach(s => {
-    const el = s._path;
-    if(el) el.style.display = showLines ? '' : 'none';
+    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? 0.25 : 0 });
   });
 }
 // ======================= Contextmenu infra =======================
@@ -868,15 +868,16 @@ function refreshPolygonLabel(layer){
     } else {
       if(!layer._labelTooltip){
         layer._labelTooltip = L.tooltip({permanent:true,direction:'center',className:'poly-label'}).setContent(lbl).setLatLng(pos);
-        layer._labelTooltip.addTo(map);
       } else {
         layer._labelTooltip.setContent(lbl).setLatLng(pos);
       }
-      const el = layer._labelTooltip.getElement();
-      if(el){
-        el.style.borderColor = col;
-        el.style.display = ((map?.getZoom()||14) >= ZOOM_LABELS) ? '' : 'none';
-      }
+      // Alleen tonen als zoom hoog genoeg
+      const shouldShow = (map?.getZoom()||14) >= ZOOM_LABELS;
+      if(shouldShow && !map.hasLayer(layer._labelTooltip)) layer._labelTooltip.addTo(map);
+      else if(!shouldShow && map.hasLayer(layer._labelTooltip)) map.removeLayer(layer._labelTooltip);
+      // Kleur
+      const el = layer._labelTooltip.getElement?.();
+      if(el) el.style.borderColor = col;
     }
   } else {
     if(layer._labelTooltip){ map.removeLayer(layer._labelTooltip); layer._labelTooltip=null; }
@@ -1077,7 +1078,7 @@ function deleteSectorFromCloudLocal(id){
 }
 function upsertPolygonFromCloud(doc){
   let p = polygonsGroup.getLayers().find(x=>x._props?.id===doc.id);
-  if(p){ polygonsGroup.removeLayer(p); }
+  if(p){ if(p._labelTooltip){ try{map.removeLayer(p._labelTooltip);}catch{} p._labelTooltip=null; } polygonsGroup.removeLayer(p); }
   const latlngs = (doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng));
   const lp = L.polygon(latlngs).addTo(polygonsGroup);
   // Label altijd opslaan — refreshPolygonLabel bepaalt zichtbaarheid op basis van actief gebied
