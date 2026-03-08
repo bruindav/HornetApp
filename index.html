@@ -138,18 +138,35 @@
       <div id="sidebar-backdrop" class="hidden" aria-hidden="true"></div>
 
       <!-- Properties modal -->
-      <div id="prop-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.3)">
-        <div style="background:#fff; padding:16px; border-radius:8px; min-width:280px">
+      <!-- Icoon eigenschappen modal -->
+      <div id="prop-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 id="pm-title" style="margin:0 0 16px;font-size:15px"></h3>
           <div class="grid">
-            <label>Datum <input id="pm-date" type="date"/></label>
-            <label>Door <input id="pm-by"/></label>
+            <label style="font-size:13px">Datum <input id="pm-date" type="date" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
+            <label style="font-size:13px">Door <input id="pm-by" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
             <div class="only-hoornaar">
-              <label>Aantal <input id="pm-amount" type="number" min="0"/></label>
+              <label style="font-size:13px">Aantal <input id="pm-amount" type="number" min="0" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
             </div>
-            <div style="display:flex; justify-content:flex-end; gap:8px">
-              <button id="pm-cancel" class="btn-secondary">Annuleren</button>
-              <button id="pm-save" class="btn-primary">Opslaan</button>
+            <label id="pm-color-row" class="hidden" style="font-size:13px;display:flex;align-items:center;gap:8px">
+              Kleur gebied <input id="pm-color" type="color" style="width:48px;height:32px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;padding:2px"/>
+            </label>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+              <button id="pm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+              <button id="pm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Polygon kleur modal (apart voor bestaande polygonen) -->
+      <div id="color-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 style="margin:0 0 16px;font-size:15px">Kleur gebied</h3>
+          <input id="cm-color" type="color" style="width:100%;height:48px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;padding:3px"/>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button id="cm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+            <button id="cm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-// app-core.js — Fix 48
+// app-core.js — Fix 49
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -330,27 +330,55 @@ function openLineColorPicker(line, x, y){
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
 }
 // ======================= Modal (icon properties) =======================
-const modalEl = $('prop-modal');
-const pmDate = $('pm-date');
-const pmBy = $('pm-by');
-const pmAmount= $('pm-amount');
-const pmSave = $('pm-save');
-const pmCancel= $('pm-cancel');
+// prop-modal elementen worden in openPropModal opgezocht
 function openPropModal({type, init={}, onSave}){
-  if(!modalEl){ console.warn('[UI] prop-modal ontbreekt'); return; }
-  if(pmDate) pmDate.value = init.date || nowISODate();
-  if(pmBy) pmBy.value = init.by || _currentDisplayName || '';
+  const modalEl2 = document.getElementById('prop-modal');
+  if(!modalEl2){ console.warn('[UI] prop-modal ontbreekt'); return; }
+  const pmDate2   = document.getElementById('pm-date');
+  const pmBy2     = document.getElementById('pm-by');
+  const pmAmount2 = document.getElementById('pm-amount');
+  const pmSave2   = document.getElementById('pm-save');
+  const pmCancel2 = document.getElementById('pm-cancel');
+  const pmTitle   = document.getElementById('pm-title');
+  const pmColorRow= document.getElementById('pm-color-row');
+  // Titel
+  const titles = { hoornaar:'🐝 Waarneming', nest:'🪹 Nest', nest_geruimd:'✅ Nest geruimd', lokpot:'🪤 Lokpot' };
+  if(pmTitle) pmTitle.textContent = titles[type] || 'Icoon eigenschappen';
+  // Velden vullen
+  if(pmDate2) pmDate2.value = init.date || nowISODate();
+  if(pmBy2) pmBy2.value = init.by || _currentDisplayName || '';
   const onlyH = document.querySelector('.only-hoornaar');
   if(onlyH) onlyH.style.display = (type==='hoornaar' ? 'grid' : 'none');
-  if(type==='hoornaar' && pmAmount) pmAmount.value = (init.aantal!=null? init.aantal : '');
-  modalEl.classList.remove('hidden');
-  function cleanup(){ if(pmCancel) pmCancel.onclick=null; if(pmSave) pmSave.onclick=null; modalEl.classList.add('hidden'); }
-  if(pmCancel) pmCancel.onclick = ()=>cleanup();
-  if(pmSave) pmSave.onclick = ()=>{
-    const vals={ date: pmDate?.value || nowISODate(), by: pmBy?.value || '' };
-    if(type==='hoornaar' && pmAmount){ const a=parseInt(pmAmount.value,10); if(!isNaN(a)) vals.aantal=a; }
+  if(type==='hoornaar' && pmAmount2) pmAmount2.value = (init.aantal!=null ? init.aantal : '');
+  // Kleur verbergen (is voor polygonen, niet iconen)
+  if(pmColorRow) pmColorRow.classList.add('hidden');
+  // Modal tonen
+  modalEl2.classList.remove('hidden');
+  function cleanup(){
+    if(pmCancel2) pmCancel2.onclick=null;
+    if(pmSave2) pmSave2.onclick=null;
+    modalEl2.classList.add('hidden');
+  }
+  if(pmCancel2) pmCancel2.onclick = ()=>cleanup();
+  if(pmSave2) pmSave2.onclick = ()=>{
+    const vals={ date: pmDate2?.value || nowISODate(), by: pmBy2?.value || '' };
+    if(type==='hoornaar' && pmAmount2){ const a=parseInt(pmAmount2.value,10); if(!isNaN(a)) vals.aantal=a; }
     onSave && onSave(vals); cleanup();
   };
+}
+
+// Kleur picker modal voor polygonen
+function openColorModal(currentColor, onSave){
+  const modal = document.getElementById('color-modal');
+  const cmColor = document.getElementById('cm-color');
+  const cmSave  = document.getElementById('cm-save');
+  const cmCancel= document.getElementById('cm-cancel');
+  if(!modal) return;
+  if(cmColor) cmColor.value = currentColor || '#0aa879';
+  modal.classList.remove('hidden');
+  function cleanup(){ if(cmSave) cmSave.onclick=null; if(cmCancel) cmCancel.onclick=null; modal.classList.add('hidden'); }
+  if(cmCancel) cmCancel.onclick = ()=>cleanup();
+  if(cmSave) cmSave.onclick = ()=>{ onSave && onSave(cmColor?.value || '#0aa879'); cleanup(); };
 }
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
@@ -375,19 +403,19 @@ function applyPropsToMarker(marker, vals){
 }
 function placeMarkerAt(latlng, type='pending'){
   const id = genId('mk'); let marker;
-  if(type==='hoornaar'){ marker=L.marker(latlng,{icon:ICONS.hoornaar()}); marker._meta={id,type}; }
-  else if(type==='nest'){ marker=L.marker(latlng,{icon:ICONS.nest()}); marker._meta={id,type}; }
-  else if(type==='nest_geruimd'){ marker=L.marker(latlng,{icon:ICONS.nest_geruimd()}); marker._meta={id,type}; }
-  else if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{icon:ICONS.lokpot()}); marker._meta={id,type,potId}; }
-  else { marker=L.marker(latlng,{icon:ICONS.pending()}); marker._meta={id,type:'pending'}; }
+  const draggable = canWrite();
+  if(type==='hoornaar'){ marker=L.marker(latlng,{icon:ICONS.hoornaar(),draggable}); marker._meta={id,type}; }
+  else if(type==='nest'){ marker=L.marker(latlng,{icon:ICONS.nest(),draggable}); marker._meta={id,type}; }
+  else if(type==='nest_geruimd'){ marker=L.marker(latlng,{icon:ICONS.nest_geruimd(),draggable}); marker._meta={id,type}; }
+  else if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{icon:ICONS.lokpot(),draggable}); marker._meta={id,type,potId}; }
+  else { marker=L.marker(latlng,{icon:ICONS.pending(),draggable}); marker._meta={id,type:'pending'}; }
   marker.on('contextmenu',e=>{
     e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;
     openMarkerContextMenu(marker, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
-  // Verplaatsen via drag (alleen voor gebruikers met schrijfrechten)
+  // Verplaatsen via drag
   if(canWrite()){
-    marker.dragging?.enable();
     marker.on('dragend', () => { persistMarker(marker); });
   }
   allMarkers.push(marker); markersGroup.addLayer(marker); attachMarkerPopup(marker);
@@ -636,7 +664,7 @@ function openUnifiedContextMenu(opts){
       if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); return; }
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
-      else if(act==='poly_color'){ const col=prompt('Kleur (CSS/hex, bv. #ffcc00):', opts.polygonLayer._props?.color||'#0aa879'); if(col===null) return; opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
+      else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }
       else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } _removePolygonLayer(opts.polygonLayer); }
     },0);
@@ -683,7 +711,7 @@ function applyFilters(){
 function upsertMarkerFromCloud(doc){
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
-    m = L.marker([doc.lat, doc.lng], { icon: (()=>{
+    m = L.marker([doc.lat, doc.lng], { draggable: canWrite(), icon: (()=>{
       if(doc.type==='hoornaar') return ICONS.hoornaar(doc.aantal);
       if(doc.type==='nest') return ICONS.nest();
       if(doc.type==='nest_geruimd') return ICONS.nest_geruimd();
