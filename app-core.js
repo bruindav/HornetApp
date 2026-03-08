@@ -1,4 +1,4 @@
-// app-core.js — Fix 55
+// app-core.js — Fix 56
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -400,6 +400,16 @@ function openPropModal({type, init={}, onSave}){
   const onlyH = document.querySelector('.only-hoornaar');
   if(onlyH) onlyH.style.display = (type==='hoornaar' ? 'grid' : 'none');
   if(type==='hoornaar' && pmAmount2) pmAmount2.value = (init.aantal!=null ? init.aantal : '');
+  // Zenderactie — alleen bij lokpot
+  const pmSenderRow = document.getElementById('pm-sender-row');
+  if(pmSenderRow) pmSenderRow.style.display = (type==='lokpot' ? 'block' : 'none');
+  if(type==='lokpot'){
+    const senderVal = init.sender || 'nee';
+    const jaEl = document.getElementById('pm-sender-ja');
+    const neeEl = document.getElementById('pm-sender-nee');
+    if(jaEl) jaEl.checked = (senderVal === 'ja');
+    if(neeEl) neeEl.checked = (senderVal !== 'ja');
+  }
   // Kleur verbergen (is voor polygonen, niet iconen)
   if(pmColorRow) pmColorRow.classList.add('hidden');
   // Modal tonen
@@ -414,6 +424,10 @@ function openPropModal({type, init={}, onSave}){
     const pmNote3 = document.getElementById('pm-note');
     const vals={ date: pmDate2?.value || nowISODate(), by: pmBy2?.value || '', note: pmNote3?.value?.trim()||'' };
     if(type==='hoornaar' && pmAmount2){ const a=parseInt(pmAmount2.value,10); if(!isNaN(a)) vals.aantal=a; }
+    if(type==='lokpot'){
+      const jaEl2 = document.getElementById('pm-sender-ja');
+      vals.sender = (jaEl2?.checked) ? 'ja' : 'nee';
+    }
     onSave && onSave(vals); cleanup();
   };
 }
@@ -433,30 +447,37 @@ function openColorModal(currentColor, onSave){
 }
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
-  const m=marker._meta||{}; let txt='';
-  if(m.type==='hoornaar'){ txt+= m.aantal?`<strong>Waarneming (x${m.aantal})</strong>`:'<strong>Waarneming</strong>'; }
-  else if(m.type==='nest'){ txt+='<strong>Nest</strong>'; }
-  else if(m.type==='nest_geruimd'){ txt+='<strong>Nest geruimd</strong>'; }
-  else if(m.type==='lokpot'){ txt='<strong>Lokpot</strong>'; }
-  else { txt='<strong>Nieuw icoon</strong>'; }
-  if(m.date) txt+=`<br><span style="color:#64748b;font-size:12px">Datum: ${m.date}</span>`;
-  if(m.by)   txt+=`<br><span style="color:#64748b;font-size:12px">Door: ${m.by}</span>`;
-  if(m.note) txt+=`<br><span style="color:#374151;font-size:12px;font-style:italic">${m.note}</span>`;
+  const m=marker._meta||{};
+  // Label per type
+  const typeLabel = m.type==='hoornaar'?(m.aantal?`Waarneming (×${m.aantal})`:'Waarneming')
+    :m.type==='nest'?'Nest':m.type==='nest_geruimd'?'Nest geruimd'
+    :m.type==='lokpot'?'Lokpot':'Icoon';
+  // Popup: alle velden netjes onder elkaar
+  const row = (lbl,val) => `<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:56px">${lbl}</span><span style="font-size:12px;color:#1e293b">${val}</span></div>`;
+  let popup = `<div style="min-width:160px"><strong style="font-size:13px">${typeLabel}</strong>`;
+  if(m.date) popup += row('Datum', m.date);
+  if(m.by)   popup += row('Door', m.by);
+  if(m.type==='lokpot' && m.sender) popup += row('Zender', m.sender==='ja'?'✅ Ja':'❌ Nee');
+  if(m.note) popup += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">${m.note}</div>`;
+  popup += '</div>';
   marker.unbindPopup();
-  marker.bindPopup(txt, {maxWidth:220});
-  // Hover tooltip (korte versie)
+  marker.bindPopup(popup, {maxWidth:240});
+  // Hover tooltip: alles onder elkaar als platte tekst
   marker.unbindTooltip();
-  let tip = m.type==='hoornaar'?(m.aantal?`Waarneming ×${m.aantal}`:'Waarneming')
-           :m.type==='nest'?'Nest':m.type==='nest_geruimd'?'Nest geruimd':m.type==='lokpot'?'Lokpot':'Icoon';
-  if(m.note) tip += `
-${m.note}`;
-  marker.bindTooltip(tip, {direction:'top', offset:[0,-8], className:'marker-tip'});
+  let tipLines = [typeLabel];
+  if(m.date) tipLines.push(`Datum: ${m.date}`);
+  if(m.by)   tipLines.push(`Door: ${m.by}`);
+  if(m.type==='lokpot' && m.sender) tipLines.push(`Zender: ${m.sender==='ja'?'Ja':'Nee'}`);
+  if(m.note) tipLines.push(m.note);
+  marker.bindTooltip(tipLines.join('
+'), {direction:'top', offset:[0,-8], className:'marker-tip'});
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
   if(vals.date) m.date=vals.date; else delete m.date;
   if(vals.by) m.by=vals.by; else delete m.by;
   if(vals.note!==undefined){ if(vals.note) m.note=vals.note; else delete m.note; }
+  if(vals.sender!==undefined){ m.sender=vals.sender; }
   if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; marker.setIcon(ICONS.hoornaar(m.aantal)); }
   else if(m.type==='nest'){ marker.setIcon(ICONS.nest()); }
   else if(m.type==='nest_geruimd'){ marker.setIcon(ICONS.nest_geruimd()); }
@@ -518,7 +539,7 @@ function persistMarker(marker){
   const doc = {
     id:m.id, type:m.type, lat:ll.lat, lng:ll.lng,
     date:m.date||null, by:m.by||null, aantal:m.aantal!=null? m.aantal:null,
-    potId:m.potId||null, note:m.note||null
+    potId:m.potId||null, note:m.note||null, sender:m.sender||null
   };
   saveMarkerToCloud(doc);
 }
@@ -847,7 +868,7 @@ function upsertMarkerFromCloud(doc){
       if(doc.type==='lokpot') return ICONS.lokpot();
       return ICONS.pending();
     })() });
-    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'' };
+    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'', sender: doc.sender||null };
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
     if(canWrite()){
       m.on('drag', () => {
@@ -877,6 +898,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.by = doc.by||null;
     m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
     m._meta.note = doc.note||'';
+    m._meta.sender = doc.sender||null;
     if(doc.type==='hoornaar') m.setIcon(ICONS.hoornaar(m._meta.aantal));
     if(doc.type==='nest') m.setIcon(ICONS.nest());
     if(doc.type==='nest_geruimd') m.setIcon(ICONS.nest_geruimd());
