@@ -1,4 +1,4 @@
-// app-core.js — Fix 61
+// app-core.js — Fix 62
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -199,9 +199,16 @@ function initUIBindings(){
   on(req('reset-filters'), 'click', ()=>{
     ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending']
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
-    const fdb = $('f_date_before'); if (fdb) fdb.value = '';
+    const sl = $('f_period_slider'); if(sl){ sl.value='0'; updatePeriodLabel(0); }
     applyFilters();
   });
+  // Slider: live label bijwerken bij schuiven
+  const periodSlider = $('f_period_slider');
+  if(periodSlider){
+    periodSlider.addEventListener('input', ()=>{
+      updatePeriodLabel(parseInt(periodSlider.value,10));
+    });
+  }
   // Cache reset
   // Beheer knop — altijd binden (knop is hidden maar bestaat in DOM)
   const _btnAdmin = document.getElementById('btn-admin');
@@ -275,6 +282,22 @@ async function searchPlaceNL(){
 //   13–14 : klein icoon, alleen emoji
 //   11–12 : gekleurde stip met letter
 //   <= 10 : kleine stip, geen tekst
+// Periode-slider stappen (index 0 = alles, 1..6 = steeds verder terug)
+const PERIOD_STEPS = [
+  { label: 'Alles',         days: null },
+  { label: 'Deze week',     days: 7    },
+  { label: '2 weken',       days: 14   },
+  { label: '3 weken',       days: 21   },
+  { label: 'Maand',         days: 30   },
+  { label: 'Half jaar',     days: 183  },
+  { label: 'Jaar',          days: 365  },
+];
+function getDateFrom(days){
+  if(!days) return null;
+  const d = new Date(); d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0,10); // 'YYYY-MM-DD'
+}
+
 const ZOOM_FULL  = 15;  // volledig icoon + tekst
 const ZOOM_SMALL = 13;  // klein icoon, alleen emoji
 const ZOOM_DOT   = 11;  // stip met letter
@@ -930,13 +953,22 @@ function getActiveFilters(){ return {
   nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
   lokpot: !!$('f_type_lokpot')?.checked,
   pending: !!$('f_type_pending')?.checked,
-  dateBefore: $('f_date_before')?.value || ''
+  dateFrom: (()=>{
+    const idx = parseInt($('f_period_slider')?.value||'0', 10);
+    return getDateFrom((PERIOD_STEPS[idx]||PERIOD_STEPS[0]).days);
+  })()
 };}
+function updatePeriodLabel(idx){
+  const step = PERIOD_STEPS[idx] || PERIOD_STEPS[0];
+  const lbl = $('f_period_label');
+  if(lbl) lbl.textContent = step.label;
+}
+
 function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
-    if(f.dateBefore && meta.date){ if(meta.date < f.dateBefore) show=false; }
+    if(f.dateFrom && meta.date){ if(meta.date < f.dateFrom) show=false; }
     if(show) markersGroup.addLayer(m); else markersGroup.removeLayer(m);
   });
   const visiblePotIds=new Set();

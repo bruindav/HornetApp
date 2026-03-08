@@ -119,7 +119,18 @@
             <label><input type="checkbox" id="f_type_nest_geruimd" checked/> Nest geruimd</label>
             <label><input type="checkbox" id="f_type_lokpot" checked/> Lokpot (incl. lijnen)</label>
             <label><input type="checkbox" id="f_type_pending" checked/> Pending</label>
-            <label>Datum vóór <input type="date" id="f_date_before"/></label>
+            <div style="margin-top:4px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                <span style="font-size:12px;color:#64748b">Periode</span>
+                <span id="f_period_label" style="font-size:12px;font-weight:600;color:#0aa879">Alles</span>
+              </div>
+              <input type="range" id="f_period_slider" min="0" max="6" value="0"
+                style="width:100%;accent-color:#0aa879;cursor:pointer"/>
+              <div style="display:flex;justify-content:space-between;margin-top:2px">
+                <span style="font-size:10px;color:#94a3b8">Alles</span>
+                <span style="font-size:10px;color:#94a3b8">1 jaar</span>
+              </div>
+            </div>
             <div style="display:flex; gap:8px">
               <button id="apply-filters">Toepassen</button>
               <button id="reset-filters">Reset</button>
