@@ -1,4 +1,4 @@
-// admin.js — Fix 70
+// admin.js — Fix 76
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -6,7 +6,7 @@
 // - EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY bovenaan instellen
 
 import { auth } from './firebase.js';
-import { getFirestore, collection, doc, setDoc, onSnapshot, query, getDoc, deleteDoc, getDocs }
+import { getFirestore, collection, doc, setDoc, onSnapshot, query, where, getDoc, deleteDoc, getDocs }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getFunctions, httpsCallable }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js';
@@ -77,6 +77,16 @@ function createOverlay() {
       .adm-btn-reject { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
       .adm-btn-delete { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
       .adm-btn-icon { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 2px; }
+      .adm-tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 0; }
+      .adm-tab { padding: 10px 18px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+      .adm-tab.active { color: #0aa879; border-bottom-color: #0aa879; }
+      .adm-sync-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+      .adm-sync-input { flex: 1; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: monospace; }
+      .adm-sync-btn { padding: 7px 16px; background: #0aa879; color: #fff; border: 0; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 13px; white-space: nowrap; }
+      .adm-sync-btn:disabled { background: #94a3b8; cursor: not-allowed; }
+      .adm-sync-log { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 12px; max-height: 300px; overflow-y: auto; line-height: 1.6; }
+      .adm-sync-obs { border-bottom: 1px solid #f1f5f9; padding: 6px 0; }
+      .adm-sync-obs:last-child { border-bottom: 0; }
     `;
     document.head.appendChild(style);
   }
@@ -86,8 +96,12 @@ function createOverlay() {
   el.innerHTML = `
     <div id="admin-panel">
       <div id="admin-header">
-        <strong>⚙️ Gebruikersbeheer</strong>
+        <strong>⚙️ Beheer</strong>
         <button id="admin-close" title="Sluiten">✕</button>
+      </div>
+      <div class="adm-tabs">
+        <button class="adm-tab active" data-tab="users">👥 Gebruikers</button>
+        <button class="adm-tab" data-tab="sync">🔄 Waarneming.nl</button>
       </div>
       <div id="admin-body"><p style="color:#64748b;padding:12px">Laden…</p></div>
       <p id="admin-footer">
@@ -98,6 +112,15 @@ function createOverlay() {
   document.getElementById('admin-close').addEventListener('click', closeAdminOverlay);
   el.addEventListener('click', e => { if (e.target === el) closeAdminOverlay(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAdminOverlay(); });
+  // Tab wisselen
+  el.querySelectorAll('.adm-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.tab === 'users') startListening();
+      else if (btn.dataset.tab === 'sync') openSyncTab();
+    });
+  });
 }
 
 function setAdminBody(html) {
@@ -309,6 +332,202 @@ async function adminConfirmAccept(uid, email, name, role, zones) {
     alert(`Accepteren mislukt: ${e.message}`);
   }
 }
+
+// ======================= Waarneming.nl Sync =======================
+// Species ID Aziatische hoornaar (Vespa velutina) op waarneming.nl
+const WAARNEMING_SPECIES_ID = 8807;
+// CORS proxy — nodig omdat browser de waarneming.nl API niet direct kan aanroepen
+const CORS_PROXY = 'https://corsproxy.io/?';
+
+// Zones met hun bounding boxes [minLat, minLng, maxLat, maxLng]
+const ZONE_BOUNDS = {
+  'Zeist':      [52.05, 5.17, 52.14, 5.33],
+  'Bilthoven':  [52.09, 5.14, 52.18, 5.26],
+  'Driebergen': [52.02, 5.24, 52.09, 5.35],
+  'Utrecht':    [52.04, 5.03, 52.15, 5.18],
+};
+
+function openSyncTab() {
+  const lastSync = localStorage.getItem('wn_last_sync') || '';
+  const token    = localStorage.getItem('wn_token') || '';
+  setAdminBody(`
+    <div style="padding:16px;max-width:600px">
+      <h3 style="margin:0 0 4px;font-size:15px">🔄 Synchronisatie met waarneming.nl</h3>
+      <p style="color:#64748b;font-size:12px;margin:0 0 16px">
+        Importeert waarnemingen van Aziatische hoornaar (Vespa velutina, soort #${WAARNEMING_SPECIES_ID})
+        binnen jouw gebieden.
+      </p>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">
+          Waarneming.nl API token (Bearer)
+        </label>
+        <div class="adm-sync-row">
+          <input id="wn-token" class="adm-sync-input" type="password"
+            placeholder="Plak hier je OAuth2 token van waarneming.nl"
+            value="${token}"/>
+          <button class="adm-sync-btn" id="wn-save-token" style="background:#475569">Opslaan</button>
+        </div>
+        <p style="font-size:11px;color:#94a3b8;margin:2px 0 0">
+          Haal je token op via: waarneming.nl → Mijn profiel → API-toegang → Token aanmaken
+        </p>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">
+          Synchroniseren vanaf
+        </label>
+        <div class="adm-sync-row">
+          <input id="wn-date" type="date" class="adm-sync-input" style="max-width:180px"
+            value="${lastSync ? lastSync.slice(0,10) : new Date(Date.now()-7*86400000).toISOString().slice(0,10)}"/>
+          <button class="adm-sync-btn" id="wn-sync-btn">▶ Synchroniseren</button>
+        </div>
+        ${lastSync ? `<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">Laatste sync: ${new Date(lastSync).toLocaleString('nl-NL')}</p>` : ''}
+      </div>
+
+      <div id="wn-log" class="adm-sync-log" style="min-height:60px">
+        <span style="color:#94a3b8">Klik op Synchroniseren om te starten.</span>
+      </div>
+    </div>
+  `);
+
+  document.getElementById('wn-save-token')?.addEventListener('click', () => {
+    const t = document.getElementById('wn-token')?.value.trim();
+    if (t) { localStorage.setItem('wn_token', t); alert('Token opgeslagen.'); }
+  });
+
+  document.getElementById('wn-sync-btn')?.addEventListener('click', () => runSync());
+}
+
+function logSync(msg, color='#334155') {
+  const log = document.getElementById('wn-log');
+  if (!log) return;
+  const line = document.createElement('div');
+  line.style.cssText = 'padding:2px 0;color:' + color;
+  line.textContent = new Date().toLocaleTimeString('nl-NL') + ' — ' + msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function runSync() {
+  const token   = localStorage.getItem('wn_token') || document.getElementById('wn-token')?.value.trim();
+  const dateStr = document.getElementById('wn-date')?.value;
+  const btn     = document.getElementById('wn-sync-btn');
+  const log     = document.getElementById('wn-log');
+
+  if (!token) { alert('Stel eerst een API token in.'); return; }
+  if (!dateStr) { alert('Stel een datum in.'); return; }
+
+  log.innerHTML = '';
+  btn.disabled = true;
+  btn.textContent = '⏳ Bezig…';
+  logSync('Start synchronisatie vanaf ' + dateStr);
+
+  const year = new Date().getFullYear().toString();
+  let totalImported = 0, totalSkipped = 0, totalDuplicates = 0;
+
+  try {
+    // Haal alle waarnemingen op (gepagineerd)
+    let url = `https://waarneming.nl/api/v1/species/${WAARNEMING_SPECIES_ID}/observations/?date_after=${dateStr}&limit=100&offset=0`;
+    let allObs = [];
+    let page = 0;
+
+    while (url) {
+      page++;
+      logSync(`Pagina ${page} ophalen…`, '#64748b');
+      const proxyUrl = CORS_PROXY + encodeURIComponent(url);
+      const resp = await fetch(proxyUrl, {
+        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+      });
+      if (!resp.ok) {
+        logSync(`API fout: ${resp.status} ${resp.statusText}`, '#ef4444');
+        break;
+      }
+      const data = await resp.json();
+      allObs = allObs.concat(data.results || []);
+      logSync(`${allObs.length} van ${data.count} waarnemingen opgehaald`, '#64748b');
+      url = data.next || null;
+      if (page > 20) { logSync('Stop na 20 pagina's (max 2000 waarnemingen).', '#f59e0b'); break; }
+    }
+
+    logSync(`Totaal ${allObs.length} waarnemingen gevonden voor soort Aziatische hoornaar.`);
+
+    // Filter op jouw zones via bounding box
+    for (const [zone, bbox] of Object.entries(ZONE_BOUNDS)) {
+      const [minLat, minLng, maxLat, maxLng] = bbox;
+      const inZone = allObs.filter(o => {
+        if (!o.point?.coordinates) return false;
+        const [lng, lat] = o.point.coordinates;
+        return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+      });
+      if (!inZone.length) { logSync(`${zone}: geen waarnemingen`, '#94a3b8'); continue; }
+      logSync(`${zone}: ${inZone.length} waarneming(en) gevonden`);
+
+      // Per waarneming importeren
+      for (const obs of inZone) {
+        const obsId = 'wn_' + obs.id;
+        const [lng, lat] = obs.point.coordinates;
+        const date = obs.date || new Date().toISOString().slice(0,10);
+        const locName = obs.location_detail?.name || '';
+        const userName = obs.user_detail?.name || obs.observer || ('gebruiker #' + obs.user);
+        const notes  = [obs.notes, locName].filter(Boolean).join(' | ');
+        const aantal = obs.number || 1;
+
+        // Controleer of al aanwezig (op externalId)
+        const base = 'maps/' + year + '/' + zone + '/data';
+        const existing = await getDocs(
+          query(collection(db, base, 'markers'), where('externalId', '==', obsId))
+        );
+        if (!existing.empty) { totalDuplicates++; continue; }
+
+        // Geocode adres via Nominatim als locatienaam beschikbaar
+        let adres = locName;
+        if (!adres && lat && lng) {
+          try {
+            const geo = await fetch(
+              'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=nl',
+              { headers: { 'User-Agent': 'HornetApp/1.0' } }
+            );
+            const geoData = await geo.json();
+            adres = geoData.display_name?.split(',').slice(0,3).join(', ') || '';
+          } catch {}
+        }
+
+        // Marker aanmaken in Firestore
+        const id = 'wn_' + obs.id;
+        const markerDoc = {
+          id, type: 'hoornaar',
+          lat, lng,
+          date,
+          by: userName,
+          aantal,
+          note: [notes, adres ? ('📍 ' + adres) : ''].filter(Boolean).join('\n'),
+          externalId: obsId,
+          source: 'waarneming.nl',
+          permalink: obs.permalink || '',
+          validationStatus: obs.validation_status || '',
+        };
+        await setDoc(doc(db, base, 'markers', id), markerDoc);
+        totalImported++;
+        logSync(`✅ Geïmporteerd: ${date} | ${userName} | ${antal_label(aantal)} | ${adres||'onbekend'}`, '#0aa879');
+      }
+    }
+
+    // Laatste sync opslaan
+    localStorage.setItem('wn_last_sync', new Date().toISOString());
+    logSync('────────────────────────────────', '#e2e8f0');
+    logSync('Klaar! ' + totalImported + ' geïmporteerd, ' + totalDuplicates + ' duplicaten overgeslagen, ' + totalSkipped + ' buiten gebieden.', '#0aa879');
+
+  } catch(e) {
+    logSync('Fout: ' + e.message, '#ef4444');
+    console.error('[sync] fout:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '▶ Synchroniseren';
+  }
+}
+
+function antal_label(n) { return n === 1 ? '1 exemplaar' : n + ' exemplaren'; }
 
 // ======================= Welkomst-email via EmailJS =======================
 async function sendWelcomeEmail(email, displayName, role, zones) {
