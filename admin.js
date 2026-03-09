@@ -1,4 +1,4 @@
-// admin.js — Fix 76
+// admin.js — Fix 76b
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
