@@ -22,7 +22,16 @@
       .hidden { display: none !important; }
       /* App shell vult volledig scherm — header fixed zodat hij nooit verdwijnt */
       #app-shell { display:flex; flex-direction:column; height:100vh; height:100dvh; overflow:hidden; }
-      header { position:relative; z-index:5; background:#0f172a; color:#fff; padding:10px 12px; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+      header { position:relative; z-index:5; background:#0f172a; color:#fff; padding:10px 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+      /* Mobiel: knoppen compact, tekst verbergen */
+      @media (max-width:540px) {
+        header { padding:8px 10px; gap:4px; }
+        header strong { font-size:14px; }
+        .hdr-text-label { display:none; }        /* "Uitloggen" tekst verbergen */
+        #hdr-role, #hdr-scope-wrap { display:none !important; } /* rol/scope in sidebar */
+        header button { padding:6px 8px !important; font-size:15px; margin-left:2px !important; }
+        #btn-admin { font-size:13px !important; padding:5px 7px !important; }
+      }
       header .spacer { flex:1; }
       /* .app vult resterende ruimte onder header */
       .app { display:flex; flex:1; overflow:hidden; min-height:0; }
@@ -151,10 +160,10 @@
           <span id="hdr-role" style="opacity:.85"></span>
           <span id="hdr-scope-wrap" class="hidden">📍 <span id="hdr-scope">–</span></span>
         </div>
-        <button id="btn-admin" class="hidden" style="margin-left:12px">⚙️ Beheer</button>
-        <button id="btn-help" title="Help" style="margin-left:8px">❓</button>
-        <button id="logoutBtn" style="margin-left:12px">Uitloggen</button>
-        <button id="btn-reset-cache" title="Reset cache & herladen" style="margin-left:8px">↺</button>
+        <button id="btn-admin" class="hidden" style="margin-left:4px" title="Beheer">⚙️ <span class="hdr-text-label">Beheer</span></button>
+        <button id="btn-help" title="Help" style="margin-left:4px">❓</button>
+        <button id="logoutBtn" style="margin-left:4px" title="Uitloggen">🚪 <span class="hdr-text-label">Uitloggen</span></button>
+        <button id="btn-reset-cache" title="Cache resetten" style="margin-left:2px">↺</button>
       </header>
       <div class="app">
         <aside class="sidebar">
