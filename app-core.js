@@ -1,4 +1,4 @@
-// app-core.js — Fix 73
+// app-core.js — Fix 74
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -122,18 +122,13 @@ function initMap(){
   compassCtrl.onAdd = () => {
     const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control compass-control');
     div.title = 'Kompas — sleep om kaart te draaien, klik om naar het noorden te resetten';
-    div.style.cssText = 'width:34px;height:34px;cursor:pointer;background:#fff;display:flex;align-items:center;justify-content:center;user-select:none';
+    div.style.cssText = 'width:34px;height:34px;background:#fff;display:flex;align-items:center;justify-content:center;user-select:none;pointer-events:none;cursor:default';
     div.innerHTML = '<svg id="compass-svg" width="26" height="26" viewBox="0 0 26 26">'
       + '<circle cx="13" cy="13" r="12" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>'
       + '<polygon id="compass-n" points="13,3 10,13 13,11 16,13" fill="#e53e3e"/>'
       + '<polygon id="compass-s" points="13,23 10,13 13,15 16,13" fill="#94a3b8"/>'
       + '<text x="13" y="8" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53e3e">N</text>'
       + '</svg>';
-    L.DomEvent.disableClickPropagation(div);
-    // Klik: reset kompas naar noorden
-    L.DomEvent.on(div, 'click', () => {
-      updateCompassSvg(0);
-    });
     return div;
   };
   compassCtrl.addTo(map);
@@ -259,16 +254,37 @@ function initMap(){
   let drawing=false;
   map.on('pm:drawstart',()=>drawing=true);
   map.on('pm:drawend', ()=>drawing=false);
-  map.on('click', e=>{
-    if(shouldDebounce()) return;
-    if(drawing) return;
-    openMapContextMenu(e.latlng, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
-  });
+  // Desktop: contextmenu (rechtermuisknop)
   map.on('contextmenu', e=>{
     if(shouldDebounce()) return;
     if(drawing) return;
     openMapContextMenu(e.latlng, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
+
+  // Mobiel: long press (600ms zonder beweging) → contextmenu
+  let _lpTimer = null, _lpMoved = false, _lpLatLng = null, _lpXY = null;
+  map.on('mousedown touchstart', e => {
+    _lpMoved = false;
+    _lpLatLng = e.latlng;
+    _lpXY = { x: e.originalEvent?.touches?.[0]?.clientX ?? e.originalEvent?.clientX ?? 0,
+               y: e.originalEvent?.touches?.[0]?.clientY ?? e.originalEvent?.clientY ?? 0 };
+    clearTimeout(_lpTimer);
+    _lpTimer = setTimeout(() => {
+      if (!_lpMoved && !drawing && !shouldDebounce()) {
+        openMapContextMenu(_lpLatLng, _lpXY.x, _lpXY.y);
+      }
+    }, 600);
+  });
+  map.on('mousemove touchmove', e => {
+    // Als er >10px bewogen is, annuleer long press
+    const t = e.originalEvent?.touches?.[0];
+    const cx = t?.clientX ?? e.originalEvent?.clientX ?? 0;
+    const cy = t?.clientY ?? e.originalEvent?.clientY ?? 0;
+    if (_lpXY && (Math.abs(cx - _lpXY.x) > 10 || Math.abs(cy - _lpXY.y) > 10)) {
+      _lpMoved = true; clearTimeout(_lpTimer);
+    }
+  });
+  map.on('mouseup touchend', () => { clearTimeout(_lpTimer); });
 }
 // ======================= UI‑bindingen =======================
 function updateHeaderHeightVar(){
@@ -304,13 +320,14 @@ function initUIBindings(){
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
   // Live update bij checkbox wijziging
-  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending'].forEach(id => {
+  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending','f_poly_outline'].forEach(id => {
     const el = $(id); if(el) el.addEventListener('change', applyFilters);
   });
   on(req('reset-filters'), 'click', ()=>{
     ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending']
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
     const sl = $('f_period_slider'); if(sl){ sl.value='0'; updatePeriodLabel(0); }
+    const fo = $('f_poly_outline'); if(fo) fo.checked = false;
     applyFilters();
   });
   // Slider: live label bijwerken bij schuiven
@@ -558,6 +575,7 @@ function openMarkerContextMenu(marker, x, y){
   closeContextMenu(); const isLokpot=(marker._meta||{}).type==='lokpot';
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Icoon</h4>
+  ${canWrite()?'<button data-act="move">✋ Verplaatsen</button>':''}
   <button data-act="edit">✏️ Eigenschappen</button>
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
   ${canWrite()?'<button data-act="delete">🗑️ Verwijderen</button>':''}`;
@@ -565,7 +583,25 @@ function openMarkerContextMenu(marker, x, y){
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     setTimeout(()=>{
-      if(act==='edit'){
+      if(act==='move'){
+        marker.options.draggable = true;
+        marker.dragging?.enable();
+        marker.once('dragend', () => {
+          marker.options.draggable = false;
+          marker.dragging?.disable();
+          persistMarker(marker);
+          if(marker._meta?.type==='lokpot' && marker._meta?.potId){
+            const ll = marker.getLatLng();
+            movePotLines(marker._meta.potId, ll);
+            allLines.forEach(l=>{
+              if(l._meta?.potId===marker._meta.potId){
+                l._meta.pot={lat:ll.lat,lng:ll.lng,id:marker._meta.potId};
+                persistLine(l);
+              }
+            });
+          }
+        });
+      } else if(act==='edit'){
         openPropModal({ type: marker._meta.type, init: marker._meta, onSave:(vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }});
       } else if(act==='new_line'){
         startSightLine(marker);
@@ -719,9 +755,9 @@ function applyPropsToMarker(marker, vals){
 }
 function placeMarkerAt(latlng, type='pending'){
   const id = genId('mk'); let marker;
-  const draggable = canWrite();
-  if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{draggable}); marker._meta={id,type,potId}; }
-  else { marker=L.marker(latlng,{draggable}); marker._meta={id,type:(type||'pending')}; }
+  // Markers zijn NIET meer vrij draggable — verplaatsen gaat via contextmenu
+  if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{draggable:false}); marker._meta={id,type,potId}; }
+  else { marker=L.marker(latlng,{draggable:false}); marker._meta={id,type:(type||'pending')}; }
   marker.setIcon(getIconForMarker(marker._meta));
   marker.on('contextmenu',e=>{
     e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
@@ -1085,6 +1121,15 @@ function applyFilters(){
   });
   const visiblePotIds=new Set();
   allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
+  // Polygoon omtrek-only
+  const outlineOnly = !!$('f_poly_outline')?.checked;
+  polygonsGroup.getLayers().forEach(layer => {
+    const col = layer._props?.color || '#0aa879';
+    layer.setStyle(outlineOnly
+      ? { fillOpacity: 0, weight: 3 }
+      : { fillColor: col, fillOpacity: 0.2, weight: 2 });
+  });
+
   allLines.forEach(line=>{
     const meta=line._meta||{}; const should = visiblePotIds.has(meta.potId);
     // Lijn zelf
@@ -1116,7 +1161,7 @@ function applyFilters(){
 function upsertMarkerFromCloud(doc){
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
-    m = L.marker([doc.lat, doc.lng], { draggable: canWrite() });
+    m = L.marker([doc.lat, doc.lng], { draggable: false });
     m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'', sender: doc.sender||null };
     m.setIcon(getIconForMarker(m._meta));
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
