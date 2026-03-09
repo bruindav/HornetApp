@@ -11,6 +11,7 @@
     <!-- Leaflet & Geoman (volgorde is belangrijk) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 
     <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
     <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
@@ -36,6 +37,18 @@
       .grid { display:grid; gap:8px; }
       .only-hoornaar { display:none; grid-template-columns: 1fr 1fr; gap:8px; }
       .tab-btn { color: #64748b; border-bottom: 2px solid transparent; }
+
+      /* Geoman sateliet knop */
+      .pm-icon-sat { background-image: none !important; font-size: 16px; line-height: 30px; }
+      .pm-icon-sat::after { content: '🛰️'; }
+      .pm-icon-sat.active-sat::after { content: '🗺️'; }
+      .pm-icon-sat.active-sat, .pm-icon-sat.active-sat a { background-color: #e8f5f0 !important; }
+
+      /* Kompas control */
+      .compass-control { border-radius: 4px; overflow: hidden; }
+
+      /* Schaalregel iets opgetild boven de toggle knop */
+      .leaflet-control-scale { margin-bottom: 8px !important; }
       .tab-btn.active { color: #0aa879; border-bottom-color: #0aa879; }
     </style>
   </head>

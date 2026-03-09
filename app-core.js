@@ -1,4 +1,4 @@
-// app-core.js — Fix 68
+// app-core.js — Fix 73
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -74,7 +74,7 @@ const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
-  map = L.map('map', { zoomControl: true }).setView([52.1, 5.3], 8);
+  map = L.map('map', { zoomControl: true, rotate: true, rotateControl: false }).setView([52.1, 5.3], 8);
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -82,7 +82,80 @@ function initMap(){
     maxZoom:19, attribution:'© Esri — satelliet'
   });
   osmLayer.addTo(map);
-  // Kaartwissel knop (rechtsonder)
+
+  // ── Schaal onderaan de kaart ──────────────────────────────────────────────
+  L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
+
+  // ── Locatie knop ─────────────────────────────────────────────────────────
+  let _locMarker = null;
+  const locBtn = L.control({ position: 'topleft' });
+  locBtn.onAdd = () => {
+    const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
+    btn.innerHTML = '📍';
+    btn.title = 'Zoom naar mijn locatie';
+    btn.style.cssText = 'width:34px;height:34px;line-height:34px;text-align:center;font-size:16px;cursor:pointer;background:#fff;border:none;display:block';
+    L.DomEvent.disableClickPropagation(btn);
+    L.DomEvent.on(btn, 'click', () => {
+      btn.innerHTML = '⏳';
+      map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: true });
+    });
+    return btn;
+  };
+  locBtn.addTo(map);
+  map.on('locationfound', e => {
+    if (_locMarker) map.removeLayer(_locMarker);
+    _locMarker = L.circleMarker(e.latlng, {
+      radius: 8, color: '#0aa879', fillColor: '#0aa879', fillOpacity: 0.8, weight: 2
+    }).addTo(map).bindPopup('Jouw locatie').openPopup();
+    document.querySelector('.leaflet-control button[title="Zoom naar mijn locatie"]').innerHTML = '📍';
+  });
+  map.on('locationerror', () => {
+    const b = document.querySelector('.leaflet-control button[title="Zoom naar mijn locatie"]');
+    if(b) b.innerHTML = '📍';
+    alert('Locatie niet beschikbaar. Controleer je browserinstellingen.');
+  });
+
+  // ── Kompas + rotatie ─────────────────────────────────────────────────────
+  let _bearing = 0; // graden, 0 = noord
+  const compassCtrl = L.control({ position: 'topleft' });
+  compassCtrl.onAdd = () => {
+    const div = L.DomUtil.create('div', 'leaflet-bar leaflet-control compass-control');
+    div.title = 'Kompas — sleep om kaart te draaien, klik om naar het noorden te resetten';
+    div.style.cssText = 'width:34px;height:34px;cursor:pointer;background:#fff;display:flex;align-items:center;justify-content:center;user-select:none';
+    div.innerHTML = '<svg id="compass-svg" width="26" height="26" viewBox="0 0 26 26">'
+      + '<circle cx="13" cy="13" r="12" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>'
+      + '<polygon id="compass-n" points="13,3 10,13 13,11 16,13" fill="#e53e3e"/>'
+      + '<polygon id="compass-s" points="13,23 10,13 13,15 16,13" fill="#94a3b8"/>'
+      + '<text x="13" y="8" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53e3e">N</text>'
+      + '</svg>';
+    L.DomEvent.disableClickPropagation(div);
+    // Klik: reset naar noorden
+    L.DomEvent.on(div, 'click', () => {
+      _bearing = 0;
+      map.setBearing(0);
+      updateCompassSvg(0);
+    });
+    // Sleep om te draaien
+    let _dragStart = null;
+    L.DomEvent.on(div, 'mousedown', e => { _dragStart = { x: e.clientX, y: e.clientY, b: _bearing }; });
+    L.DomEvent.on(document, 'mousemove', e => {
+      if (!_dragStart) return;
+      const dx = e.clientX - _dragStart.x;
+      _bearing = (_dragStart.b + dx * 1.5) % 360;
+      map.setBearing(_bearing);
+      updateCompassSvg(_bearing);
+    });
+    L.DomEvent.on(document, 'mouseup', () => { _dragStart = null; });
+    return div;
+  };
+  compassCtrl.addTo(map);
+
+  function updateCompassSvg(bearing) {
+    const svg = document.getElementById('compass-svg');
+    if (svg) svg.style.transform = 'rotate(' + bearing + 'deg)';
+  }
+
+  // ── Kaartwissel in toolbox (topleft) ─────────────────────────────────────
   let _satMode = false;
   const mapToggleBtn = L.control({ position: 'bottomright' });
   mapToggleBtn.onAdd = () => {
@@ -111,9 +184,29 @@ function initMap(){
     drawCircle:false, drawCircleMarker:false, drawText:false,
     editMode:false, dragMode:false, cutPolygon:false, removalMode:false, rotateMode:false
   });
-  // Polygoon sluiten: dubbelklik OF eerste punt aanklikken
-  // Eerste punt krijgt visueel een andere kleur via CSS + pm:drawstart event
   map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
+
+  // Sateliet-knop als custom Geoman control in de toolbar (topleft)
+  map.pm.Toolbar.createCustomControl({
+    name: 'toggleSat',
+    block: 'custom',
+    title: 'Wissel kaart / satelliet',
+    className: 'pm-icon-sat',
+    onClick: () => {
+      _satMode = !_satMode;
+      if (_satMode) {
+        map.removeLayer(osmLayer); satLayer.addTo(map);
+        document.querySelector('.pm-icon-sat')?.classList.add('active-sat');
+      } else {
+        map.removeLayer(satLayer); osmLayer.addTo(map);
+        document.querySelector('.pm-icon-sat')?.classList.remove('active-sat');
+      }
+      // Ook de losse toggle knop rechtsonder bijwerken
+      const toggleBtn = document.querySelector('.map-toggle-btn');
+      if (toggleBtn) toggleBtn.innerHTML = _satMode ? '🗺️ Kaart' : '🛰️ Satelliet';
+    },
+    toggle: false,
+  });
 
   // Icoon grootte aanpassen bij zoom
   map.on('zoomend', () => {
