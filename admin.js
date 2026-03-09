@@ -233,7 +233,7 @@ function renderTable(users) {
     const zoneAdd = available.length
       ? `<div class="adm-zone-add">
            <select id="zadd-${u.uid}">
-             ${available.map(z=>`<option value="${z}">${z.replace('Hoornaar_','')}</option>`).join('')}
+             ${available.map(z=>'<option value="' + z + '">' + z.replace('Hoornaar_','') + '</option>').join('')}
            </select>
            <button onclick="adminAddZone('${u.uid}')">+ Gebied</button>
          </div>`
