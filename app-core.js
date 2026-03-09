@@ -1,4 +1,4 @@
-// app-core.js — Fix 79
+// app-core.js — Fix 80
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -164,23 +164,8 @@ function initMap(){
     updateCompassSvg(heading);
   }
 
-  // ── Kaartwissel in toolbox (topleft) ─────────────────────────────────────
+  // Satelliet toggle — alleen via kaart contextmenu, geen losse knop
   let _satMode = false;
-  const mapToggleBtn = L.control({ position: 'bottomright' });
-  mapToggleBtn.onAdd = () => {
-    const btn = L.DomUtil.create('button', 'map-toggle-btn');
-    btn.innerHTML = '🛰️ Satelliet';
-    btn.title = 'Wissel kaart/satelliet';
-    btn.style.cssText = 'padding:6px 10px;border:2px solid #fff;border-radius:6px;background:#1e293b;color:#fff;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-    L.DomEvent.on(btn, 'click', L.DomEvent.stopPropagation);
-    L.DomEvent.on(btn, 'click', () => {
-      _satMode = !_satMode;
-      if (_satMode) { map.removeLayer(osmLayer); satLayer.addTo(map); btn.innerHTML = '🗺️ Kaart'; }
-      else { map.removeLayer(satLayer); osmLayer.addTo(map); btn.innerHTML = '🛰️ Satelliet'; }
-    });
-    return btn;
-  };
-  mapToggleBtn.addTo(map);
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -211,8 +196,7 @@ function initMap(){
         document.querySelector('.pm-icon-sat')?.classList.remove('active-sat');
       }
       // Ook de losse toggle knop rechtsonder bijwerken
-      const toggleBtn = document.querySelector('.map-toggle-btn');
-      if (toggleBtn) toggleBtn.innerHTML = _satMode ? '🗺️ Kaart' : '🛰️ Satelliet';
+      // (toggle knop staat alleen in contextmenu)
     },
     toggle: false,
   });
@@ -429,6 +413,7 @@ function getDateFrom(days){
 const ZOOM_FULL  = 15;  // volledig icoon + tekst (straatniveau)
 const ZOOM_SMALL = 13;  // middelgroot icoon, alleen emoji
 const ZOOM_DOT   = 12;  // stip met letter
+const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 // Labels en zichtlijnen/sectoren alleen op straatniveau
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
 const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
@@ -466,11 +451,11 @@ const ICONS = {
 };
 // Stip-iconen: kleur + één letter als herkenbaarheid
 const DOTS = {
-  hoornaar: (tiny)=>makeDotIcon('#cc2222', tiny?'':'W', tiny?8:13), // rood  W=Waarneming
-  nest:     (tiny)=>makeDotIcon('#334466', tiny?'':'N', tiny?8:13), // blauw N=Nest
-  nest_geruimd:(tiny)=>makeDotIcon('#1a7a40', tiny?'':'G', tiny?8:13), // groen G=Geruimd
-  lokpot:   (tiny)=>makeDotIcon('#2d6b50', tiny?'':'L', tiny?8:13), // donkergroen L=Lokpot
-  pending:  (tiny)=>makeDotIcon('#888888', tiny?'':'?', tiny?8:13),
+  hoornaar: (sz)=>makeDotIcon('#cc2222', (sz===true||sz==='micro')?'':'W', sz==='micro'?5:sz===true?8:13),
+  nest:     (sz)=>makeDotIcon('#334466', (sz===true||sz==='micro')?'':'N', sz==='micro'?5:sz===true?8:13),
+  nest_geruimd:(sz)=>makeDotIcon('#1a7a40',(sz===true||sz==='micro')?'':'G', sz==='micro'?5:sz===true?8:13),
+  lokpot:   (sz)=>makeDotIcon('#2d6b50', (sz===true||sz==='micro')?'':'L', sz==='micro'?5:sz===true?8:13),
+  pending:  (sz)=>makeDotIcon('#888888', (sz===true||sz==='micro')?'':'?', sz==='micro'?5:sz===true?8:13),
 };
 
 // Geeft juist icoon terug op basis van huidig zoomniveau
@@ -486,11 +471,14 @@ function getIconForMarker(meta){
     if(type==='hoornaar') return ICONS.hoornaar(meta.aantal,'small');
     return ICONS[type]?.('small') || ICONS.pending('small');
   } else if(zoom >= ZOOM_DOT){
-    // Stip met letter
+    // Stip met letter (size 13)
     return (DOTS[type]||DOTS.pending)(false);
-  } else {
-    // Heel kleine stip, geen letter
+  } else if(zoom >= ZOOM_TINY){
+    // Kleine stip zonder letter (size 8)
     return (DOTS[type]||DOTS.pending)(true);
+  } else {
+    // Onder ZOOM_TINY: nog kleinere stip (size 5)
+    return (DOTS[type]||DOTS.pending)('micro');
   }
 }
 // Alle markers bijwerken bij zoom
