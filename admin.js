@@ -1,4 +1,4 @@
-// admin.js — Fix 77
+// admin.js — Fix 78
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -336,12 +336,7 @@ async function adminConfirmAccept(uid, email, name, role, zones) {
   }
 }
 
-// ======================= Waarneming.nl Sync =======================
-// Species ID Aziatische hoornaar (Vespa velutina) op waarneming.nl
-const WAARNEMING_SPECIES_ID = 8807;
-// CORS proxy — nodig omdat browser de waarneming.nl API niet direct kan aanroepen
-const CORS_PROXY = 'https://corsproxy.io/?';
-
+// ======================= Waarneming.nl CSV Import =======================
 // Zones met hun bounding boxes [minLat, minLng, maxLat, maxLng]
 const ZONE_BOUNDS = {
   'Zeist':      [52.05, 5.17, 52.14, 5.33],
@@ -352,185 +347,181 @@ const ZONE_BOUNDS = {
 
 function openSyncTab() {
   const lastSync = localStorage.getItem('wn_last_sync') || '';
-  const token    = localStorage.getItem('wn_token') || '';
-  setAdminBody(`
-    <div style="padding:16px;max-width:600px">
-      <h3 style="margin:0 0 4px;font-size:15px">🔄 Synchronisatie met waarneming.nl</h3>
-      <p style="color:#64748b;font-size:12px;margin:0 0 16px">
-        Importeert waarnemingen van Aziatische hoornaar (Vespa velutina, soort #${WAARNEMING_SPECIES_ID})
-        binnen jouw gebieden.
-      </p>
-
-      <div style="margin-bottom:14px">
-        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">
-          Waarneming.nl API token (Bearer)
-        </label>
-        <div class="adm-sync-row">
-          <input id="wn-token" class="adm-sync-input" type="password"
-            placeholder="Plak hier je OAuth2 token van waarneming.nl"
-            value="${token}"/>
-          <button class="adm-sync-btn" id="wn-save-token" style="background:#475569">Opslaan</button>
-        </div>
-        <p style="font-size:11px;color:#94a3b8;margin:2px 0 0">
-          Haal je token op via: waarneming.nl → Mijn profiel → API-toegang → Token aanmaken
-        </p>
-      </div>
-
-      <div style="margin-bottom:14px">
-        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">
-          Synchroniseren vanaf
-        </label>
-        <div class="adm-sync-row">
-          <input id="wn-date" type="date" class="adm-sync-input" style="max-width:180px"
-            value="${lastSync ? lastSync.slice(0,10) : new Date(Date.now()-7*86400000).toISOString().slice(0,10)}"/>
-          <button class="adm-sync-btn" id="wn-sync-btn">▶ Synchroniseren</button>
-        </div>
-        ${lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">Laatste sync: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : ''}
-      </div>
-
-      <div id="wn-log" class="adm-sync-log" style="min-height:60px">
-        <span style="color:#94a3b8">Klik op Synchroniseren om te starten.</span>
-      </div>
-    </div>
-  `);
-
-  document.getElementById('wn-save-token')?.addEventListener('click', () => {
-    const t = document.getElementById('wn-token')?.value.trim();
-    if (t) { localStorage.setItem('wn_token', t); alert('Token opgeslagen.'); }
+  setAdminBody(
+    '<div style="padding:16px;max-width:620px">' +
+    '<h3 style="margin:0 0 4px;font-size:15px">&#x1F504; Import vanuit waarneming.nl</h3>' +
+    '<p style="color:#64748b;font-size:13px;margin:0 0 16px;line-height:1.6">' +
+    'Exporteer de waarnemingen van <strong>Aziatische hoornaar</strong> als CSV vanuit waarneming.nl ' +
+    'en upload het bestand hier. Duplicaten worden automatisch overgeslagen.' +
+    '</p>' +
+    '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#166534">' +
+    '<strong>Hoe exporteer je vanuit waarneming.nl?</strong><br>' +
+    '1. Ga naar waarneming.nl &rarr; Verkennen &rarr; Soort zoeken: "Aziatische hoornaar"<br>' +
+    '2. Filter op jouw gemeente/regio en gewenste periode<br>' +
+    '3. Klik op <strong>Exporteren &rarr; CSV</strong> (rechts bovenaan de lijst)<br>' +
+    '4. Upload het gedownloade bestand hieronder' +
+    '</div>' +
+    '<div class="adm-sync-row" style="flex-direction:column;align-items:flex-start;gap:10px">' +
+    '<label style="font-size:12px;font-weight:600;color:#475569">CSV bestand selecteren</label>' +
+    '<div style="display:flex;gap:8px;align-items:center;width:100%">' +
+    '<input type="file" id="wn-csv-file" accept=".csv,.txt" style="flex:1;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px"/>' +
+    '<button class="adm-sync-btn" id="wn-import-btn">&#9654; Importeren</button>' +
+    '</div>' +
+    (lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:0">Laatste import: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : '') +
+    '</div>' +
+    '<div id="wn-log" class="adm-sync-log" style="min-height:80px;margin-top:14px">' +
+    '<span style="color:#94a3b8">Selecteer een CSV bestand en klik op Importeren.</span>' +
+    '</div>' +
+    '</div>'
+  );
+  document.getElementById('wn-import-btn')?.addEventListener('click', () => {
+    const file = document.getElementById('wn-csv-file')?.files[0];
+    if (!file) { alert('Selecteer eerst een CSV bestand.'); return; }
+    runCsvImport(file);
   });
-
-  document.getElementById('wn-sync-btn')?.addEventListener('click', () => runSync());
 }
 
-function logSync(msg, color='#334155') {
+function logSync(msg, color) {
+  color = color || '#334155';
   const log = document.getElementById('wn-log');
   if (!log) return;
+  if (log.querySelector('span')) log.innerHTML = '';
   const line = document.createElement('div');
   line.style.cssText = 'padding:2px 0;color:' + color;
-  line.textContent = new Date().toLocaleTimeString('nl-NL') + ' — ' + msg;
+  line.textContent = new Date().toLocaleTimeString('nl-NL') + ' \u2014 ' + msg;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
 }
 
-async function runSync() {
-  const token   = localStorage.getItem('wn_token') || document.getElementById('wn-token')?.value.trim();
-  const dateStr = document.getElementById('wn-date')?.value;
-  const btn     = document.getElementById('wn-sync-btn');
-  const log     = document.getElementById('wn-log');
-
-  if (!token) { alert('Stel eerst een API token in.'); return; }
-  if (!dateStr) { alert('Stel een datum in.'); return; }
-
-  log.innerHTML = '';
-  btn.disabled = true;
-  btn.textContent = '⏳ Bezig…';
-  logSync('Start synchronisatie vanaf ' + dateStr);
-
-  const year = new Date().getFullYear().toString();
-  let totalImported = 0, totalSkipped = 0, totalDuplicates = 0;
-
-  try {
-    // Haal alle waarnemingen op (gepagineerd)
-    let url = `https://waarneming.nl/api/v1/species/${WAARNEMING_SPECIES_ID}/observations/?date_after=${dateStr}&limit=100&offset=0`;
-    let allObs = [];
-    let page = 0;
-
-    while (url) {
-      page++;
-      logSync(`Pagina ${page} ophalen…`, '#64748b');
-      const proxyUrl = CORS_PROXY + encodeURIComponent(url);
-      const resp = await fetch(proxyUrl, {
-        headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
-      });
-      if (!resp.ok) {
-        logSync(`API fout: ${resp.status} ${resp.statusText}`, '#ef4444');
-        break;
-      }
-      const data = await resp.json();
-      allObs = allObs.concat(data.results || []);
-      logSync(`${allObs.length} van ${data.count} waarnemingen opgehaald`, '#64748b');
-      url = data.next || null;
-      if (page > 20) { logSync("Stop na 20 pagina's (max 2000 waarnemingen).", '#f59e0b'); break; }
-    }
-
-    logSync(`Totaal ${allObs.length} waarnemingen gevonden voor soort Aziatische hoornaar.`);
-
-    // Filter op jouw zones via bounding box
-    for (const [zone, bbox] of Object.entries(ZONE_BOUNDS)) {
-      const [minLat, minLng, maxLat, maxLng] = bbox;
-      const inZone = allObs.filter(o => {
-        if (!o.point?.coordinates) return false;
-        const [lng, lat] = o.point.coordinates;
-        return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
-      });
-      if (!inZone.length) { logSync(`${zone}: geen waarnemingen`, '#94a3b8'); continue; }
-      logSync(`${zone}: ${inZone.length} waarneming(en) gevonden`);
-
-      // Per waarneming importeren
-      for (const obs of inZone) {
-        const obsId = 'wn_' + obs.id;
-        const [lng, lat] = obs.point.coordinates;
-        const date = obs.date || new Date().toISOString().slice(0,10);
-        const locName = obs.location_detail?.name || '';
-        const userName = obs.user_detail?.name || obs.observer || ('gebruiker #' + obs.user);
-        const notes  = [obs.notes, locName].filter(Boolean).join(' | ');
-        const aantal = obs.number || 1;
-
-        // Controleer of al aanwezig (op externalId)
-        const base = 'maps/' + year + '/' + zone + '/data';
-        const existing = await getDocs(
-          query(collection(db, base, 'markers'), where('externalId', '==', obsId))
-        );
-        if (!existing.empty) { totalDuplicates++; continue; }
-
-        // Geocode adres via Nominatim als locatienaam beschikbaar
-        let adres = locName;
-        if (!adres && lat && lng) {
-          try {
-            const geo = await fetch(
-              'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lng + '&format=json&accept-language=nl',
-              { headers: { 'User-Agent': 'HornetApp/1.0' } }
-            );
-            const geoData = await geo.json();
-            adres = geoData.display_name?.split(',').slice(0,3).join(', ') || '';
-          } catch {}
-        }
-
-        // Marker aanmaken in Firestore
-        const id = 'wn_' + obs.id;
-        const markerDoc = {
-          id, type: 'hoornaar',
-          lat, lng,
-          date,
-          by: userName,
-          aantal,
-          note: [notes, adres ? ('📍 ' + adres) : ''].filter(Boolean).join('\n'),
-          externalId: obsId,
-          source: 'waarneming.nl',
-          permalink: obs.permalink || '',
-          validationStatus: obs.validation_status || '',
-        };
-        await setDoc(doc(db, base, 'markers', id), markerDoc);
-        totalImported++;
-        logSync(`✅ Geïmporteerd: ${date} | ${userName} | ${antal_label(aantal)} | ${adres||'onbekend'}`, '#0aa879');
-      }
-    }
-
-    // Laatste sync opslaan
-    localStorage.setItem('wn_last_sync', new Date().toISOString());
-    logSync('────────────────────────────────', '#e2e8f0');
-    logSync('Klaar! ' + totalImported + ' geïmporteerd, ' + totalDuplicates + ' duplicaten overgeslagen, ' + totalSkipped + ' buiten gebieden.', '#0aa879');
-
-  } catch(e) {
-    logSync('Fout: ' + e.message, '#ef4444');
-    console.error('[sync] fout:', e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '▶ Synchroniseren';
+function splitCsvLine(line, sep) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === sep && !inQ) { result.push(cur); cur = ''; }
+    else { cur += ch; }
   }
+  result.push(cur);
+  return result;
 }
 
-function antal_label(n) { return n === 1 ? '1 exemplaar' : n + ' exemplaren'; }
+function parseWaarnemingCsv(text) {
+  const sep = (text.indexOf(';') > -1 && text.indexOf(';') < text.indexOf('\n')) ? ';' : ',';
+  const lines = text.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(sep).map(function(h){ return h.replace(/["\r]/g,'').toLowerCase().trim(); });
+
+  function col(name) {
+    const aliases = {
+      id:       ['id','observation id','waarneming id','waarnemingid'],
+      lat:      ['lat','latitude','breedtegraad','y'],
+      lng:      ['lon','lng','longitude','lengtegraad','x'],
+      date:     ['datum','date','waarneming datum','observatiedatum'],
+      observer: ['waarnemer','observer','gebruiker','user'],
+      number:   ['aantal','number','count'],
+      location: ['locatie','location','plaatsnaam','locality','location name'],
+      notes:    ['opmerking','notes','remarks','notitie','opmerkingen'],
+      status:   ['status','validatiestatus','validation status'],
+    };
+    const list = aliases[name] || [name];
+    for (let a = 0; a < list.length; a++) {
+      const idx = headers.indexOf(list[a]);
+      if (idx > -1) return idx;
+    }
+    return -1;
+  }
+
+  const idIdx  = col('id'),  latIdx = col('lat'), lngIdx = col('lng');
+  const dateIdx = col('date'), obsIdx = col('observer'), numIdx = col('number');
+  const locIdx = col('location'), notesIdx = col('notes'), statusIdx = col('status');
+
+  if (latIdx === -1 || lngIdx === -1) return null;
+
+  const obs = [];
+  for (let i = 1; i < lines.length; i++) {
+    const parts = splitCsvLine(lines[i], sep);
+    function get(idx) { return (idx > -1 && idx < parts.length) ? parts[idx].replace(/^"|"$/g,'').trim() : ''; }
+
+    const lat = parseFloat(get(latIdx).replace(',','.'));
+    const lng = parseFloat(get(lngIdx).replace(',','.'));
+    if (isNaN(lat) || isNaN(lng)) continue;
+
+    let date = get(dateIdx);
+    if (/^\d{2}-\d{2}-\d{4}$/.test(date)) date = date.split('-').reverse().join('-');
+    else if (/^\d{2}\/\d{2}\/\d{4}$/.test(date)) { const p = date.split('/'); date = p[2]+'-'+p[1]+'-'+p[0]; }
+
+    obs.push({
+      id:       get(idIdx) || ('csv_' + i),
+      lat, lng,
+      date:     date || new Date().toISOString().slice(0,10),
+      by:       get(obsIdx) || 'waarneming.nl',
+      aantal:   parseInt(get(numIdx)) || 1,
+      location: get(locIdx),
+      notes:    get(notesIdx),
+      status:   get(statusIdx),
+    });
+  }
+  return obs;
+}
+
+async function runCsvImport(file) {
+  const btn = document.getElementById('wn-import-btn');
+  btn.disabled = true; btn.textContent = '\u23F3 Bezig\u2026';
+  logSync('CSV lezen: ' + file.name);
+
+  const text = await file.text();
+  const obs = parseWaarnemingCsv(text);
+
+  if (!obs) {
+    logSync('Fout: geen lat/lon kolommen gevonden. Controleer het bestand.', '#ef4444');
+    btn.disabled = false; btn.textContent = '\u25BA Importeren'; return;
+  }
+  if (obs.length === 0) {
+    logSync('Geen geldige rijen gevonden in CSV.', '#f59e0b');
+    btn.disabled = false; btn.textContent = '\u25BA Importeren'; return;
+  }
+  logSync(obs.length + ' rijen gelezen.');
+
+  const year = new Date().getFullYear().toString();
+  let imported = 0, duplicates = 0, outOfZone = 0;
+
+  for (let oi = 0; oi < obs.length; oi++) {
+    const o = obs[oi];
+    let zone = null;
+    const zoneKeys = Object.keys(ZONE_BOUNDS);
+    for (let zi = 0; zi < zoneKeys.length; zi++) {
+      const z = zoneKeys[zi]; const bbox = ZONE_BOUNDS[z];
+      if (o.lat >= bbox[0] && o.lat <= bbox[2] && o.lng >= bbox[1] && o.lng <= bbox[3]) { zone = z; break; }
+    }
+    if (!zone) { outOfZone++; continue; }
+
+    const externalId = 'wn_' + o.id;
+    const base = 'maps/' + year + '/' + zone + '/data';
+    const existing = await getDocs(query(collection(db, base, 'markers'), where('externalId', '==', externalId)));
+    if (!existing.empty) { duplicates++; continue; }
+
+    const noteParts = [];
+    if (o.notes) noteParts.push(o.notes);
+    if (o.location) noteParts.push('\uD83D\uDCCD ' + o.location);
+    if (o.status) noteParts.push('\u2714 ' + o.status);
+    noteParts.push('Bron: waarneming.nl');
+
+    await setDoc(doc(db, base, 'markers', externalId), {
+      id: externalId, type: 'hoornaar',
+      lat: o.lat, lng: o.lng, date: o.date,
+      by: o.by, aantal: o.aantal,
+      note: noteParts.join('\n'),
+      externalId, source: 'waarneming.nl',
+    });
+    imported++;
+    logSync('\u2705 ' + o.date + ' | ' + o.by + ' | ' + zone + (o.location ? ' | ' + o.location : ''), '#0aa879');
+  }
+
+  localStorage.setItem('wn_last_sync', new Date().toISOString());
+  logSync('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500', '#e2e8f0');
+  logSync('Klaar! ' + imported + ' geïmporteerd, ' + duplicates + ' duplicaten, ' + outOfZone + ' buiten gebieden.', imported > 0 ? '#0aa879' : '#f59e0b');
+  btn.disabled = false; btn.textContent = '\u25BA Importeren';
+}
 
 // ======================= Welkomst-email via EmailJS =======================
 async function sendWelcomeEmail(email, displayName, role, zones) {
