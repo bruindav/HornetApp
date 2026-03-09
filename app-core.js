@@ -1,4 +1,4 @@
-// app-core.js — Fix 81
+// app-core.js — Fix 87
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -438,17 +438,26 @@ const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
 const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
 
-function makeDivIcon(html, bg='#1e293b', border='#334155', size='full'){
-  if(size==='full'){
+// SVG hoornaar — geel/zwart, herkenbaar silhouet
+const HORNET_SVG_FULL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="22" height="15" style="display:inline-block;vertical-align:middle;margin-right:3px"><g transform="translate(2,2)"><ellipse cx="16" cy="10" rx="10" ry="6" fill="#f5a800" stroke="#1a1a00" stroke-width="1"/><rect x="8" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><rect x="13" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><rect x="18" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><ellipse cx="25" cy="10" rx="4" ry="3" fill="#f5a800" stroke="#1a1a00" stroke-width=".8"/><ellipse cx="7" cy="10" rx="3" ry="2.5" fill="#c8761a" stroke="#1a1a00" stroke-width=".8"/><path d="M10 5 Q12 1 16 3" stroke="#1a1a00" stroke-width=".8" fill="none"/><path d="M19 5 Q21 1 17 3" stroke="#1a1a00" stroke-width=".8" fill="none"/><path d="M22 8 Q28 4 30 7" stroke="#888" stroke-width=".7" fill="rgba(200,220,255,.5)"/><path d="M22 12 Q28 16 30 13" stroke="#888" stroke-width=".7" fill="rgba(200,220,255,.5)"/></g></svg>';
+const HORNET_SVG_SMALL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16" width="16" height="11"><ellipse cx="12" cy="8" rx="8" ry="5" fill="#f5a800" stroke="#1a1a00" stroke-width="1"/><rect x="6" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><rect x="10" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><rect x="14" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><ellipse cx="20" cy="8" rx="3" ry="2" fill="#f5a800" stroke="#1a1a00" stroke-width=".7"/><ellipse cx="4" cy="8" rx="2.5" ry="2" fill="#c8761a" stroke="#1a1a00" stroke-width=".7"/></svg>';
+
+function makeDivIcon(html, bg, border, size){
+  bg     = bg     || '#1e293b';
+  border = border || '#334155';
+  size   = size   || 'full';
+  // Vervang 'hornet' placeholder door SVG
+  const svgHtml = html === 'hornet' ? HORNET_SVG_SMALL : html;
+  if(size === 'full'){
     return L.divIcon({
       className:'custom-div-icon',
-      html:`<div style="background:${bg};color:#fff;border:2px solid ${border};border-radius:12px;padding:4px 6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);white-space:nowrap">${html}</div>`,
+      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:12px;padding:3px 6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);white-space:nowrap;display:flex;align-items:center">'+svgHtml+'</div>',
       iconSize:[36,24], iconAnchor:[18,12]
     });
-  } else { // small: alleen emoji, geen label
+  } else {
     return L.divIcon({
       className:'custom-div-icon',
-      html:`<div style="background:${bg};color:#fff;border:2px solid ${border};border-radius:10px;padding:3px 5px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.3)">${html}</div>`,
+      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:10px;padding:3px 5px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center">'+svgHtml+'</div>',
       iconSize:[26,22], iconAnchor:[13,11]
     });
   }
@@ -471,7 +480,7 @@ function makeDotIcon(color, letter, size){
   });
 }
 const ICONS = {
-  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?('🐝'+(a?' ×'+a:'')):'🐝','#aa2222','#cc3333',sz),
+  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?(HORNET_SVG_FULL+(a?' <span style="font-size:12px;font-weight:700">\xD7'+a+'</span>':'')):'hornet','#aa2222','#cc3333',sz),
   nest:        (sz='full')=>makeDivIcon(sz==='full'?'🪹 Nest'          :'🪹','#334466','#556688',sz),
   nest_geruimd:(sz='full')=>makeDivIcon(sz==='full'?'✅ Geruimd'        :'✅','#1a5c35','#2d8a52',sz),
   lokpot:      (sz='full')=>makeDivIcon(sz==='full'?'🪤 Lokpot'         :'🪤','#1e4d3b','#2d7a5e',sz),
@@ -1268,7 +1277,23 @@ function upsertMarkerFromCloud(doc){
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
     m = L.marker([doc.lat, doc.lng], { draggable: false });
-    m._meta = { id: doc.id, type: doc.type, potId: doc.potId||null, date: doc.date||null, by: doc.by||null, aantal: doc.aantal!=null? doc.aantal:null, note: doc.note||'', sender: doc.sender||null };
+    m._meta = {
+      id: doc.id, type: doc.type, potId: doc.potId||null,
+      date: doc.date||null, by: doc.by||null,
+      aantal: doc.aantal!=null ? doc.aantal : null,
+      note: doc.note||'', sender: doc.sender||null,
+      // Bron metadata
+      source: doc.source||null, externalId: doc.externalId||null,
+      gbifKey: doc.gbifKey||null, gbifDataset: doc.gbifDataset||null,
+      gbifLocality: doc.gbifLocality||null, gbifBehavior: doc.gbifBehavior||null,
+      gbifLifestage: doc.gbifLifestage||null, gbifSex: doc.gbifSex||null,
+      gbifBasis: doc.gbifBasis||null, gbifIssues: doc.gbifIssues||null,
+      gbifUrl: doc.gbifUrl||null, gbifCoordPrec: doc.gbifCoordPrec||null,
+      gbifCountry: doc.gbifCountry||null,
+      // waarneming.nl CSV
+      validationStatus: doc.validationStatus||null, permalink: doc.permalink||null,
+      location: doc.location||null,
+    };
     m.setIcon(getIconForMarker(m._meta));
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
     if(canWrite()){
@@ -1297,9 +1322,25 @@ function upsertMarkerFromCloud(doc){
     m._meta.potId = doc.potId||null;
     m._meta.date = doc.date||null;
     m._meta.by = doc.by||null;
-    m._meta.aantal = (doc.aantal!=null? doc.aantal:null);
+    m._meta.aantal = (doc.aantal!=null ? doc.aantal : null);
     m._meta.note = doc.note||'';
     m._meta.sender = doc.sender||null;
+    m._meta.source = doc.source||null;
+    m._meta.externalId = doc.externalId||null;
+    m._meta.gbifKey = doc.gbifKey||null;
+    m._meta.gbifDataset = doc.gbifDataset||null;
+    m._meta.gbifLocality = doc.gbifLocality||null;
+    m._meta.gbifBehavior = doc.gbifBehavior||null;
+    m._meta.gbifLifestage = doc.gbifLifestage||null;
+    m._meta.gbifSex = doc.gbifSex||null;
+    m._meta.gbifBasis = doc.gbifBasis||null;
+    m._meta.gbifIssues = doc.gbifIssues||null;
+    m._meta.gbifUrl = doc.gbifUrl||null;
+    m._meta.gbifCoordPrec = doc.gbifCoordPrec||null;
+    m._meta.gbifCountry = doc.gbifCountry||null;
+    m._meta.validationStatus = doc.validationStatus||null;
+    m._meta.permalink = doc.permalink||null;
+    m._meta.location = doc.location||null;
     m.setIcon(getIconForMarker(m._meta));
   }
   attachMarkerPopup(m);
