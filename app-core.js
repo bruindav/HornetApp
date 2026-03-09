@@ -1,4 +1,4 @@
-// app-core.js — Fix 80
+// app-core.js — Fix 81
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -433,13 +433,21 @@ function makeDivIcon(html, bg='#1e293b', border='#334155', size='full'){
     });
   }
 }
-function makeDotIcon(color, letter='', size=12){
-  const s = size+'px';
-  const fs = Math.round(size*0.55)+'px';
+function makeDotIcon(color, letter, size){
+  letter = letter || '';
+  size   = size   || 12;
+  const border = size <= 6 ? 1 : size <= 9 ? 1.5 : 2;
+  const fs     = Math.max(6, Math.round(size * 0.55));
+  const total  = size + border * 2;
   return L.divIcon({
-    className:'dot-icon',
-    html:`<div style="width:${s};height:${s};background:${color};border:2px solid rgba(0,0,0,.4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:700;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4);line-height:1">${letter}</div>`,
-    iconSize:[size,size], iconAnchor:[size/2,size/2]
+    className: 'dot-icon',
+    html: '<div style="width:' + size + 'px;height:' + size + 'px;background:' + color +
+          ';border:' + border + 'px solid rgba(255,255,255,.8);border-radius:50%;' +
+          'display:flex;align-items:center;justify-content:center;' +
+          'font-size:' + fs + 'px;font-weight:700;color:#fff;' +
+          'box-shadow:0 1px 3px rgba(0,0,0,.6);line-height:1">' + letter + '</div>',
+    iconSize:   [total, total],
+    iconAnchor: [total / 2, total / 2]
   });
 }
 const ICONS = {
@@ -527,10 +535,23 @@ function closeContextMenu(){
     document.removeEventListener('click', closeContextMenuOnce, true);
   }
 }
-function positionMenu(el,x,y){
-  const pad=6,vw=window.innerWidth,vh=window.innerHeight;
-  el.style.left=Math.min(vw-el.offsetWidth-pad,Math.max(pad,x))+'px';
-  el.style.top =Math.min(vh-el.offsetHeight-pad,Math.max(pad,y))+'px';
+function positionMenu(el, x, y){
+  const isMobile = window.innerWidth <= 600;
+  if (isMobile) {
+    // Op mobiel: menu breed, gecentreerd onderin
+    el.style.left     = '50%';
+    el.style.transform= 'translateX(-50%)';
+    el.style.bottom   = '12px';
+    el.style.top      = 'auto';
+    el.style.maxWidth = (window.innerWidth - 24) + 'px';
+    el.style.width    = 'max-content';
+  } else {
+    const pad = 6, vw = window.innerWidth, vh = window.innerHeight;
+    el.style.transform = '';
+    el.style.bottom    = 'auto';
+    el.style.left = Math.min(vw - el.offsetWidth  - pad, Math.max(pad, x)) + 'px';
+    el.style.top  = Math.min(vh - el.offsetHeight - pad, Math.max(pad, y)) + 'px';
+  }
 }
 function escClose(e){ if(e.key==='Escape') closeContextMenu(); }
 function closeContextMenuOnce(){ closeContextMenu(); }

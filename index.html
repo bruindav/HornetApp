@@ -31,7 +31,28 @@
       .content { flex:1; position:relative; overflow:hidden; min-width:0; }
       #map { position:absolute; inset:0; width:100%; height:100%; }
       .hidden { display:none !important; }
-      .ctx-menu { position:fixed; background:#fff; border:1px solid #cbd5e1; border-radius:6px; padding:8px; box-shadow:0 6px 24px rgba(15,23,42,.15); z-index: 9999; }
+      .ctx-menu {
+        position:fixed; background:#fff; border:1px solid #cbd5e1;
+        border-radius:10px; padding:6px; box-shadow:0 6px 24px rgba(15,23,42,.2);
+        z-index:9999; max-height:85vh; overflow-y:auto;
+      }
+      .ctx-menu h4 {
+        margin:0 0 4px; padding:4px 8px 6px; font-size:12px;
+        color:#64748b; border-bottom:1px solid #e2e8f0; font-weight:600;
+      }
+      .ctx-menu button {
+        display:block; width:100%; text-align:left;
+        padding:9px 12px; border:0; background:none;
+        border-radius:6px; cursor:pointer; font-size:14px;
+        white-space:nowrap; color:#1e293b;
+      }
+      .ctx-menu button:hover, .ctx-menu button:active { background:#f1f5f9; }
+      .ctx-menu hr { border:0; border-top:1px solid #e2e8f0; margin:4px 0; }
+      @media (max-width:600px) {
+        .ctx-menu { border-radius:14px 14px 14px 14px; padding:8px; min-width:200px; }
+        .ctx-menu button { padding:12px 14px; font-size:15px; }
+        .ctx-menu h4 { font-size:13px; padding:6px 10px 8px; }
+      }
       .poly-label { background:#fff; border:2px solid #0aa879; color:#111; font-weight:600; }
       .line-label { background:#111; color:#fff; border:0; }
       .line-handle div { width:12px; height:12px; border-radius:50%; background:#111; border:2px solid #fff; box-shadow:0 0 0 2px #111; }
