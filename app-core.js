@@ -1,4 +1,4 @@
-// app-core.js — Fix 75
+// app-core.js — Fix 79
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -297,7 +297,7 @@ function initUIBindings(){
   // Sidebar toggle + mobiel backdrop
   const backdrop = req('sidebar-backdrop');
   const sidebarEl = document.querySelector('.sidebar');
-  try{ sidebarEl && sidebarEl.addEventListener('transitionend', (e)=>{ if(e.propertyName==='transform'){ try{ map?.invalidateSize(); }catch{} } }); }catch{}
+  try{ sidebarEl && sidebarEl.addEventListener('transitionend', () => { try{ map?.invalidateSize(); }catch{} }); }catch{}
   function setSidebar(open){
     document.body.classList.toggle('sidebar-collapsed', !open);
     document.body.classList.toggle('sidebar-open', !!open);
@@ -426,12 +426,12 @@ function getDateFrom(days){
   return d.toISOString().slice(0,10); // 'YYYY-MM-DD'
 }
 
-const ZOOM_FULL  = 15;  // volledig icoon + tekst
-const ZOOM_SMALL = 13;  // klein icoon, alleen emoji
-const ZOOM_DOT   = 11;  // stip met letter
+const ZOOM_FULL  = 17;  // volledig icoon + tekst (straatniveau)
+const ZOOM_SMALL = 15;  // middelgroot icoon, alleen emoji
+const ZOOM_DOT   = 13;  // stip met letter
 // Labels en zichtlijnen/sectoren alleen op straatniveau
-const ZOOM_LABELS = 14; // polygon labels tonen >= dit niveau
-const ZOOM_LINES  = 14; // zichtlijnen + sectoren tonen >= dit niveau
+const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
+const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
 
 function makeDivIcon(html, bg='#1e293b', border='#334155', size='full'){
   if(size==='full'){
@@ -1019,7 +1019,7 @@ function refreshPolygonLabel(layer){
         layer._labelTooltip.setContent(lbl).setLatLng(pos);
       }
       // Alleen tonen als zoom hoog genoeg
-      const shouldShow = (map?.getZoom()||14) >= ZOOM_LABELS;
+      const shouldShow = (map?.getZoom()||15) >= ZOOM_LABELS;
       if(shouldShow && !map.hasLayer(layer._labelTooltip)) layer._labelTooltip.addTo(map);
       else if(!shouldShow && map.hasLayer(layer._labelTooltip)) map.removeLayer(layer._labelTooltip);
       // Kleur
