@@ -24,13 +24,33 @@
       #app-shell { display:flex; flex-direction:column; height:100vh; height:100dvh; overflow:hidden; }
       header { position:relative; z-index:5; background:#0f172a; color:#fff; padding:10px 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
       /* Mobiel: knoppen compact, tekst verbergen */
+      /* Statusbalk onder header — alleen mobiel */
+      #hdr-statusbar {
+        display: none;
+        background: #1e293b;
+        color: #94a3b8;
+        font-size: 12px;
+        padding: 4px 12px;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #334155;
+      }
+      #hdr-statusbar.visible { display: flex; }
+      #hdr-statusbar .sb-role { color: #e2e8f0; font-weight: 600; }
+      #hdr-statusbar .sb-scope { color: #0aa879; font-weight: 600; }
       @media (max-width:540px) {
         header { padding:8px 10px; gap:4px; }
         header strong { font-size:14px; }
-        .hdr-text-label { display:none; }        /* "Uitloggen" tekst verbergen */
-        #hdr-role, #hdr-scope-wrap { display:none !important; } /* rol/scope in sidebar */
+        .hdr-text-label { display:none; }
+        #hdr-role-wrap { display:none !important; } /* op mobiel via statusbalk */
         header button { padding:6px 8px !important; font-size:15px; margin-left:2px !important; }
         #btn-admin { font-size:13px !important; padding:5px 7px !important; }
+        #hdr-statusbar { display:none; } /* wordt 'visible' via JS als ingelogd */
+        #hdr-statusbar.visible { display:flex; }
+      }
+      @media (min-width:541px) {
+        #hdr-statusbar { display:none !important; } /* desktop: nooit tonen */
       }
       header .spacer { flex:1; }
       /* .app vult resterende ruimte onder header */
@@ -156,7 +176,7 @@
         <button id="toggle-sidebar">☰</button>
         <strong>HornetApp</strong>
         <div class="spacer"></div>
-        <div style="display:flex;gap:8px;align-items:center;font-size:13px">
+        <div id="hdr-role-wrap" style="display:flex;gap:8px;align-items:center;font-size:13px">
           <span id="hdr-role" style="opacity:.85"></span>
           <span id="hdr-scope-wrap" class="hidden">📍 <span id="hdr-scope">–</span></span>
         </div>
@@ -165,6 +185,14 @@
         <button id="logoutBtn" style="margin-left:4px" title="Uitloggen">🚪 <span class="hdr-text-label">Uitloggen</span></button>
         <button id="btn-reset-cache" title="Cache resetten" style="margin-left:2px">↺</button>
       </header>
+      <!-- Statusbalk — alleen zichtbaar op mobiel als ingelogd -->
+      <div id="hdr-statusbar">
+        <span>👤</span>
+        <span id="sb-role" class="sb-role"></span>
+        <span style="opacity:.4">·</span>
+        <span>📍</span>
+        <span id="sb-scope" class="sb-scope">–</span>
+      </div>
       <div class="app">
         <aside class="sidebar">
           <div id="sidebar-userblock" style="padding:6px 2px 10px;border-bottom:1px solid #cbd5e1;margin-bottom:10px;font-size:13px;color:#475569;display:none">

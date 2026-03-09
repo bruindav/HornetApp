@@ -369,7 +369,8 @@ function initUIBindings(){
   updateSWStatus();
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
-  window.addEventListener('orientationchange', ()=>{ setTimeout(updateHeaderHeightVar, 250); }, {passive:true});
+  window.addEventListener('resize', _updateStatusbar, {passive:true});
+  window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
 }
 // ======================= Geocoder =======================
@@ -1347,6 +1348,10 @@ function updateHeaderScope(zone, year) {
   const wrap = document.getElementById('hdr-scope-wrap');
   if (el) el.textContent = `${label} (${year || DEFAULT_YEAR})`;
   if (wrap) wrap.classList.remove('hidden');
+  // Statusbalk mobiel
+  const sbScope = document.getElementById('sb-scope');
+  if (sbScope) sbScope.textContent = `${label} ${year || DEFAULT_YEAR}`;
+  _updateStatusbar();
 }
 function updateHeaderRole(role, name) {
   // Rol in header tonen
@@ -1359,6 +1364,20 @@ function updateHeaderRole(role, name) {
   if (sidebarName && displayName) {
     sidebarName.textContent = displayName;
     if (sidebarBlock) sidebarBlock.style.display = '';
+  }
+  // Statusbalk mobiel
+  const sbRole = document.getElementById('sb-role');
+  if (sbRole) sbRole.textContent = ROL_LABEL[role] || role;
+  _updateStatusbar();
+}
+function _updateStatusbar() {
+  const bar = document.getElementById('hdr-statusbar');
+  if (!bar) return;
+  // Alleen tonen op mobiel én als ingelogd met rol
+  if (window.innerWidth <= 540 && _currentRole && _currentRole !== 'pending') {
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
   }
 }
 function readScope(){ try{ return JSON.parse(localStorage.getItem(LS_SCOPE))||null; }catch{return null;} }
