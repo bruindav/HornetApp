@@ -89,7 +89,8 @@ function initMap(){
   // ── Locatie knop ─────────────────────────────────────────────────────────
   let _locMarker = null;
   const locBtn = L.control({ position: 'topleft' });
-  locBtn.onAdd = () => {
+  let _locBtnEl = null; // directe referentie naar de knop
+  locBtn.onAdd = function() {
     const btn = L.DomUtil.create('button', 'leaflet-bar leaflet-control');
     btn.innerHTML = '📍';
     btn.title = 'Zoom naar mijn locatie';
@@ -99,6 +100,7 @@ function initMap(){
       btn.innerHTML = '⏳';
       map.locate({ setView: true, maxZoom: 16, enableHighAccuracy: true });
     });
+    _locBtnEl = btn;
     return btn;
   };
   locBtn.addTo(map);
@@ -107,11 +109,10 @@ function initMap(){
     _locMarker = L.circleMarker(e.latlng, {
       radius: 8, color: '#0aa879', fillColor: '#0aa879', fillOpacity: 0.8, weight: 2
     }).addTo(map).bindPopup('Jouw locatie').openPopup();
-    document.querySelector('.leaflet-control button[title="Zoom naar mijn locatie"]').innerHTML = '📍';
+    if (_locBtnEl) _locBtnEl.innerHTML = '📍';
   });
   map.on('locationerror', () => {
-    const b = document.querySelector('.leaflet-control button[title="Zoom naar mijn locatie"]');
-    if(b) b.innerHTML = '📍';
+    if (_locBtnEl) _locBtnEl.innerHTML = '📍';
     alert('Locatie niet beschikbaar. Controleer je browserinstellingen.');
   });
 
@@ -129,30 +130,43 @@ function initMap(){
       + '<text x="13" y="8" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53e3e">N</text>'
       + '</svg>';
     L.DomEvent.disableClickPropagation(div);
-    // Klik: reset naar noorden
+    // Klik: reset kompas naar noorden
     L.DomEvent.on(div, 'click', () => {
-      _bearing = 0;
-      map.setBearing(0);
       updateCompassSvg(0);
     });
-    // Sleep om te draaien
-    let _dragStart = null;
-    L.DomEvent.on(div, 'mousedown', e => { _dragStart = { x: e.clientX, y: e.clientY, b: _bearing }; });
-    L.DomEvent.on(document, 'mousemove', e => {
-      if (!_dragStart) return;
-      const dx = e.clientX - _dragStart.x;
-      _bearing = (_dragStart.b + dx * 1.5) % 360;
-      map.setBearing(_bearing);
-      updateCompassSvg(_bearing);
-    });
-    L.DomEvent.on(document, 'mouseup', () => { _dragStart = null; });
     return div;
   };
   compassCtrl.addTo(map);
 
+  // Kompas volgt deviceorientation op mobiel
   function updateCompassSvg(bearing) {
     const svg = document.getElementById('compass-svg');
     if (svg) svg.style.transform = 'rotate(' + bearing + 'deg)';
+  }
+
+  // Kompas op mobiel: volg het kompas van het apparaat
+  if (window.DeviceOrientationEvent) {
+    const requestCompass = () => {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ vereist expliciete toestemming
+        DeviceOrientationEvent.requestPermission().then(state => {
+          if (state === 'granted') window.addEventListener('deviceorientation', _onOrientation, true);
+        }).catch(() => {});
+      } else {
+        window.addEventListener('deviceorientation', _onOrientation, true);
+      }
+    };
+    // Aktiveer kompas zodra locatieknop aangeklikt wordt
+    const _origLocClick = _locBtnEl;
+    document.addEventListener('click', e => {
+      if (e.target === _locBtnEl) requestCompass();
+    }, { once: false });
+  }
+
+  function _onOrientation(e) {
+    const heading = e.webkitCompassHeading ?? (e.alpha != null ? (360 - e.alpha) : null);
+    if (heading == null) return;
+    updateCompassSvg(heading);
   }
 
   // ── Kaartwissel in toolbox (topleft) ─────────────────────────────────────
