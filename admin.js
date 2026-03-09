@@ -1,4 +1,4 @@
-// admin.js — Fix 78
+// admin.js — Fix 85
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -104,7 +104,8 @@ function createOverlay() {
       </div>
       <div class="adm-tabs">
         <button class="adm-tab active" data-tab="users">👥 Gebruikers</button>
-        <button class="adm-tab" data-tab="sync">🔄 Waarneming.nl</button>
+        <button class="adm-tab" data-tab="sync">📄 CSV Import</button>
+        <button class="adm-tab" data-tab="gbif">🌍 GBIF Sync</button>
       </div>
       <div id="admin-body"><p style="color:#64748b;padding:12px">Laden…</p></div>
       <p id="admin-footer">
@@ -122,6 +123,7 @@ function createOverlay() {
       btn.classList.add('active');
       if (btn.dataset.tab === 'users') startListening();
       else if (btn.dataset.tab === 'sync') openSyncTab();
+      else if (btn.dataset.tab === 'gbif') openGbifTab();
     });
   });
 }
@@ -521,6 +523,169 @@ async function runCsvImport(file) {
   logSync('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500', '#e2e8f0');
   logSync('Klaar! ' + imported + ' geïmporteerd, ' + duplicates + ' duplicaten, ' + outOfZone + ' buiten gebieden.', imported > 0 ? '#0aa879' : '#f59e0b');
   btn.disabled = false; btn.textContent = '\u25BA Importeren';
+}
+
+// ======================= GBIF Synchronisatie =======================
+// GBIF taxonKey voor Vespa velutina (Aziatische hoornaar)
+const GBIF_TAXON_KEY = 1311477;
+const GBIF_API = 'https://api.gbif.org/v1/occurrence/search';
+
+// WKT bounding box per zone (POLYGON lon lat volgorde voor GBIF)
+const ZONE_WKT = {
+  'Zeist':      'POLYGON((5.17 52.05,5.33 52.05,5.33 52.14,5.17 52.14,5.17 52.05))',
+  'Bilthoven':  'POLYGON((5.14 52.09,5.26 52.09,5.26 52.18,5.14 52.18,5.14 52.09))',
+  'Driebergen': 'POLYGON((5.24 52.02,5.35 52.02,5.35 52.09,5.24 52.09,5.24 52.02))',
+  'Utrecht':    'POLYGON((5.03 52.04,5.18 52.04,5.18 52.15,5.03 52.15,5.03 52.04))',
+};
+
+function openGbifTab() {
+  const lastSync = localStorage.getItem('gbif_last_sync') || '';
+  const defaultDate = lastSync
+    ? lastSync.slice(0, 10)
+    : new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+
+  setAdminBody(
+    '<div style="padding:16px;max-width:620px">' +
+    '<h3 style="margin:0 0 4px;font-size:15px">&#x1F30D; GBIF Synchronisatie</h3>' +
+    '<p style="color:#64748b;font-size:13px;margin:0 0 14px;line-height:1.6">' +
+    'Haalt waarnemingen van <strong>Aziatische hoornaar</strong> (Vespa velutina) op via de ' +
+    'gratis publieke GBIF API — geen account of token nodig.' +
+    '</p>' +
+    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:12px;color:#1e40af">' +
+    '&#x2139;&#xFE0F; GBIF ontvangt zijn data van waarneming.nl (observation.org) via automatische nachtelijke synchronisatie. ' +
+    'Recente waarnemingen van vandaag zijn mogelijk nog niet beschikbaar.' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap">' +
+    '<div>' +
+    '<label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Synchroniseren vanaf</label>' +
+    '<input type="date" id="gbif-date" class="adm-sync-input" style="max-width:170px" value="' + defaultDate + '"/>' +
+    '</div>' +
+    '<button class="adm-sync-btn" id="gbif-sync-btn">&#9654; Synchroniseren</button>' +
+    '</div>' +
+    (lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:0 0 12px">Laatste sync: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : '') +
+    '<div id="gbif-log" class="adm-sync-log" style="min-height:80px">' +
+    '<span style="color:#94a3b8">Klik op Synchroniseren om GBIF te bevragen.</span>' +
+    '</div>' +
+    '</div>'
+  );
+
+  document.getElementById('gbif-sync-btn')?.addEventListener('click', runGbifSync);
+}
+
+function logGbif(msg, color) {
+  color = color || '#334155';
+  const log = document.getElementById('gbif-log');
+  if (!log) return;
+  if (log.querySelector('span')) log.innerHTML = '';
+  const line = document.createElement('div');
+  line.style.cssText = 'padding:2px 0;color:' + color;
+  line.textContent = new Date().toLocaleTimeString('nl-NL') + ' \u2014 ' + msg;
+  log.appendChild(line);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function runGbifSync() {
+  const dateStr = document.getElementById('gbif-date')?.value;
+  const btn     = document.getElementById('gbif-sync-btn');
+  if (!dateStr) { alert('Stel een datum in.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '\u23F3 Bezig\u2026';
+  logGbif('Start GBIF query voor Vespa velutina vanaf ' + dateStr + '\u2026');
+
+  const year = new Date().getFullYear().toString();
+  let totalImported = 0, totalDuplicates = 0, totalOutOfZone = 0;
+
+  try {
+    const zoneNames = Object.keys(ZONE_WKT);
+    for (let zi = 0; zi < zoneNames.length; zi++) {
+      const zone = zoneNames[zi];
+      const wkt  = ZONE_WKT[zone];
+      logGbif('Zone ' + zone + ' opvragen bij GBIF\u2026', '#64748b');
+
+      let offset = 0, pageObs = [], endOfRecords = false;
+      let pageNum = 0;
+
+      while (!endOfRecords) {
+        pageNum++;
+        const url = GBIF_API +
+          '?taxonKey=' + GBIF_TAXON_KEY +
+          '&geometry=' + encodeURIComponent(wkt) +
+          '&eventDate=' + dateStr + ',' + new Date().toISOString().slice(0,10) +
+          '&hasCoordinate=true' +
+          '&hasGeospatialIssue=false' +
+          '&limit=300&offset=' + offset;
+
+        const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!resp.ok) {
+          logGbif('GBIF fout ' + resp.status + ' voor zone ' + zone, '#ef4444');
+          break;
+        }
+        const data = await resp.json();
+        const results = data.results || [];
+        pageObs = pageObs.concat(results);
+        endOfRecords = data.endOfRecords !== false ? true : (results.length < 300);
+        offset += results.length;
+        if (pageNum > 10) { logGbif('Max paginas bereikt voor ' + zone, '#f59e0b'); break; }
+      }
+
+      if (!pageObs.length) {
+        logGbif(zone + ': geen waarnemingen gevonden', '#94a3b8');
+        continue;
+      }
+      logGbif(zone + ': ' + pageObs.length + ' waarneming(en) ontvangen');
+
+      for (let oi = 0; oi < pageObs.length; oi++) {
+        const o = pageObs[oi];
+        const lat = o.decimalLatitude;
+        const lng = o.decimalLongitude;
+        if (!lat || !lng) continue;
+
+        const gbifId    = 'gbif_' + o.gbifID;
+        const base      = 'maps/' + year + '/' + zone + '/data';
+        const date      = o.eventDate ? o.eventDate.slice(0,10) : (o.year ? o.year + '-' + String(o.month||1).padStart(2,'0') + '-' + String(o.day||1).padStart(2,'0') : new Date().toISOString().slice(0,10));
+        const observer  = o.recordedBy || o.institutionCode || 'GBIF';
+        const locName   = [o.locality, o.municipality, o.stateProvince].filter(Boolean).join(', ');
+        const aantal    = o.individualCount || 1;
+        const noteParts = [];
+        if (o.occurrenceRemarks) noteParts.push(o.occurrenceRemarks);
+        if (locName) noteParts.push('\uD83D\uDCCD ' + locName);
+        noteParts.push('Bron: GBIF #' + o.gbifID);
+
+        // Duplicaat check
+        const existing = await getDocs(query(collection(db, base, 'markers'), where('externalId', '==', gbifId)));
+        if (!existing.empty) { totalDuplicates++; continue; }
+
+        await setDoc(doc(db, base, 'markers', gbifId), {
+          id: gbifId, type: 'hoornaar',
+          lat, lng, date,
+          by: observer,
+          aantal,
+          note: noteParts.join('\n'),
+          externalId: gbifId,
+          source: 'GBIF',
+          gbifKey: o.gbifID || '',
+        });
+        totalImported++;
+        logGbif('\u2705 ' + date + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : ''), '#0aa879');
+      }
+    }
+
+    localStorage.setItem('gbif_last_sync', new Date().toISOString());
+    logGbif('\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500', '#e2e8f0');
+    logGbif(
+      'Klaar! ' + totalImported + ' ge\xEFmporteerd, ' +
+      totalDuplicates + ' duplicaten overgeslagen.',
+      totalImported > 0 ? '#0aa879' : '#f59e0b'
+    );
+
+  } catch (e) {
+    logGbif('Fout: ' + e.message, '#ef4444');
+    console.error('[gbif]', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '\u25BA Synchroniseren';
+  }
 }
 
 // ======================= Welkomst-email via EmailJS =======================
