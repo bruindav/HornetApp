@@ -1,4 +1,4 @@
-// app-core.js — Fix 74
+// app-core.js — Fix 75
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1033,14 +1033,36 @@ function refreshPolygonLabel(layer){
 function initPolygon(layer){
   layer._props = layer._props || { id: genId('poly'), label:'', color:'#0aa879' };
   const col = layer._props.color||'#0aa879';
-  layer.setStyle({ color: col, fillColor: col, fillOpacity: .2, weight: 2 });
+  layer.setStyle({ color: col, fillColor: col, fillOpacity: .2, weight: 3 });
   refreshPolygonLabel(layer);
-  const open = (ev)=>{
+  // Desktop: contextmenu / click opent menu direct
+  // Mobiel: long press (600ms, <10px beweging)
+  layer.on('contextmenu', ev => {
     ev.originalEvent?.preventDefault(); ev.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;
     openUnifiedContextMenu({ x:ev.originalEvent?.clientX||0, y:ev.originalEvent?.clientY||0, latlng:ev.latlng, polygonLayer: layer });
-  };
-  layer.on('contextmenu', open); layer.on('click', open);
+  });
+  let _polyLp = null, _polyMoved = false, _polyXY = null;
+  layer.on('mousedown touchstart', ev => {
+    _polyMoved = false;
+    const t = ev.originalEvent?.touches?.[0];
+    _polyXY = { x: t?.clientX ?? ev.originalEvent?.clientX ?? 0, y: t?.clientY ?? ev.originalEvent?.clientY ?? 0 };
+    clearTimeout(_polyLp);
+    _polyLp = setTimeout(() => {
+      if (!_polyMoved && !shouldDebounce()) {
+        openUnifiedContextMenu({ x: _polyXY.x, y: _polyXY.y, latlng: ev.latlng, polygonLayer: layer });
+      }
+    }, 600);
+  });
+  layer.on('mousemove touchmove', ev => {
+    const t = ev.originalEvent?.touches?.[0];
+    const cx = t?.clientX ?? ev.originalEvent?.clientX ?? 0;
+    const cy = t?.clientY ?? ev.originalEvent?.clientY ?? 0;
+    if (_polyXY && (Math.abs(cx - _polyXY.x) > 10 || Math.abs(cy - _polyXY.y) > 10)) {
+      _polyMoved = true; clearTimeout(_polyLp);
+    }
+  });
+  layer.on('mouseup touchend', () => clearTimeout(_polyLp));
 }
 function persistPolygon(layer){
   const id = layer._props?.id || genId('poly'); layer._props.id = id;
@@ -1126,8 +1148,8 @@ function applyFilters(){
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
     layer.setStyle(outlineOnly
-      ? { fillOpacity: 0, weight: 3 }
-      : { fillColor: col, fillOpacity: 0.2, weight: 2 });
+      ? { fillOpacity: 0, weight: 4 }
+      : { fillColor: col, fillOpacity: 0.2, weight: 3 });
   });
 
   allLines.forEach(line=>{
