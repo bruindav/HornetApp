@@ -426,9 +426,9 @@ function getDateFrom(days){
   return d.toISOString().slice(0,10); // 'YYYY-MM-DD'
 }
 
-const ZOOM_FULL  = 17;  // volledig icoon + tekst (straatniveau)
-const ZOOM_SMALL = 15;  // middelgroot icoon, alleen emoji
-const ZOOM_DOT   = 13;  // stip met letter
+const ZOOM_FULL  = 15;  // volledig icoon + tekst (straatniveau)
+const ZOOM_SMALL = 13;  // middelgroot icoon, alleen emoji
+const ZOOM_DOT   = 12;  // stip met letter
 // Labels en zichtlijnen/sectoren alleen op straatniveau
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
 const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
