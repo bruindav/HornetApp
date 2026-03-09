@@ -152,6 +152,7 @@
           <span id="hdr-scope-wrap" class="hidden">📍 <span id="hdr-scope">–</span></span>
         </div>
         <button id="btn-admin" class="hidden" style="margin-left:12px">⚙️ Beheer</button>
+        <button id="btn-help" title="Help" style="margin-left:8px">❓</button>
         <button id="logoutBtn" style="margin-left:12px">Uitloggen</button>
         <button id="btn-reset-cache" title="Reset cache & herladen" style="margin-left:8px">↺</button>
       </header>
@@ -280,5 +281,220 @@
 
     <!-- App entry (auth-gated) -->
     <script type="module" src="./main.js?v=610r21f17"></script>
+
+    <!-- ═══════════════════════ HELP OVERLAY ═══════════════════════ -->
+    <div id="help-overlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);align-items:flex-start;justify-content:center;padding-top:48px">
+      <div id="help-panel" style="background:#fff;border-radius:14px;width:92%;max-width:600px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden">
+
+        <!-- Header -->
+        <div style="background:#0f172a;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:22px">🐝</span>
+            <div>
+              <div style="font-weight:700;font-size:16px">HornetApp Help</div>
+              <div style="font-size:11px;opacity:.7">Aziatische hoornaar monitoring</div>
+            </div>
+          </div>
+          <button id="help-close" style="background:none;border:0;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1">✕</button>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;flex-shrink:0">
+          <button class="help-tab active" data-tab="volunteer" style="flex:1;padding:11px;border:0;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#0aa879;border-bottom:3px solid #0aa879;margin-bottom:-2px">
+            👤 Vrijwilliger
+          </button>
+          <button class="help-tab" data-tab="admin" style="flex:1;padding:11px;border:0;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;border-bottom:3px solid transparent;margin-bottom:-2px">
+            ⚙️ Beheerder
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div id="help-body" style="overflow-y:auto;flex:1;padding:0">
+
+          <!-- ── VRIJWILLIGER TAB ── -->
+          <div id="help-volunteer" class="help-page">
+
+            <div style="padding:16px 20px 0">
+              <p style="margin:0 0 16px;color:#475569;font-size:13px;line-height:1.6">
+                Welkom bij HornetApp. Hieronder vind je uitleg over de belangrijkste functies die je als vrijwilliger gebruikt.
+              </p>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🗺️ De kaart</div>
+              <div class="help-row">
+                <div class="help-icon">☰</div>
+                <div><strong>Sidebar openen/sluiten</strong> — Klik op het hamburger-menu linksboven om de filterbalk te tonen of verbergen. Op mobiel sluit de kaart dan volledig.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📍</div>
+                <div><strong>Huidige locatie</strong> — Klik op de locatieknop op de kaart om naar jouw positie te navigeren. Het kompas draait mee met jouw richting.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🛰️</div>
+                <div><strong>Satellietweergave</strong> — Houd de kaart ingedrukt (of rechtermuisknop op desktop) om het kaartmenu te openen. Kies <em>Satelliet/Kaart</em> om te wisselen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🔎</div>
+                <div><strong>Icoon schaling</strong> — Iconen worden groter en tonen meer detail naarmate je verder inzoomt. Zoom voorbij niveau 15 voor het volledige icoon met tekst.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📌 Waarnemingen vastleggen</div>
+              <div class="help-row">
+                <div class="help-icon">➕</div>
+                <div><strong>Nieuw icoon plaatsen</strong> — Houd de kaart ingedrukt op de gewenste locatie (of rechtermuisknop). Kies het type:</div>
+              </div>
+              <div style="padding:0 12px 12px 52px;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#cc2222;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">W</span><span style="font-size:13px"><strong>🐝 Waarneming</strong> — je ziet een hoornaar of nest in de buurt</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#334466;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">N</span><span style="font-size:13px"><strong>🪹 Nest</strong> — een bevestigd nest</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#1a7a40;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">G</span><span style="font-size:13px"><strong>✅ Nest geruimd</strong> — nest is verwijderd</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#2d6b50;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">L</span><span style="font-size:13px"><strong>🪤 Lokpot</strong> — geplaatste vangpot</span></div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✏️</div>
+                <div><strong>Eigenschappen bewerken</strong> — Tik op een icoon om datum, waarnemer, aantal en opmerking in te stellen. Klik op <em>Opslaan</em>.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✋</div>
+                <div><strong>Icoon verplaatsen</strong> — Houd een bestaand icoon ingedrukt en kies <em>Verplaatsen</em>. Sleep het naar de juiste positie.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Icoon verwijderen</strong> — Houd het icoon ingedrukt en kies <em>Verwijderen</em>.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🔍 Filteren</div>
+              <div class="help-row">
+                <div class="help-icon">☑️</div>
+                <div><strong>Type filters</strong> — Vink in de sidebar aan welke typen je wilt zien: Waarneming, Nest, Nest geruimd, Lokpot of Pending.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📅</div>
+                <div><strong>Periodefilter</strong> — Schuif de slider om alleen waarnemingen van de afgelopen week, 2 weken, maand of jaar te tonen. Helemaal links = alles.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">⬜</div>
+                <div><strong>Polygonen alleen omtrek</strong> — Zet de gebiedskleur uit zodat je de kaart beter ziet door de gebieden heen.</div>
+              </div>
+            </div>
+
+            <div class="help-section" style="margin-bottom:20px">
+              <div class="help-section-title">📊 Overzicht</div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div>Onderaan de sidebar zie je een overzicht van het aantal waarnemingen, lokpotten en nesten per gebied voor de gekozen periode.</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ── BEHEERDER TAB ── -->
+          <div id="help-admin" class="help-page" style="display:none">
+
+            <div style="padding:16px 20px 0">
+              <p style="margin:0 0 16px;color:#475569;font-size:13px;line-height:1.6">
+                Als beheerder of admin heb je toegang tot extra functies: tekenen, gebruikersbeheer en data-import.
+              </p>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🖊️ Tekenen (manager + admin)</div>
+              <div class="help-row">
+                <div class="help-icon">▭</div>
+                <div><strong>Gebieden tekenen</strong> — De tekenknopppen verschijnen linksboven op de kaart. Teken polygonen om werkgebieden af te bakenen. Ze worden opgeslagen per zone en jaar.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✏️</div>
+                <div><strong>Gebied bewerken</strong> — Klik op een bestaand gebied om het te selecteren, dan op de bewerk-knop om punten te verslepen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">💬</div>
+                <div><strong>Naam en kleur</strong> — Houd een gebied ingedrukt (of rechtermuisknop) en kies <em>Naam/kleur</em> om het gebied een herkenbare naam en kleur te geven.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📏</div>
+                <div><strong>Zichtlijnen en sectoren</strong> — Via het contextmenu op een lokpot kun je zichtlijnen naar omliggende punten tekenen om dekking te visualiseren.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">👥 Gebruikersbeheer (⚙️ Beheer → Gebruikers)</div>
+              <div class="help-row">
+                <div class="help-icon">⏳</div>
+                <div><strong>Nieuwe gebruikers accepteren</strong> — Nieuwe aanmeldingen staan bovenaan als <em>pending</em>. Klik op <em>Accepteren</em> om naam, rol en toegestane gebieden in te stellen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗂️</div>
+                <div><strong>Rollen</strong> — Er zijn drie rollen: <strong>Vrijwilliger</strong> (iconen plaatsen), <strong>Manager</strong> (ook tekenen in eigen gebieden), <strong>Admin</strong> (alles).</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📍</div>
+                <div><strong>Gebieden toewijzen</strong> — Per gebruiker geef je aan in welke zones hij/zij actief is. Een manager kan alleen in eigen zones tekenen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📧</div>
+                <div><strong>Welkomstmail</strong> — Na acceptatie ontvangt de gebruiker automatisch een e-mail met zijn rol en gebieden via EmailJS.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🔄 Waarneming.nl import (⚙️ Beheer → Waarneming.nl)</div>
+              <div class="help-row">
+                <div class="help-icon">📥</div>
+                <div><strong>CSV importeren</strong> — Exporteer waarnemingen van Aziatische hoornaar als CSV via waarneming.nl en upload het bestand. Duplicaten worden automatisch overgeslagen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗓️</div>
+                <div><strong>Exporteren vanuit waarneming.nl</strong> — Ga naar waarneming.nl → Verkennen → zoek "Aziatische hoornaar" → filter op regio → Exporteren → CSV.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📌</div>
+                <div><strong>Automatische zone-koppeling</strong> — Geïmporteerde waarnemingen worden automatisch aan de juiste zone gekoppeld op basis van de coördinaten.</div>
+              </div>
+            </div>
+
+            <div class="help-section" style="margin-bottom:20px">
+              <div class="help-section-title">⚙️ Overige beheertools</div>
+              <div class="help-row">
+                <div class="help-icon">↺</div>
+                <div><strong>Cache resetten</strong> — De ↺ knop rechtsboven reset de serviceworker cache en herlaadt de app. Gebruik dit als de app een oude versie toont.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📡</div>
+                <div><strong>Scope instellen</strong> — Kies bovenin de sidebar het jaar en het gebied om de juiste dataset te laden. De huidige scope staat rechtsboven in de header.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#f8fafc">
+          <span style="font-size:11px;color:#94a3b8">HornetApp — Aziatische hoornaar monitoring</span>
+          <button id="help-close-btn" style="padding:7px 18px;background:#0aa879;color:#fff;border:0;border-radius:7px;font-weight:600;cursor:pointer;font-size:13px">Sluiten</button>
+        </div>
+
+      </div>
+    </div>
+
+    <style>
+      #help-overlay.open { display:flex !important; }
+      .help-tab { transition: color .15s, border-color .15s; }
+      .help-tab.active { color:#0aa879 !important; border-bottom-color:#0aa879 !important; }
+      .help-section { padding:0 20px 4px; border-bottom:1px solid #f1f5f9; margin-bottom:4px; }
+      .help-section:last-child { border-bottom:0; }
+      .help-section-title { font-weight:700; font-size:13px; color:#0f172a; margin:14px 0 10px; display:flex; align-items:center; gap:6px; }
+      .help-row { display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; font-size:13px; color:#334155; line-height:1.5; }
+      .help-icon { width:28px; height:28px; background:#f1f5f9; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; margin-top:1px; }
+      @media (max-width:600px) {
+        #help-panel { width:100%; max-width:100%; border-radius:14px 14px 0 0; max-height:90vh; }
+        #help-overlay { padding-top:0; align-items:flex-end; }
+      }
+    </style>
+
   </body>
 </html>

@@ -340,6 +340,25 @@ function initUIBindings(){
   } else {
     console.warn('[app] btn-admin NIET GEVONDEN in DOM bij initUIBindings');
   }
+  // ── Help overlay ─────────────────────────────────────────────────────────
+  const helpOverlay = document.getElementById('help-overlay');
+  const helpOpen = () => { if(helpOverlay) helpOverlay.classList.add('open'); };
+  const helpClose = () => { if(helpOverlay) helpOverlay.classList.remove('open'); };
+  document.getElementById('btn-help')?.addEventListener('click', helpOpen);
+  document.getElementById('help-close')?.addEventListener('click', helpClose);
+  document.getElementById('help-close-btn')?.addEventListener('click', helpClose);
+  helpOverlay?.addEventListener('click', e => { if(e.target === helpOverlay) helpClose(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape' && helpOverlay?.classList.contains('open')) helpClose(); });
+  // Tab wisselen
+  helpOverlay?.querySelectorAll('.help-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      helpOverlay.querySelectorAll('.help-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('help-volunteer').style.display = btn.dataset.tab === 'volunteer' ? '' : 'none';
+      document.getElementById('help-admin').style.display     = btn.dataset.tab === 'admin'     ? '' : 'none';
+    });
+  });
+
   on(req('btn-reset-cache'), 'click', async()=>{
     try{
       if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
