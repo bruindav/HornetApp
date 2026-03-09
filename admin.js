@@ -1,4 +1,4 @@
-// admin.js — Fix 76b
+// admin.js — Fix 77
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -13,6 +13,9 @@ import { getFunctions, httpsCallable }
 import { app } from './firebase.js';
 
 const db        = getFirestore(app);
+
+// Helper: naam veilig maken voor gebruik in onclick attribuut
+function _esc(s) { return String(s||'').replace(/'/g, '&#39;'); }
 const functions = getFunctions(app, 'europe-west4');
 
 // ======================= EmailJS configuratie =======================
@@ -192,7 +195,7 @@ function renderTable(users) {
       <td>
         <div style="display:flex;align-items:center;gap:6px">
           <span id="dn-text-${u.uid}"><strong>${u.displayName || '<em style="color:#94a3b8">geen naam</em>'}</strong></span>
-          <button class="adm-btn-icon" title="Naam bewerken" onclick="adminEditName('${u.uid}','${(u.displayName||'').replace(/'/g,"\\'")}')">✏️</button>
+          <button class="adm-btn-icon" title="Naam bewerken" onclick="adminEditName('${u.uid}','${_esc(u.displayName)}')">✏️</button>
         </div>
         <div class="adm-muted">${u.email || u.uid}</div>
         ${isSelf ? '<div style="color:#0aa879;font-size:11px">(jouw account)</div>' : ''}
@@ -205,13 +208,13 @@ function renderTable(users) {
         <td>
           <span style="color:#f59e0b;font-weight:600">⏳ Pending</span>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <button class="adm-btn-accept" onclick="adminOpenAcceptDialog('${u.uid}','${u.email||''}','${(u.displayName||'').replace(/'/g,"\\'")}')">✓ Accepteren</button>
-            <button class="adm-btn-reject" onclick="adminRejectUser('${u.uid}','${u.displayName||u.email||''}')">✕ Weigeren</button>
+            <button class="adm-btn-accept" onclick="adminOpenAcceptDialog('${u.uid}','${_esc(u.email)}','${_esc(u.displayName)}')">✓ Accepteren</button>
+            <button class="adm-btn-reject" onclick="adminRejectUser('${u.uid}','${_esc(u.displayName||u.email)}')">✕ Weigeren</button>
           </div>
         </td>`;
     } else {
       const deleteBtn = isAccepted && !isSelf
-        ? `<button class="adm-btn-delete" onclick="adminDeleteUser('${u.uid}','${u.displayName||u.email||''}')">🗑️ Verwijderen</button>`
+        ? `<button class="adm-btn-delete" onclick="adminDeleteUser('${u.uid}','${_esc(u.displayName||u.email)}')">🗑️ Verwijderen</button>`
         : '';
       rolCell = `
         <td>
@@ -447,7 +450,7 @@ async function runSync() {
       allObs = allObs.concat(data.results || []);
       logSync(`${allObs.length} van ${data.count} waarnemingen opgehaald`, '#64748b');
       url = data.next || null;
-      if (page > 20) { logSync('Stop na 20 pagina's (max 2000 waarnemingen).', '#f59e0b'); break; }
+      if (page > 20) { logSync("Stop na 20 pagina's (max 2000 waarnemingen).", '#f59e0b'); break; }
     }
 
     logSync(`Totaal ${allObs.length} waarnemingen gevonden voor soort Aziatische hoornaar.`);
