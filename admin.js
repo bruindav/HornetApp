@@ -382,7 +382,7 @@ function openSyncTab() {
             value="${lastSync ? lastSync.slice(0,10) : new Date(Date.now()-7*86400000).toISOString().slice(0,10)}"/>
           <button class="adm-sync-btn" id="wn-sync-btn">▶ Synchroniseren</button>
         </div>
-        ${lastSync ? `<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">Laatste sync: ${new Date(lastSync).toLocaleString('nl-NL')}</p>` : ''}
+        ${lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:2px 0 0">Laatste sync: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : ''}
       </div>
 
       <div id="wn-log" class="adm-sync-log" style="min-height:60px">
