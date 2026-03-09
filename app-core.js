@@ -713,6 +713,61 @@ function openPropModal({type, init={}, onSave}){
   }
   // Kleur verbergen (is voor polygonen, niet iconen)
   if(pmColorRow) pmColorRow.classList.add('hidden');
+
+  // ── Broninfo sectie (GBIF / waarneming.nl) ───────────────────────────────
+  const srcBlock = document.getElementById('pm-source-block');
+  const srcRows  = document.getElementById('pm-source-rows');
+  if (srcBlock && srcRows) {
+    const src = init.source || '';
+    if (src === 'GBIF' || src === 'waarneming.nl') {
+      srcRows.innerHTML = '';
+      function srcRow(label, val, link) {
+        if (!val && !link) return;
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;gap:6px;align-items:baseline';
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'color:#94a3b8;min-width:110px;flex-shrink:0';
+        lbl.textContent = label;
+        const val2 = document.createElement('span');
+        val2.style.cssText = 'color:#334155;word-break:break-word';
+        if (link) {
+          const a = document.createElement('a');
+          a.href = link; a.target = '_blank';
+          a.style.cssText = 'color:#0aa879;text-decoration:none';
+          a.textContent = val || link;
+          val2.appendChild(a);
+        } else {
+          val2.textContent = val;
+        }
+        row.appendChild(lbl); row.appendChild(val2);
+        srcRows.appendChild(row);
+      }
+      const LIFE = { 'ADULT':'Volwassen', 'JUVENILE':'Juveniel', 'LARVA':'Larve', 'PUPA':'Pop', 'EGG':'Ei', 'UNKNOWN':'' };
+      const SEX  = { 'FEMALE':'Vrouwtje', 'MALE':'Mannetje', 'HERMAPHRODITE':'Hermafrodiet', 'UNKNOWN':'' };
+      const BASIS= { 'HUMAN_OBSERVATION':'Menselijke observatie', 'MACHINE_OBSERVATION':'Sensor/camera', 'PRESERVED_SPECIMEN':'Specimen', 'LITERATURE':'Literatuur', 'MATERIAL_CITATION':'Materiaalcitaat', 'OCCURRENCE':'' };
+
+      srcRow('Bron', src);
+      if (src === 'GBIF') {
+        srcRow('Dataset', init.gbifDataset);
+        srcRow('Locatie', init.gbifLocality);
+        srcRow('Levensstadium', LIFE[init.gbifLifestage] || init.gbifLifestage);
+        srcRow('Geslacht', SEX[init.gbifSex] || init.gbifSex);
+        srcRow('Gedrag', init.gbifBehavior);
+        srcRow('Registratietype', BASIS[init.gbifBasis] || init.gbifBasis);
+        srcRow('Land', init.gbifCountry);
+        if (init.gbifCoordPrec) srcRow('Nauwkeurigheid', '±' + init.gbifCoordPrec + 'm');
+        if (init.gbifIssues) srcRow('Opmerkingen', init.gbifIssues);
+        if (init.gbifUrl) srcRow('GBIF link', 'Bekijk op gbif.org', init.gbifUrl);
+      } else {
+        srcRow('Locatie', init.location);
+        srcRow('Validatiestatus', init.validationStatus);
+        if (init.permalink) srcRow('Link', 'Bekijk op waarneming.nl', init.permalink);
+      }
+      srcBlock.style.display = 'block';
+    } else {
+      srcBlock.style.display = 'none';
+    }
+  }
   // Modal tonen
   modalEl2.classList.remove('hidden');
   function cleanup(){

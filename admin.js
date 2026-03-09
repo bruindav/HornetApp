@@ -1,4 +1,4 @@
-// admin.js — Fix 85
+// admin.js — Fix 86
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -641,16 +641,40 @@ async function runGbifSync() {
         const lng = o.decimalLongitude;
         if (!lat || !lng) continue;
 
-        const gbifId    = 'gbif_' + o.gbifID;
-        const base      = 'maps/' + year + '/' + zone + '/data';
-        const date      = o.eventDate ? o.eventDate.slice(0,10) : (o.year ? o.year + '-' + String(o.month||1).padStart(2,'0') + '-' + String(o.day||1).padStart(2,'0') : new Date().toISOString().slice(0,10));
-        const observer  = o.recordedBy || o.institutionCode || 'GBIF';
-        const locName   = [o.locality, o.municipality, o.stateProvince].filter(Boolean).join(', ');
-        const aantal    = o.individualCount || 1;
+        const gbifId   = 'gbif_' + o.gbifID;
+        const base     = 'maps/' + year + '/' + zone + '/data';
+
+        // Datum opbouwen
+        const date = o.eventDate
+          ? o.eventDate.slice(0, 10)
+          : (o.year
+            ? o.year + '-' + String(o.month || 1).padStart(2, '0') + '-' + String(o.day || 1).padStart(2, '0')
+            : new Date().toISOString().slice(0, 10));
+
+        // Waarnemer — GBIF geeft soms meerdere namen gescheiden door |
+        const observer = o.recordedBy || o.identifiedBy || o.institutionCode || 'GBIF';
+
+        // Locatie opbouwen
+        const locParts = [o.locality, o.municipality, o.county, o.stateProvince].filter(Boolean);
+        const locName  = locParts.join(', ');
+
+        const aantal = o.individualCount || 1;
+
+        // Gedragsinfo
+        const behavior    = o.behavior || '';
+        const lifestage   = o.lifeStage || '';
+        const sex         = o.sex && o.sex !== 'UNKNOWN' ? o.sex : '';
+        const established = o.establishmentMeans || '';
+
+        // Validatie
+        const taxonMatch  = o.taxonMatchType || '';
+        const issues      = (o.issues || []).join(', ');
+        const basisOfRec  = o.basisOfRecord || '';
+
+        // Opmerking voor notitieveld (zichtbaar in popup)
         const noteParts = [];
         if (o.occurrenceRemarks) noteParts.push(o.occurrenceRemarks);
         if (locName) noteParts.push('\uD83D\uDCCD ' + locName);
-        noteParts.push('Bron: GBIF #' + o.gbifID);
 
         // Duplicaat check
         const existing = await getDocs(query(collection(db, base, 'markers'), where('externalId', '==', gbifId)));
@@ -664,7 +688,19 @@ async function runGbifSync() {
           note: noteParts.join('\n'),
           externalId: gbifId,
           source: 'GBIF',
-          gbifKey: o.gbifID || '',
+          // Extra GBIF metadata — zichtbaar in detailweergave
+          gbifKey:       String(o.gbifID || ''),
+          gbifDataset:   o.datasetName || o.collectionCode || '',
+          gbifLocality:  locName,
+          gbifBehavior:  behavior,
+          gbifLifestage: lifestage,
+          gbifSex:       sex,
+          gbifEstablishment: established,
+          gbifBasis:     basisOfRec,
+          gbifIssues:    issues,
+          gbifUrl:       o.occurrenceID || ('https://www.gbif.org/occurrence/' + o.gbifID),
+          gbifCoordPrec: o.coordinatePrecision != null ? String(o.coordinatePrecision) : '',
+          gbifCountry:   o.country || '',
         });
         totalImported++;
         logGbif('\u2705 ' + date + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : ''), '#0aa879');

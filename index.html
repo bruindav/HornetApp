@@ -280,6 +280,11 @@
             <label id="pm-note-row" style="font-size:13px;display:block">
               Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
             </label>
+            <!-- Broninfo — alleen zichtbaar bij geïmporteerde waarnemingen -->
+            <div id="pm-source-block" style="display:none;margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:10px;font-size:12px">
+              <div style="font-weight:600;color:#475569;margin-bottom:6px">📡 Brongegevens (alleen lezen)</div>
+              <div id="pm-source-rows" style="display:grid;gap:4px"></div>
+            </div>
             <label id="pm-color-row" class="hidden" style="font-size:13px;display:flex;align-items:center;gap:8px">
               Kleur gebied <input id="pm-color" type="color" style="width:48px;height:32px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;padding:2px"/>
             </label>
