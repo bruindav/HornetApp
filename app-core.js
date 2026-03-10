@@ -1,4 +1,4 @@
-// app-core.js — Fix 97
+// app-core.js — Fix 98
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -882,31 +882,43 @@ function openColorModal(currentColor, onSave){
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
   const m=marker._meta||{};
+  const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
   // Label per type
-  const typeLabel = m.type==='hoornaar'?(m.aantal?`Waarneming (×${m.aantal})`:'Waarneming')
-    :m.type==='nest'?'Nest':m.type==='nest_geruimd'?'Nest geruimd'
-    :m.type==='lokpot'?'Lokpot':'Icoon';
-  // Popup: alle velden netjes onder elkaar
-  const row = (lbl,val) => '<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:80px">' + lbl + '</span><span style="font-size:12px;color:#1e293b">' + val + '</span></div>';
-  let popup = `<div style="min-width:160px"><strong style="font-size:13px">${typeLabel}</strong>`;
-  if(m.date) popup += row('Datum', m.date);
-  if(m.by)   popup += row('Door', m.by);
-  if(m.type==='lokpot' && m.sender) popup += row('Zender', m.sender==='ja'?'Ja':'Nee');
-  if(m.type==='nest' && m.nesttype) popup += row('Nesttype', m.nesttype.charAt(0).toUpperCase()+m.nesttype.slice(1));
+  const typeLabel = m.type==='hoornaar'?(m.aantal?'Waarneming (\xD7'+m.aantal:'Waarneming')+(m.aantal?')':'')
+    :m.type==='nest'?'Nest gevonden':m.type==='nest_geruimd'?'Nest geruimd'
+    :m.type==='lokpot'?'Lokpot':m.type==='val'?'Val geplaatst':'Icoon';
+  // Bouw rijen als array: eerst basisrijen, dan extra rijen
+  const row = (lbl,val) => '<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:82px;flex-shrink:0">'+lbl+'</span><span style="font-size:12px;color:#1e293b">'+val+'</span></div>';
+  // Basisrijen (altijd zichtbaar)
+  let base = '';
+  if(m.date) base += row('Datum', m.date);
+  if(m.by)   base += row('Door',  m.by);
+  // Extra rijen (in inklapbaar blok)
+  let extra = '';
+  if(m.type==='hoornaar' && m.aantal) extra += row('Aantal', String(m.aantal));
+  if(m.type==='lokpot' && m.sender)   extra += row('Zender', m.sender==='ja'?'Ja':'Nee');
+  if(m.type==='nest' && m.nesttype)   extra += row('Nesttype', cap(m.nesttype));
   if(m.type==='nest_geruimd'){
-    if(m.ruimer)  popup += row('Geruimd door', m.ruimer);
-    if(m.methode) popup += row('Methode', m.methode.charAt(0).toUpperCase()+m.methode.slice(1));
-    if(m.succes)  popup += row('Succesvol', m.succes==='ja'?'Ja':'Nee');
+    if(m.ruimer)  extra += row('Geruimd door', m.ruimer);
+    if(m.methode) extra += row('Methode', cap(m.methode));
+    if(m.succes)  extra += row('Succesvol', m.succes==='ja'?'Ja':'Nee');
   }
   if(m.type==='val'){
-    if(m.valtype)           popup += row('Type val', m.valtype.charAt(0).toUpperCase()+m.valtype.slice(1));
-    if(m.koninginnen!=null) popup += row('Koninginnen', String(m.koninginnen));
+    if(m.valtype)           extra += row('Type val', cap(m.valtype));
+    if(m.koninginnen!=null) extra += row('Koninginnen', String(m.koninginnen));
   }
-  if(m.note) popup += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">${m.note}</div>`;
-  popup += '</div>';
+  if(m.note) extra += '<div style="margin-top:5px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">'+m.note+'</div>';
+  // Samenvoegen — "meer" knop alleen als er extra rijen zijn
+  const meerBtn = extra
+    ? '<div style="margin-top:5px">'
+      + '<span id="pm-meer-lnk" style="font-size:11px;color:#0aa879;cursor:pointer;user-select:none" onclick="var d=document.getElementById('pm-meer-blk');var s=document.getElementById('pm-meer-lnk');if(d.style.display==='none'){d.style.display='block';s.textContent='minder ▲';}else{d.style.display='none';s.textContent='meer ▼';}">meer ▼</span>'
+      + '<div id="pm-meer-blk" style="display:none;margin-top:2px">'+extra+'</div>'
+      + '</div>'
+    : '';
+  const popup = '<div style="min-width:170px;max-width:240px"><strong style="font-size:13px">'+typeLabel+'</strong>'+base+meerBtn+'</div>';
   marker.unbindPopup();
-  marker.bindPopup(popup, {maxWidth:240});
-  marker.unbindTooltip(); // geen hover tooltip — klik opent eigenschappen
+  marker.bindPopup(popup, {maxWidth:260, minWidth:170});
+  marker.unbindTooltip();
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
