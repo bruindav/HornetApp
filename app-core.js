@@ -1,4 +1,11 @@
-// app-core.js — Fix 98
+// app-core.js — Fix 99
+function _toggleMeer(){
+  var d=document.getElementById('pm-meer-blk');
+  var s=document.getElementById('pm-meer-lnk');
+  if(!d||!s) return;
+  if(d.style.display==='none'){ d.style.display='block'; s.innerHTML='minder &#9650;'; }
+  else { d.style.display='none'; s.innerHTML='meer &#9660;'; }
+}
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -884,7 +891,7 @@ function attachMarkerPopup(marker){
   const m=marker._meta||{};
   const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
   // Label per type
-  const typeLabel = m.type==='hoornaar'?(m.aantal?'Waarneming (\xD7'+m.aantal:'Waarneming')+(m.aantal?')':'')
+  const typeLabel = m.type==='hoornaar'?(m.aantal?'Waarneming (×'+m.aantal+')':'Waarneming')
     :m.type==='nest'?'Nest gevonden':m.type==='nest_geruimd'?'Nest geruimd'
     :m.type==='lokpot'?'Lokpot':m.type==='val'?'Val geplaatst':'Icoon';
   // Bouw rijen als array: eerst basisrijen, dan extra rijen
@@ -908,10 +915,10 @@ function attachMarkerPopup(marker){
     if(m.koninginnen!=null) extra += row('Koninginnen', String(m.koninginnen));
   }
   if(m.note) extra += '<div style="margin-top:5px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">'+m.note+'</div>';
-  // Samenvoegen — "meer" knop alleen als er extra rijen zijn
+  // Samenvoegen — meer knop alleen als er extra rijen zijn
   const meerBtn = extra
     ? '<div style="margin-top:5px">'
-      + '<span id="pm-meer-lnk" style="font-size:11px;color:#0aa879;cursor:pointer;user-select:none" onclick="var d=document.getElementById('pm-meer-blk');var s=document.getElementById('pm-meer-lnk');if(d.style.display==='none'){d.style.display='block';s.textContent='minder ▲';}else{d.style.display='none';s.textContent='meer ▼';}">meer ▼</span>'
+      + '<span id="pm-meer-lnk" style="font-size:11px;color:#0aa879;cursor:pointer;user-select:none" onclick="_toggleMeer()">meer &#9660;</span>'
       + '<div id="pm-meer-blk" style="display:none;margin-top:2px">'+extra+'</div>'
       + '</div>'
     : '';
