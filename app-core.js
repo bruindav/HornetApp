@@ -1,11 +1,4 @@
-// app-core.js — Fix 99
-function _toggleMeer(){
-  var d=document.getElementById('pm-meer-blk');
-  var s=document.getElementById('pm-meer-lnk');
-  if(!d||!s) return;
-  if(d.style.display==='none'){ d.style.display='block'; s.innerHTML='minder &#9650;'; }
-  else { d.style.display='none'; s.innerHTML='meer &#9660;'; }
-}
+// app-core.js — Fix 100
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -926,6 +919,16 @@ function attachMarkerPopup(marker){
   marker.unbindPopup();
   marker.bindPopup(popup, {maxWidth:260, minWidth:170});
   marker.unbindTooltip();
+  // Koppel meer/minder toggle via popupopen (werkt ook in module-scope)
+  marker.off('popupopen').on('popupopen', function(){
+    var lnk = document.getElementById('pm-meer-lnk');
+    var blk = document.getElementById('pm-meer-blk');
+    if(!lnk||!blk) return;
+    lnk.onclick = function(){
+      if(blk.style.display==='none'){ blk.style.display='block'; lnk.innerHTML='minder &#9650;'; }
+      else { blk.style.display='none'; lnk.innerHTML='meer &#9660;'; }
+    };
+  });
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
