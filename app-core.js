@@ -1,4 +1,4 @@
-// app-core.js — Fix 87
+// app-core.js — Fix 88
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -438,27 +438,33 @@ const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
 const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
 
-// SVG hoornaar — geel/zwart, herkenbaar silhouet
-const HORNET_SVG_FULL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="22" height="15" style="display:inline-block;vertical-align:middle;margin-right:3px"><g transform="translate(2,2)"><ellipse cx="16" cy="10" rx="10" ry="6" fill="#f5a800" stroke="#1a1a00" stroke-width="1"/><rect x="8" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><rect x="13" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><rect x="18" y="7" width="4" ry="2" height="6" fill="#1a1a00" opacity=".7"/><ellipse cx="25" cy="10" rx="4" ry="3" fill="#f5a800" stroke="#1a1a00" stroke-width=".8"/><ellipse cx="7" cy="10" rx="3" ry="2.5" fill="#c8761a" stroke="#1a1a00" stroke-width=".8"/><path d="M10 5 Q12 1 16 3" stroke="#1a1a00" stroke-width=".8" fill="none"/><path d="M19 5 Q21 1 17 3" stroke="#1a1a00" stroke-width=".8" fill="none"/><path d="M22 8 Q28 4 30 7" stroke="#888" stroke-width=".7" fill="rgba(200,220,255,.5)"/><path d="M22 12 Q28 16 30 13" stroke="#888" stroke-width=".7" fill="rgba(200,220,255,.5)"/></g></svg>';
-const HORNET_SVG_SMALL = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16" width="16" height="11"><ellipse cx="12" cy="8" rx="8" ry="5" fill="#f5a800" stroke="#1a1a00" stroke-width="1"/><rect x="6" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><rect x="10" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><rect x="14" y="5.5" width="3" ry="1.5" height="5" fill="#1a1a00" opacity=".7"/><ellipse cx="20" cy="8" rx="3" ry="2" fill="#f5a800" stroke="#1a1a00" stroke-width=".7"/><ellipse cx="4" cy="8" rx="2.5" ry="2" fill="#c8761a" stroke="#1a1a00" stroke-width=".7"/></svg>';
+// SVG iconen — gebaseerd op illustratie (hoornaar, nest, nest geruimd, lokpot)
+const SVG = {
+  hornet_full:        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Vleugels --><ellipse cx="17" cy="10" rx="9" ry="4" fill="rgba(210,230,255,0.75)" stroke="#666" stroke-width="0.6" transform="rotate(-20,17,10)"/><ellipse cx="17" cy="14" rx="7" ry="3" fill="rgba(210,230,255,0.6)" stroke="#666" stroke-width="0.5" transform="rotate(10,17,14)"/><!-- Lijf segmenten geel/zwart --><ellipse cx="14" cy="17" rx="6" ry="4" fill="#f5c800" stroke="#1a0a00" stroke-width="0.8"/><rect x="9" y="15" width="3.5" height="4" rx="1" fill="#1a0a00" opacity="0.85"/><rect x="13.5" y="15" width="3" height="4" rx="1" fill="#1a0a00" opacity="0.85"/><rect x="17" y="15" width="2.5" height="4" rx="1" fill="#1a0a00" opacity="0.75"/><!-- Achterlijf punt --><path d="M20 17 Q24 17 25 19 Q24 21 20 19 Z" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><!-- Kop --><circle cx="9" cy="16" r="3.5" fill="#1a0a00"/><!-- Oog --><ellipse cx="8" cy="15" rx="1.5" ry="1.8" fill="#f5c800"/><circle cx="8" cy="15" r="0.8" fill="#1a0a00"/><!-- Antennes --><path d="M9 13 Q7 9 5 7" stroke="#1a0a00" stroke-width="0.8" fill="none" stroke-linecap="round"/><path d="M10 13 Q10 8 9 6" stroke="#1a0a00" stroke-width="0.8" fill="none" stroke-linecap="round"/><!-- Poten --><path d="M12 20 Q10 23 8 25" stroke="#1a0a00" stroke-width="0.7" fill="none" stroke-linecap="round"/><path d="M14 21 Q13 24 12 26" stroke="#1a0a00" stroke-width="0.7" fill="none" stroke-linecap="round"/><path d="M16 21 Q16 24 15 26" stroke="#1a0a00" stroke-width="0.7" fill="none" stroke-linecap="round"/></svg>',
+  hornet_small:       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><ellipse cx="11" cy="7" rx="6" ry="2.5" fill="rgba(210,230,255,0.7)" stroke="#888" stroke-width="0.5" transform="rotate(-20,11,7)"/><ellipse cx="9" cy="11" rx="4.5" ry="3" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><rect x="5.5" y="9.5" width="2.5" height="3" rx="0.8" fill="#1a0a00" opacity="0.85"/><rect x="8.5" y="9.5" width="2" height="3" rx="0.8" fill="#1a0a00" opacity="0.8"/><path d="M13 11 Q16 11 17 12.5 Q16 14 13 12.5 Z" fill="#f5c800" stroke="#1a0a00" stroke-width="0.6"/><circle cx="6" cy="10.5" r="2.5" fill="#1a0a00"/><ellipse cx="5.2" cy="10" rx="1" ry="1.2" fill="#f5c800"/></svg>',
+  nest_full:          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Nest bol --><ellipse cx="16" cy="17" rx="12" ry="11" fill="#9e8e7a" stroke="#5a4a3a" stroke-width="1"/><!-- Textuur lijnen --><path d="M8 12 Q16 10 24 12" stroke="#7a6a5a" stroke-width="0.6" fill="none"/><path d="M6 16 Q16 14 26 16" stroke="#7a6a5a" stroke-width="0.6" fill="none"/><path d="M7 20 Q16 18 25 20" stroke="#7a6a5a" stroke-width="0.6" fill="none"/><path d="M9 24 Q16 22 23 24" stroke="#7a6a5a" stroke-width="0.6" fill="none"/><!-- Ingang opening --><ellipse cx="16" cy="17" rx="5" ry="4.5" fill="#2a1a0a" stroke="#1a0a00" stroke-width="0.8"/><ellipse cx="16" cy="17" rx="3.5" ry="3" fill="#0a0500"/><!-- Kleine hoornaar bovenop --><ellipse cx="16" cy="7" rx="3.5" ry="2" fill="#f5c800" stroke="#1a0a00" stroke-width="0.6"/><rect x="13.5" y="6" width="1.5" height="2" rx="0.5" fill="#1a0a00" opacity="0.8"/><rect x="15.5" y="6" width="1.5" height="2" rx="0.5" fill="#1a0a00" opacity="0.8"/><circle cx="12.5" cy="7" r="1.5" fill="#1a0a00"/><path d="M12.5 6 Q11 4 10 3" stroke="#1a0a00" stroke-width="0.6" fill="none"/><ellipse cx="18" cy="5.5" rx="3" ry="1.5" fill="rgba(210,230,255,0.7)" stroke="#666" stroke-width="0.4" transform="rotate(-15,18,5.5)"/></svg>',
+  nest_small:         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><ellipse cx="10" cy="11" rx="8.5" ry="7.5" fill="#9e8e7a" stroke="#5a4a3a" stroke-width="0.8"/><path d="M4 8 Q10 6 16 8" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><path d="M3 12 Q10 10 17 12" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><path d="M4 16 Q10 14 16 16" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><ellipse cx="10" cy="11" rx="3.5" ry="3" fill="#2a1a0a" stroke="#1a0a00" stroke-width="0.7"/><ellipse cx="10" cy="11" rx="2" ry="1.8" fill="#0a0500"/></svg>',
+  nest_geruimd_full:  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Nest bol (wat kleiner, ruimte voor kruis) --><ellipse cx="16" cy="18" rx="11" ry="10" fill="#9e8e7a" stroke="#5a4a3a" stroke-width="1"/><path d="M8 14 Q16 12 24 14" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><path d="M6 18 Q16 16 26 18" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><path d="M7 22 Q16 20 25 22" stroke="#7a6a5a" stroke-width="0.5" fill="none"/><!-- Ingang --><ellipse cx="16" cy="18" rx="4.5" ry="4" fill="#2a1a0a" stroke="#1a0a00" stroke-width="0.7"/><ellipse cx="16" cy="18" rx="3" ry="2.5" fill="#0a0500"/><!-- Rood kruis --><line x1="5" y1="5" x2="27" y2="27" stroke="#cc0000" stroke-width="3.5" stroke-linecap="round"/><line x1="27" y1="5" x2="5" y2="27" stroke="#cc0000" stroke-width="3.5" stroke-linecap="round"/><!-- Kruis rand --><line x1="5" y1="5" x2="27" y2="27" stroke="#ff4444" stroke-width="2" stroke-linecap="round"/><line x1="27" y1="5" x2="5" y2="27" stroke="#ff4444" stroke-width="2" stroke-linecap="round"/></svg>',
+  nest_geruimd_small: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><ellipse cx="10" cy="12" rx="8" ry="7" fill="#9e8e7a" stroke="#5a4a3a" stroke-width="0.8"/><ellipse cx="10" cy="12" rx="3" ry="2.5" fill="#2a1a0a"/><line x1="3" y1="3" x2="17" y2="17" stroke="#cc0000" stroke-width="3" stroke-linecap="round"/><line x1="17" y1="3" x2="3" y2="17" stroke="#cc0000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="3" x2="17" y2="17" stroke="#ff5555" stroke-width="1.5" stroke-linecap="round"/><line x1="17" y1="3" x2="3" y2="17" stroke="#ff5555" stroke-width="1.5" stroke-linecap="round"/></svg>',
+  lokpot_full:        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Cilinder body --><rect x="9" y="14" width="14" height="14" rx="2" fill="#1a1a1a" stroke="#0a0a0a" stroke-width="0.8"/><!-- Geel deksel --><ellipse cx="16" cy="14" rx="7" ry="2.5" fill="#f5c800" stroke="#1a0a00" stroke-width="0.8"/><ellipse cx="16" cy="12.5" rx="7" ry="2.5" fill="#f5c800" stroke="#1a0a00" stroke-width="0.8"/><!-- Deksel zijkant --><rect x="9" y="12.5" width="14" height="1.5" fill="#d4a800"/><!-- Hoornaar op deksel --><ellipse cx="16" cy="10" rx="4" ry="2.2" fill="#f5c800" stroke="#1a0a00" stroke-width="0.6"/><rect x="13.5" y="9" width="1.8" height="2.2" rx="0.5" fill="#1a0a00" opacity="0.8"/><rect x="15.8" y="9" width="1.8" height="2.2" rx="0.5" fill="#1a0a00" opacity="0.8"/><circle cx="12.5" cy="10" r="1.8" fill="#1a0a00"/><ellipse cx="8.5" cy="8" rx="4" ry="1.8" fill="rgba(210,230,255,0.75)" stroke="#666" stroke-width="0.4" transform="rotate(-15,8.5,8)"/><path d="M12 9 Q10 6 9 5" stroke="#1a0a00" stroke-width="0.7" fill="none"/><path d="M13 9 Q12 6 11 5" stroke="#1a0a00" stroke-width="0.7" fill="none"/><!-- Cilinder basis --><ellipse cx="16" cy="28" rx="7" ry="2" fill="#111" stroke="#0a0a0a" stroke-width="0.5"/><!-- Ventilatiesleuven --><line x1="11" y1="18" x2="21" y2="18" stroke="#333" stroke-width="0.8"/><line x1="11" y1="21" x2="21" y2="21" stroke="#333" stroke-width="0.8"/><line x1="11" y1="24" x2="21" y2="24" stroke="#333" stroke-width="0.8"/></svg>',
+  lokpot_small:       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><rect x="6" y="10" width="10" height="9" rx="1.5" fill="#1a1a1a" stroke="#0a0a0a" stroke-width="0.6"/><ellipse cx="11" cy="10" rx="5" ry="1.8" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><ellipse cx="11" cy="8.5" rx="5" ry="1.8" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><rect x="6" y="8.5" width="10" height="1.5" fill="#d4a800"/><ellipse cx="11" cy="19" rx="5" ry="1.5" fill="#111"/></svg>',
+};
 
-function makeDivIcon(html, bg, border, size){
+function makeDivIcon(svgHtml, bg, border, size){
   bg     = bg     || '#1e293b';
   border = border || '#334155';
   size   = size   || 'full';
-  // Vervang 'hornet' placeholder door SVG
-  const svgHtml = html === 'hornet' ? HORNET_SVG_SMALL : html;
   if(size === 'full'){
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:12px;padding:3px 6px;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);white-space:nowrap;display:flex;align-items:center">'+svgHtml+'</div>',
-      iconSize:[36,24], iconAnchor:[18,12]
+      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:12px;padding:3px 5px;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;gap:3px">'+svgHtml+'</div>',
+      iconSize:[36,30], iconAnchor:[18,15]
     });
   } else {
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:10px;padding:3px 5px;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center">'+svgHtml+'</div>',
-      iconSize:[26,22], iconAnchor:[13,11]
+      html:'<div style="background:'+bg+';color:#fff;border:2px solid '+border+';border-radius:10px;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.3);display:flex;align-items:center">'+svgHtml+'</div>',
+      iconSize:[26,24], iconAnchor:[13,12]
     });
   }
 }
@@ -480,11 +486,21 @@ function makeDotIcon(color, letter, size){
   });
 }
 const ICONS = {
-  hoornaar:(a,sz='full')=>makeDivIcon(sz==='full'?(HORNET_SVG_FULL+(a?' <span style="font-size:12px;font-weight:700">\xD7'+a+'</span>':'')):'hornet','#aa2222','#cc3333',sz),
-  nest:        (sz='full')=>makeDivIcon(sz==='full'?'🪹 Nest'          :'🪹','#334466','#556688',sz),
-  nest_geruimd:(sz='full')=>makeDivIcon(sz==='full'?'✅ Geruimd'        :'✅','#1a5c35','#2d8a52',sz),
-  lokpot:      (sz='full')=>makeDivIcon(sz==='full'?'🪤 Lokpot'         :'🪤','#1e4d3b','#2d7a5e',sz),
-  pending:     (sz='full')=>makeDivIcon(sz==='full'?'⏳'                :'⏳','#555','#777',sz),
+  hoornaar:(a,sz='full')=>makeDivIcon(
+    sz==='full'
+      ? SVG.hornet_full + (a ? '<span style="font-size:11px;font-weight:700;color:#fff">\xD7'+a+'</span>' : '')
+      : SVG.hornet_small,
+    '#8b1a1a','#cc2222',sz),
+  nest:(sz='full')=>makeDivIcon(
+    sz==='full' ? SVG.nest_full          : SVG.nest_small,
+    '#3a3a2a','#6a5a3a',sz),
+  nest_geruimd:(sz='full')=>makeDivIcon(
+    sz==='full' ? SVG.nest_geruimd_full  : SVG.nest_geruimd_small,
+    '#1a3a2a','#2d6a4a',sz),
+  lokpot:(sz='full')=>makeDivIcon(
+    sz==='full' ? SVG.lokpot_full        : SVG.lokpot_small,
+    '#1a1a0a','#3a3a1a',sz),
+  pending:(sz='full')=>makeDivIcon(sz==='full'?'\u23F3':'\u23F3','#555','#777',sz),
 };
 // Stip-iconen: kleur + één letter als herkenbaarheid
 const DOTS = {
