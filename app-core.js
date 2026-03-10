@@ -1,4 +1,4 @@
-// app-core.js — Fix 94
+// app-core.js — Fix 95
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -849,14 +849,7 @@ function attachMarkerPopup(marker){
   popup += '</div>';
   marker.unbindPopup();
   marker.bindPopup(popup, {maxWidth:240});
-  // Hover tooltip: alles onder elkaar als platte tekst
-  marker.unbindTooltip();
-  let tipLines = [typeLabel];
-  if(m.date) tipLines.push(`Datum: ${m.date}`);
-  if(m.by)   tipLines.push(`Door: ${m.by}`);
-  if(m.type==='lokpot' && m.sender) tipLines.push(`Zender: ${m.sender==='ja'?'Ja':'Nee'}`);
-  if(m.note) tipLines.push(m.note);
-  marker.bindTooltip(tipLines.join('\n'), {direction:'top', offset:[0,-8], className:'marker-tip'});
+  marker.unbindTooltip(); // geen hover tooltip — klik opent eigenschappen
 }
 function applyPropsToMarker(marker, vals){
   const m=marker._meta||{};
