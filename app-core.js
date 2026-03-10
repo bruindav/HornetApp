@@ -1,4 +1,4 @@
-// app-core.js — Fix 96
+// app-core.js — Fix 97
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -742,6 +742,35 @@ function openPropModal({type, init={}, onSave}){
     if(jaEl) jaEl.checked = (senderVal === 'ja');
     if(neeEl) neeEl.checked = (senderVal !== 'ja');
   }
+  // Nesttype — alleen bij nest
+  const pmNesttypeRow = document.getElementById('pm-nesttype-row');
+  if(pmNesttypeRow) pmNesttypeRow.style.display = (type==='nest' ? 'block' : 'none');
+  if(type==='nest'){
+    const pmNesttype = document.getElementById('pm-nesttype');
+    if(pmNesttype) pmNesttype.value = init.nesttype || '';
+  }
+  // Ruiming — alleen bij nest_geruimd
+  const pmRuimingRow = document.getElementById('pm-ruiming-row');
+  if(pmRuimingRow) pmRuimingRow.style.display = (type==='nest_geruimd' ? 'block' : 'none');
+  if(type==='nest_geruimd'){
+    const pmRuimer  = document.getElementById('pm-ruimer');
+    const pmMethode = document.getElementById('pm-methode');
+    const pmSuccesJa = document.getElementById('pm-succes-ja');
+    const pmSuccesNee= document.getElementById('pm-succes-nee');
+    if(pmRuimer)   pmRuimer.value   = init.ruimer  || '';
+    if(pmMethode)  pmMethode.value  = init.methode || '';
+    if(pmSuccesJa)  pmSuccesJa.checked  = (init.succes === 'ja');
+    if(pmSuccesNee) pmSuccesNee.checked = (init.succes !== 'ja');
+  }
+  // Val-specifiek — alleen bij val
+  const pmValRow = document.getElementById('pm-val-row');
+  if(pmValRow) pmValRow.style.display = (type==='val' ? 'block' : 'none');
+  if(type==='val'){
+    const pmValtype      = document.getElementById('pm-valtype');
+    const pmKoninginnen  = document.getElementById('pm-koninginnen');
+    if(pmValtype)     pmValtype.value     = init.valtype     || '';
+    if(pmKoninginnen) pmKoninginnen.value = init.koninginnen != null ? init.koninginnen : '';
+  }
   // Kleur verbergen (is voor polygonen, niet iconen)
   if(pmColorRow) pmColorRow.classList.add('hidden');
 
@@ -815,6 +844,24 @@ function openPropModal({type, init={}, onSave}){
       const jaEl2 = document.getElementById('pm-sender-ja');
       vals.sender = (jaEl2?.checked) ? 'ja' : 'nee';
     }
+    if(type==='nest'){
+      const v = document.getElementById('pm-nesttype')?.value;
+      if(v) vals.nesttype = v;
+    }
+    if(type==='nest_geruimd'){
+      const r = document.getElementById('pm-ruimer')?.value?.trim();
+      const m = document.getElementById('pm-methode')?.value;
+      const s = document.getElementById('pm-succes-ja')?.checked ? 'ja' : 'nee';
+      if(r) vals.ruimer  = r;
+      if(m) vals.methode = m;
+      vals.succes = s;
+    }
+    if(type==='val'){
+      const vt = document.getElementById('pm-valtype')?.value;
+      const kn = parseInt(document.getElementById('pm-koninginnen')?.value, 10);
+      if(vt) vals.valtype = vt;
+      if(!isNaN(kn)) vals.koninginnen = kn;
+    }
     onSave && onSave(vals); cleanup();
   };
 }
@@ -840,11 +887,21 @@ function attachMarkerPopup(marker){
     :m.type==='nest'?'Nest':m.type==='nest_geruimd'?'Nest geruimd'
     :m.type==='lokpot'?'Lokpot':'Icoon';
   // Popup: alle velden netjes onder elkaar
-  const row = (lbl,val) => `<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:56px">${lbl}</span><span style="font-size:12px;color:#1e293b">${val}</span></div>`;
+  const row = (lbl,val) => '<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:80px">' + lbl + '</span><span style="font-size:12px;color:#1e293b">' + val + '</span></div>';
   let popup = `<div style="min-width:160px"><strong style="font-size:13px">${typeLabel}</strong>`;
   if(m.date) popup += row('Datum', m.date);
   if(m.by)   popup += row('Door', m.by);
-  if(m.type==='lokpot' && m.sender) popup += row('Zender', m.sender==='ja'?'✅ Ja':'❌ Nee');
+  if(m.type==='lokpot' && m.sender) popup += row('Zender', m.sender==='ja'?'Ja':'Nee');
+  if(m.type==='nest' && m.nesttype) popup += row('Nesttype', m.nesttype.charAt(0).toUpperCase()+m.nesttype.slice(1));
+  if(m.type==='nest_geruimd'){
+    if(m.ruimer)  popup += row('Geruimd door', m.ruimer);
+    if(m.methode) popup += row('Methode', m.methode.charAt(0).toUpperCase()+m.methode.slice(1));
+    if(m.succes)  popup += row('Succesvol', m.succes==='ja'?'Ja':'Nee');
+  }
+  if(m.type==='val'){
+    if(m.valtype)           popup += row('Type val', m.valtype.charAt(0).toUpperCase()+m.valtype.slice(1));
+    if(m.koninginnen!=null) popup += row('Koninginnen', String(m.koninginnen));
+  }
   if(m.note) popup += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">${m.note}</div>`;
   popup += '</div>';
   marker.unbindPopup();

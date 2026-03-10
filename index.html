@@ -278,6 +278,55 @@
                 <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-sender" id="pm-sender-nee" value="nee" checked/> Nee</label>
               </label>
             </div>
+
+            <!-- Nest gevonden: nesttype -->
+            <div id="pm-nesttype-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block">Nesttype
+                <select id="pm-nesttype" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="embryonaal">Embryonaal</option>
+                  <option value="primair">Primair</option>
+                  <option value="secundair">Secundair</option>
+                  <option value="verlaten">Verlaten</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Nest geruimd: ruimer, methode, succes -->
+            <div id="pm-ruiming-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block;margin-bottom:6px">Geruimd door
+                <input id="pm-ruimer" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px" placeholder="Naam ruimer"/>
+              </label>
+              <label style="font-size:13px;display:block;margin-bottom:6px">Methode
+                <select id="pm-methode" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="wegzuigen">Wegzuigen</option>
+                  <option value="inspuiten">Inspuiten</option>
+                  <option value="anders">Anders</option>
+                </select>
+              </label>
+              <div style="font-size:13px;margin-bottom:4px">Succesvol geruimd</div>
+              <div style="display:flex;gap:12px">
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-succes" id="pm-succes-ja" value="ja"/> Ja</label>
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-succes" id="pm-succes-nee" value="nee" checked/> Nee</label>
+              </div>
+            </div>
+
+            <!-- Val geplaatst: type val + koninginnen -->
+            <div id="pm-val-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block;margin-bottom:6px">Type val
+                <select id="pm-valtype" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="glazen pot">Glazen pot</option>
+                  <option value="ahembriox">Ahembriox</option>
+                  <option value="anders">Anders</option>
+                </select>
+              </label>
+              <label style="font-size:13px;display:block">Koninginnen gevangen
+                <input id="pm-koninginnen" type="number" min="0" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px" placeholder="0"/>
+              </label>
+            </div>
+
             <label id="pm-note-row" style="font-size:13px;display:block">
               Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
             </label>
