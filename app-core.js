@@ -1,4 +1,4 @@
-// app-core.js — Fix 100
+// app-core.js — Fix 101
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -937,6 +937,18 @@ function applyPropsToMarker(marker, vals){
   if(vals.note!==undefined){ if(vals.note) m.note=vals.note; else delete m.note; }
   if(vals.sender!==undefined){ m.sender=vals.sender; }
   if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; }
+  if(m.type==='nest'){
+    if(vals.nesttype) m.nesttype=vals.nesttype; else delete m.nesttype;
+  }
+  if(m.type==='nest_geruimd'){
+    if(vals.ruimer)  m.ruimer=vals.ruimer;   else delete m.ruimer;
+    if(vals.methode) m.methode=vals.methode; else delete m.methode;
+    if(vals.succes)  m.succes=vals.succes;   else delete m.succes;
+  }
+  if(m.type==='val'){
+    if(vals.valtype)           m.valtype=vals.valtype;         else delete m.valtype;
+    if(vals.koninginnen!=null) m.koninginnen=vals.koninginnen; else delete m.koninginnen;
+  }
   marker.setIcon(getIconForMarker(m));
   marker._meta=m; attachMarkerPopup(marker);
 }
@@ -993,7 +1005,10 @@ function persistMarker(marker){
   const doc = {
     id:m.id, type:m.type, lat:ll.lat, lng:ll.lng,
     date:m.date||null, by:m.by||null, aantal:m.aantal!=null? m.aantal:null,
-    potId:m.potId||null, note:m.note||null, sender:m.sender||null
+    potId:m.potId||null, note:m.note||null, sender:m.sender||null,
+    nesttype:m.nesttype||null,
+    ruimer:m.ruimer||null, methode:m.methode||null, succes:m.succes||null,
+    valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null
   };
   saveMarkerToCloud(doc);
 }
@@ -1378,6 +1393,9 @@ function upsertMarkerFromCloud(doc){
       date: doc.date||null, by: doc.by||null,
       aantal: doc.aantal!=null ? doc.aantal : null,
       note: doc.note||'', sender: doc.sender||null,
+      nesttype: doc.nesttype||null,
+      ruimer: doc.ruimer||null, methode: doc.methode||null, succes: doc.succes||null,
+      valtype: doc.valtype||null, koninginnen: doc.koninginnen!=null ? doc.koninginnen : null,
       // Bron metadata
       source: doc.source||null, externalId: doc.externalId||null,
       gbifKey: doc.gbifKey||null, gbifDataset: doc.gbifDataset||null,
@@ -1421,6 +1439,12 @@ function upsertMarkerFromCloud(doc){
     m._meta.aantal = (doc.aantal!=null ? doc.aantal : null);
     m._meta.note = doc.note||'';
     m._meta.sender = doc.sender||null;
+    m._meta.nesttype = doc.nesttype||null;
+    m._meta.ruimer = doc.ruimer||null;
+    m._meta.methode = doc.methode||null;
+    m._meta.succes = doc.succes||null;
+    m._meta.valtype = doc.valtype||null;
+    m._meta.koninginnen = doc.koninginnen!=null ? doc.koninginnen : null;
     m._meta.source = doc.source||null;
     m._meta.externalId = doc.externalId||null;
     m._meta.gbifKey = doc.gbifKey||null;
