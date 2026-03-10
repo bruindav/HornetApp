@@ -1,4 +1,4 @@
-// app-core.js — Fix 90
+// app-core.js — Fix 91
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -452,21 +452,21 @@ const IMG = {
   val_small: '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAA8AAAAUCAYAAABSx2cSAAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAAAD+UlEQVR42m1Ub2iVZRw9z/O8733f+2fb3b9m22Q6h27u7pout+WfXiorAyuLLhSILDJSwiIq+tZ1GFRkH4IyGmSQouQisSaTptiltYz5h1UsyyJ1U+eW2+7dvffdfd/neX59qBVE5+PhcA7nwzkM/4NkEhwAurqg57nnnRVREWEvEtHC4lx0O1Ipj+28v+Xh4qD5+BzRQXD7u7ePfDvxr0mSZ88fbTQ4v5c0tRekOh3Nle7tSqUkAYw9d3dsi2WLPZqhkoAsAdcINMEBD5qqhRAhYqiRkt5XxD4LAJM8447uGfx5ls2nPNUeq6KIqo6AG1JprorCm4lo+8Sc2qxHR88tXlKznJFYKaAXSINb15XsYyfjzTtcra5s+vHCMQDY+IhTe0vIeocxtkFrHZSer6SSX1zw8MwPxwamAeDTpqWbI5bZwE7HY17UFMal7Ny63WsW80ZP92qGEtctgIjAOYfgDNrzrg1bYsMb309WLA0FUjO+dI1RX62PCH58Ucj88rbxNJsoCYWCGtI0TUNKCaU1lCelHzCq78x4qWWWYbuapsY8dR8DgO7Gxo41tvm1DxjddVE9Fba5rQiSNKA08iCU5ub0zkmXm1LPnstn12+9eGmYE8APr15U9lF9OYTWqnN0hofTWaR9D0Jr+KZA1JN4ejzHmNJ6b22R3tu+NEcA5wzQNe5c03hx0PhwYTGFNbBtPItKAjKmgXDBx7bxLMKa2AeVQZosskvqbmbaGKA5AOQZ62VZF5fDlrGvpghRT2PLWBo1WRdbx9IoK0jsqy6iq0W2UJm8fzNd+AoARBLgMliezpdam0KEqusCejQc4CtnC2ibcWEAOLAggou2oUsMwRRRX++Joe5kMsk5HId3nz3rM8beNS2TBwh0xRKYMjgiGpjmDL9xDZOIK6lZNue9CgAjIyOMd6VSCgAPFQo9eU8NBwOm0TmW1jWuj96wQFVBYccNV1qM0XQu/97xk2fOJ5NJ3tPTozgASjoO3/f54Oz13FznE1czfpOraH+I0cEIxycVtq73tNE5lpm1p3NJAGgeGWH/dN51+bIeqa0N7vZZd4Ovlx26NcLPlEeoSgTkWMg0/mAsfU/WL1lFfK2pKg6/MpQqEMD5LoAYYLxUVtrTEAo+8ItbeLmvzH62wgxwCJhWwZ84UBW643clX6i3rbVPVosjW+vqbI6/ts4G4y2HMx2rqT+2/LX5lT320LrEow92vLXxrtYl81x/c9OudMftNLQifrQVMDHQEusbb2ul/tjyNwHglOMYiQTEf5+FEgkBACdaml6/0baKBuPNKXwTj/2aaol9DAB/CxgAJBIJ4TiOMX9JANgpxzEAINXSvH8g3vzTn/Cs3dULRJmNAAAAAElFTkSuQmCC" width="15" height="20" style="display:inline-block;vertical-align:middle">',
 };
 
-function makeDivIcon(imgHtml, bg, border, size){
-  bg     = bg     || '#1e293b';
-  border = border || '#334155';
-  size   = size   || 'full';
+function makeDivIcon(imgHtml, _bg, _border, size){
+  // Geen achtergrondvlakje — alleen het icoon met drop-shadow voor zichtbaarheid
+  size = size || 'full';
+  const shadow = 'filter:drop-shadow(0 1px 3px rgba(0,0,0,.9)) drop-shadow(0 0 2px rgba(0,0,0,.7))';
   if(size === 'full'){
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:'+bg+';border:2px solid '+border+';border-radius:10px;padding:3px 5px;box-shadow:0 2px 8px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;gap:2px;min-width:28px;min-height:28px">'+imgHtml+'</div>',
-      iconSize:[40,36], iconAnchor:[20,18]
+      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;gap:3px;'+shadow+'">'+imgHtml+'</div>',
+      iconSize:[40,40], iconAnchor:[20,20]
     });
   } else {
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:'+bg+';border:2px solid '+border+';border-radius:8px;padding:2px 4px;box-shadow:0 1px 4px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;min-width:20px;min-height:20px">'+imgHtml+'</div>',
-      iconSize:[28,26], iconAnchor:[14,13]
+      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;'+shadow+'">'+imgHtml+'</div>',
+      iconSize:[26,26], iconAnchor:[13,13]
     });
   }
 }
@@ -490,22 +490,22 @@ function makeDotIcon(color, letter, size){
 const ICONS = {
   hoornaar:(a,sz='full')=>makeDivIcon(
     sz==='full'
-      ? IMG.hoornaar_full + (a ? '<span style="font-size:11px;font-weight:700;color:#fff">\xD7'+a+'</span>' : '')
+      ? IMG.hoornaar_full + (a ? '<span style="font-size:10px;font-weight:900;color:#fff;text-shadow:0 0 3px #000,0 0 3px #000;line-height:1">\xD7'+a+'</span>' : '')
       : IMG.hoornaar_small,
-    '#8b1a1a','#cc2222',sz),
+    '','',sz),
   nest:(sz='full')=>makeDivIcon(
     sz==='full' ? IMG.nest_full          : IMG.nest_small,
-    '#3a3a2a','#6a5a3a',sz),
+    '','',sz),
   nest_geruimd:(sz='full')=>makeDivIcon(
     sz==='full' ? IMG.nest_geruimd_full  : IMG.nest_geruimd_small,
-    '#1a3a2a','#2d6a4a',sz),
+    '','',sz),
   lokpot:(sz='full')=>makeDivIcon(
     sz==='full' ? IMG.lokpot_full        : IMG.lokpot_small,
-    '#1a1a0a','#3a3a1a',sz),
+    '','',sz),
   val:(sz='full')=>makeDivIcon(
     sz==='full' ? IMG.val_full          : IMG.val_small,
-    '#5a3a1a','#8b6030',sz),
-  pending:(sz='full')=>makeDivIcon(sz==='full'?'\u23F3':'\u23F3','#555','#777',sz),
+    '','',sz),
+  pending:(sz='full')=>makeDivIcon(sz==='full'?'\u23F3':'\u23F3','','',sz),
 };
 // Stip-iconen: kleur + één letter als herkenbaarheid
 const DOTS = {
