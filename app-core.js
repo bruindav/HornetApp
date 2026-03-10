@@ -1,4 +1,4 @@
-// app-core.js — Fix 88
+// app-core.js — Fix 89
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -304,11 +304,11 @@ function initUIBindings(){
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
   // Live update bij checkbox wijziging
-  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending','f_poly_outline'].forEach(id => {
+  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_type_pending','f_poly_outline'].forEach(id => {
     const el = $(id); if(el) el.addEventListener('change', applyFilters);
   });
   on(req('reset-filters'), 'click', ()=>{
-    ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_pending']
+    ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_type_pending']
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
     const sl = $('f_period_slider'); if(sl){ sl.value='0'; updatePeriodLabel(0); }
     const fo = $('f_poly_outline'); if(fo) fo.checked = false;
@@ -448,6 +448,8 @@ const SVG = {
   nest_geruimd_small: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><ellipse cx="10" cy="12" rx="8" ry="7" fill="#9e8e7a" stroke="#5a4a3a" stroke-width="0.8"/><ellipse cx="10" cy="12" rx="3" ry="2.5" fill="#2a1a0a"/><line x1="3" y1="3" x2="17" y2="17" stroke="#cc0000" stroke-width="3" stroke-linecap="round"/><line x1="17" y1="3" x2="3" y2="17" stroke="#cc0000" stroke-width="3" stroke-linecap="round"/><line x1="3" y1="3" x2="17" y2="17" stroke="#ff5555" stroke-width="1.5" stroke-linecap="round"/><line x1="17" y1="3" x2="3" y2="17" stroke="#ff5555" stroke-width="1.5" stroke-linecap="round"/></svg>',
   lokpot_full:        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Cilinder body --><rect x="9" y="14" width="14" height="14" rx="2" fill="#1a1a1a" stroke="#0a0a0a" stroke-width="0.8"/><!-- Geel deksel --><ellipse cx="16" cy="14" rx="7" ry="2.5" fill="#f5c800" stroke="#1a0a00" stroke-width="0.8"/><ellipse cx="16" cy="12.5" rx="7" ry="2.5" fill="#f5c800" stroke="#1a0a00" stroke-width="0.8"/><!-- Deksel zijkant --><rect x="9" y="12.5" width="14" height="1.5" fill="#d4a800"/><!-- Hoornaar op deksel --><ellipse cx="16" cy="10" rx="4" ry="2.2" fill="#f5c800" stroke="#1a0a00" stroke-width="0.6"/><rect x="13.5" y="9" width="1.8" height="2.2" rx="0.5" fill="#1a0a00" opacity="0.8"/><rect x="15.8" y="9" width="1.8" height="2.2" rx="0.5" fill="#1a0a00" opacity="0.8"/><circle cx="12.5" cy="10" r="1.8" fill="#1a0a00"/><ellipse cx="8.5" cy="8" rx="4" ry="1.8" fill="rgba(210,230,255,0.75)" stroke="#666" stroke-width="0.4" transform="rotate(-15,8.5,8)"/><path d="M12 9 Q10 6 9 5" stroke="#1a0a00" stroke-width="0.7" fill="none"/><path d="M13 9 Q12 6 11 5" stroke="#1a0a00" stroke-width="0.7" fill="none"/><!-- Cilinder basis --><ellipse cx="16" cy="28" rx="7" ry="2" fill="#111" stroke="#0a0a0a" stroke-width="0.5"/><!-- Ventilatiesleuven --><line x1="11" y1="18" x2="21" y2="18" stroke="#333" stroke-width="0.8"/><line x1="11" y1="21" x2="21" y2="21" stroke="#333" stroke-width="0.8"/><line x1="11" y1="24" x2="21" y2="24" stroke="#333" stroke-width="0.8"/></svg>',
   lokpot_small:       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><rect x="6" y="10" width="10" height="9" rx="1.5" fill="#1a1a1a" stroke="#0a0a0a" stroke-width="0.6"/><ellipse cx="11" cy="10" rx="5" ry="1.8" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><ellipse cx="11" cy="8.5" rx="5" ry="1.8" fill="#f5c800" stroke="#1a0a00" stroke-width="0.7"/><rect x="6" y="8.5" width="10" height="1.5" fill="#d4a800"/><ellipse cx="11" cy="19" rx="5" ry="1.5" fill="#111"/></svg>',
+  val_full:           '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="22" height="22"><!-- Houten basis --><rect x="4" y="22" width="24" height="6" rx="2" fill="#c8a46a" stroke="#8b6a30" stroke-width="1"/><line x1="8" y1="22" x2="8" y2="28" stroke="#8b6a30" stroke-width="0.5"/><line x1="16" y1="22" x2="16" y2="28" stroke="#8b6a30" stroke-width="0.5"/><line x1="24" y1="22" x2="24" y2="28" stroke="#8b6a30" stroke-width="0.5"/><!-- Veerspanning boog (metalen beugel gespannen) --><path d="M7 22 Q7 8 16 6 Q25 8 25 22" stroke="#333" stroke-width="2.5" fill="none" stroke-linecap="round"/><!-- Beugel highlight --><path d="M7 22 Q7 9 16 7 Q25 9 25 22" stroke="#666" stroke-width="1" fill="none" stroke-linecap="round"/><!-- Trigger plaatje --><rect x="13" y="17" width="6" height="3" rx="1" fill="#888" stroke="#555" stroke-width="0.7"/><!-- Veer spiraal --><circle cx="8" cy="21" r="2" fill="none" stroke="#555" stroke-width="1.2"/><circle cx="24" cy="21" r="2" fill="none" stroke="#555" stroke-width="1.2"/><!-- Slotpen --><line x1="8" y1="19" x2="8" y2="23" stroke="#333" stroke-width="1.2" stroke-linecap="round"/><line x1="24" y1="19" x2="24" y2="23" stroke="#333" stroke-width="1.2" stroke-linecap="round"/></svg>',
+  val_small:          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" width="16" height="16"><rect x="2" y="14" width="16" height="4" rx="1.5" fill="#c8a46a" stroke="#8b6a30" stroke-width="0.8"/><path d="M4 14 Q4 5 10 4 Q16 5 16 14" stroke="#333" stroke-width="2" fill="none" stroke-linecap="round"/><rect x="8" y="11" width="4" height="2" rx="0.8" fill="#888" stroke="#555" stroke-width="0.5"/><circle cx="4" cy="13" r="1.5" fill="none" stroke="#555" stroke-width="1"/><circle cx="16" cy="13" r="1.5" fill="none" stroke="#555" stroke-width="1"/></svg>',
 };
 
 function makeDivIcon(svgHtml, bg, border, size){
@@ -500,6 +502,9 @@ const ICONS = {
   lokpot:(sz='full')=>makeDivIcon(
     sz==='full' ? SVG.lokpot_full        : SVG.lokpot_small,
     '#1a1a0a','#3a3a1a',sz),
+  val:(sz='full')=>makeDivIcon(
+    sz==='full' ? SVG.val_full          : SVG.val_small,
+    '#5a3a1a','#8b6030',sz),
   pending:(sz='full')=>makeDivIcon(sz==='full'?'\u23F3':'\u23F3','#555','#777',sz),
 };
 // Stip-iconen: kleur + één letter als herkenbaarheid
@@ -508,6 +513,7 @@ const DOTS = {
   nest:     (sz)=>makeDotIcon('#334466', (sz===true||sz==='micro')?'':'N', sz==='micro'?5:sz===true?8:13),
   nest_geruimd:(sz)=>makeDotIcon('#1a7a40',(sz===true||sz==='micro')?'':'G', sz==='micro'?5:sz===true?8:13),
   lokpot:   (sz)=>makeDotIcon('#2d6b50', (sz===true||sz==='micro')?'':'L', sz==='micro'?5:sz===true?8:13),
+  val:      (sz)=>makeDotIcon('#8b6030', (sz===true||sz==='micro')?'':'V', sz==='micro'?5:sz===true?8:13),
   pending:  (sz)=>makeDotIcon('#888888', (sz===true||sz==='micro')?'':'?', sz==='micro'?5:sz===true?8:13),
 };
 
@@ -606,10 +612,11 @@ function openMapContextMenu(latlng, x, y){
   const el=document.createElement('div');
   el.className='ctx-menu';
   el.innerHTML=`<h4>Nieuw icoon</h4>
-  <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
-  <button data-act="mk" data-type="nest">🪹 Nest</button>
-  <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
-  <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+  <button data-act="mk" data-type="hoornaar">Waarneming</button>
+  <button data-act="mk" data-type="nest">Nest gevonden</button>
+  <button data-act="mk" data-type="nest_geruimd">Nest geruimd</button>
+  <button data-act="mk" data-type="lokpot">Lokpot</button>
+  <button data-act="mk" data-type="val">Val geplaatst</button>`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return;
     closeContextMenu();
@@ -716,7 +723,7 @@ function openPropModal({type, init={}, onSave}){
   const pmTitle   = document.getElementById('pm-title');
   const pmColorRow= document.getElementById('pm-color-row');
   // Titel
-  const titles = { hoornaar:'🐝 Waarneming', nest:'🪹 Nest', nest_geruimd:'✅ Nest geruimd', lokpot:'🪤 Lokpot' };
+  const titles = { hoornaar:'Waarneming', nest:'Nest gevonden', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val geplaatst' };
   if(pmTitle) pmTitle.textContent = titles[type] || 'Icoon eigenschappen';
   // Velden vullen
   const pmNote2 = document.getElementById('pm-note');
@@ -1203,10 +1210,11 @@ function openUnifiedContextMenu(opts){
   }
   if(canWrite()){
     html += `<h4>Nieuw icoon</h4>
-    <button data-act="mk" data-type="hoornaar">🐝 Waarneming</button>
-    <button data-act="mk" data-type="nest">🪹 Nest</button>
-    <button data-act="mk" data-type="nest_geruimd">✅ Nest geruimd</button>
-    <button data-act="mk" data-type="lokpot">🪤 Lokpot</button>`;
+    <button data-act="mk" data-type="hoornaar">Waarneming</button>
+    <button data-act="mk" data-type="nest">Nest gevonden</button>
+    <button data-act="mk" data-type="nest_geruimd">Nest geruimd</button>
+    <button data-act="mk" data-type="lokpot">Lokpot</button>
+    <button data-act="mk" data-type="val">Val geplaatst</button>`;
   }
   if(!html) return; // niets te tonen
   el.innerHTML=html;
@@ -1231,6 +1239,7 @@ function getActiveFilters(){ return {
   nest: !!$('f_type_nest')?.checked,
   nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
   lokpot: !!$('f_type_lokpot')?.checked,
+  val: !!$('f_type_val')?.checked,
   pending: !!$('f_type_pending')?.checked,
   dateFrom: (()=>{
     const idx = parseInt($('f_period_slider')?.value||'0', 10);
@@ -1582,18 +1591,19 @@ function pointInPolygon(lat, lng, latlngs) {
   return inside;
 }
 
-function emptyCount() { return { waarnemingen:0, lokpotten:0, nesten:0, geruimd:0 }; }
+function emptyCount() { return { waarnemingen:0, lokpotten:0, nesten:0, geruimd:0, vallen:0 }; }
 function addCount(c, type) {
   if (type==='hoornaar') c.waarnemingen++;
   else if (type==='lokpot') c.lokpotten++;
   else if (type==='nest') c.nesten++;
   else if (type==='nest_geruimd') c.geruimd++;
+  else if (type==='val') c.vallen++;
 }
-function rowTotal(c) { return c.waarnemingen+c.lokpotten+c.nesten+c.geruimd; }
+function rowTotal(c) { return c.waarnemingen+c.lokpotten+c.nesten+c.geruimd+c.vallen; }
 
 function renderCountCells(c) {
-  const v = (n, col) => `<td style="text-align:center;padding:3px 4px;color:${n?col:'#cbd5e1'}">${n||'–'}</td>`;
-  return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40');
+  const v = (n, col) => '<td style="text-align:center;padding:3px 4px;color:' + (n?col:'#cbd5e1') + '">' + (n||'\u2013') + '</td>';
+  return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40') + v(c.vallen,'#8b6030');
 }
 
 async function loadReport(days) {
@@ -1617,10 +1627,11 @@ async function loadReport(days) {
     const HDR = `<table style="width:100%;border-collapse:collapse;font-size:11px">
       <thead><tr style="border-bottom:2px solid #e2e8f0;color:#94a3b8">
         <th style="text-align:left;padding:3px 4px">Gebied / Polygoon</th>
-        <th style="text-align:center;padding:3px 4px" title="Waarnemingen">🐝</th>
-        <th style="text-align:center;padding:3px 4px" title="Lokpotten">🪤</th>
-        <th style="text-align:center;padding:3px 4px" title="Nesten">🪹</th>
-        <th style="text-align:center;padding:3px 4px" title="Geruimd">✅</th>
+        <th style="text-align:center;padding:3px 4px" title="Waarnemingen">W</th>
+        <th style="text-align:center;padding:3px 4px" title="Lokpotten">L</th>
+        <th style="text-align:center;padding:3px 4px" title="Nesten">N</th>
+        <th style="text-align:center;padding:3px 4px" title="Geruimd">G</th>
+        <th style="text-align:center;padding:3px 4px" title="Vallen">V</th>
       </tr></thead><tbody>`;
 
     let totAll = emptyCount();
@@ -1673,7 +1684,7 @@ async function loadReport(days) {
 
       // Zone kopregel
       html += `<tr style="background:#f1f5f9">
-        <td colspan="5" style="padding:5px 4px;font-weight:700;color:#1e293b;font-size:12px">${zone}</td>
+        <td colspan="6" style="padding:5px 4px;font-weight:700;color:#1e293b;font-size:12px">${zone}</td>
       </tr>`;
 
       // Polygoon rijen
@@ -1701,7 +1712,7 @@ async function loadReport(days) {
 
       // Optellen bij eindtotaal
       totAll.waarnemingen+=zoneCount.waarnemingen; totAll.lokpotten+=zoneCount.lokpotten;
-      totAll.nesten+=zoneCount.nesten; totAll.geruimd+=zoneCount.geruimd;
+      totAll.nesten+=zoneCount.nesten; totAll.geruimd+=zoneCount.geruimd; totAll.vallen+=zoneCount.vallen;
     }
 
     if (!anyData) {
