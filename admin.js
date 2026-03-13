@@ -1,4 +1,4 @@
-// admin.js — Fix 86
+// admin.js — Fix 102
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -102,10 +102,11 @@ function createOverlay() {
         <strong>⚙️ Beheer</strong>
         <button id="admin-close" title="Sluiten">✕</button>
       </div>
-      <div class="adm-tabs">
-        <button class="adm-tab active" data-tab="users">👥 Gebruikers</button>
-        <button class="adm-tab" data-tab="sync">📄 CSV Import</button>
-        <button class="adm-tab" data-tab="gbif">🌍 GBIF Sync</button>
+      <div class="adm-tabs" id="adm-tabs-bar">
+        <button class="adm-tab adm-tab-admin active" data-tab="users">👥 Gebruikers</button>
+        <button class="adm-tab adm-tab-admin" data-tab="sync">📄 CSV Import</button>
+        <button class="adm-tab adm-tab-admin" data-tab="gbif">🌍 GBIF Sync</button>
+        <button class="adm-tab" data-tab="overzicht">📊 Overzicht</button>
       </div>
       <div id="admin-body"><p style="color:#64748b;padding:12px">Laden…</p></div>
       <p id="admin-footer">
@@ -124,6 +125,7 @@ function createOverlay() {
       if (btn.dataset.tab === 'users') startListening();
       else if (btn.dataset.tab === 'sync') openSyncTab();
       else if (btn.dataset.tab === 'gbif') openGbifTab();
+      else if (btn.dataset.tab === 'overzicht') openOverzichtTab();
     });
   });
 }
@@ -133,30 +135,48 @@ function setAdminBody(html) {
   if (body) body.innerHTML = html;
 }
 
-export async function openAdminOverlay() {
+export async function openAdminOverlay(callerRole) {
   const uid = auth.currentUser?.uid;
   if (!uid) { alert('Niet ingelogd.'); return; }
   _adminUid = uid;
 
   createOverlay();
   document.getElementById('admin-overlay').classList.add('open');
-  setAdminBody('<p style="color:#64748b;padding:12px">Controleren…</p>');
 
-  let myRole;
-  try {
-    const mySnap = await getDoc(doc(db, 'roles', uid));
-    myRole = mySnap.data()?.role;
-  } catch (e) {
-    setAdminBody(`<p style="color:red;padding:12px">Fout bij rolcheck: ${e.code} — ${e.message}</p>`);
-    return;
+  // Role bepalen: gebruik meegegeven rol (sneller), of haal op uit Firestore
+  let myRole = callerRole;
+  if (!myRole) {
+    try {
+      const mySnap = await getDoc(doc(db, 'roles', uid));
+      myRole = mySnap.data()?.role;
+    } catch (e) {
+      setAdminBody(`<p style="color:red;padding:12px">Fout bij rolcheck: ${e.code} — ${e.message}</p>`);
+      return;
+    }
   }
 
-  if (myRole !== 'admin') {
+  const isAdmin = myRole === 'admin';
+
+  // Admin-only tabs tonen/verbergen
+  document.querySelectorAll('.adm-tab-admin').forEach(tab => {
+    tab.style.display = isAdmin ? '' : 'none';
+  });
+
+  if (isAdmin) {
+    // Admin: standaard op Gebruikers tab
+    document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
+    const usersTab = document.querySelector('.adm-tab[data-tab="users"]');
+    if (usersTab) usersTab.classList.add('active');
+    startListening();
+  } else if (myRole === 'manager' || myRole === 'volunteer') {
+    // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
+    document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
+    const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
+    if (overzichtTab) overzichtTab.classList.add('active');
+    openOverzichtTab();
+  } else {
     setAdminBody(`<p style="color:red;padding:12px">Geen toegang. Jouw rol is: "${myRole}"</p>`);
-    return;
   }
-
-  startListening();
 }
 
 function closeAdminOverlay() {
@@ -871,3 +891,48 @@ window.adminRemoveZone = async (uid, zone) => {
     alert(`Gebied verwijderen mislukt: ${e.message}`);
   }
 };
+
+// ======================= Overzicht tab =======================
+// Fix 102: overzicht rapport vanuit app-core weergeven in beheer scherm
+let _overzichtLoaded = false;
+
+function openOverzichtTab() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+
+  // Bouw de container — app-core.js vult 'report-content-modal' via loadReportInto()
+  body.innerHTML = `
+    <div style="padding:12px">
+      <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+        <button class="adm-rpt-btn active" data-days="7"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#0aa879;color:#fff;font-size:12px;cursor:pointer">Week</button>
+        <button class="adm-rpt-btn" data-days="14" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">2 weken</button>
+        <button class="adm-rpt-btn" data-days="30" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Maand</button>
+        <button class="adm-rpt-btn" data-days="365" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Jaar</button>
+      </div>
+      <div id="report-content-modal" style="font-size:12px">
+        <span style="color:#94a3b8">Laden...</span>
+      </div>
+    </div>`;
+
+  // Periode knoppen
+  body.querySelectorAll('.adm-rpt-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      body.querySelectorAll('.adm-rpt-btn').forEach(b => {
+        b.style.background = '#fff'; b.style.color = '#1e293b';
+      });
+      btn.style.background = '#0aa879'; btn.style.color = '#fff';
+      _triggerReportLoad(parseInt(btn.dataset.days, 10));
+    });
+  });
+
+  // Laad het rapport via app-core
+  _triggerReportLoad(7);
+}
+
+function _triggerReportLoad(days) {
+  // app-core.js exporteert loadReportInto() vanaf Fix 102
+  // We dispatchen een custom event zodat app-core kan reageren
+  window.dispatchEvent(new CustomEvent('hornet:loadReport', {
+    detail: { days, targetId: 'report-content-modal' }
+  }));
+}

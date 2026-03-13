@@ -1,4 +1,4 @@
-// app-core.js — Fix 101
+// app-core.js — Fix 102
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -330,8 +330,7 @@ function initUIBindings(){
       console.log('[app] Beheer knop geklikt');
       try {
         const { openAdminOverlay } = await import('./admin.js');
-        console.log('[app] openAdminOverlay geïmporteerd, aanroepen...');
-        await openAdminOverlay();
+        await openAdminOverlay(_currentRole);
       } catch(e) {
         console.error('[app] admin overlay fout:', e);
         alert('Beheer kon niet worden geopend: ' + e.message);
@@ -1701,9 +1700,9 @@ function renderCountCells(c) {
   return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40') + v(c.vallen,'#8b6030');
 }
 
-async function loadReport(days) {
+async function loadReport(days, targetId = 'report-content') {
   _reportDays = days;
-  const el = document.getElementById('report-content');
+  const el = document.getElementById(targetId);
   if (!el) return;
   el.innerHTML = '<span style="color:#94a3b8">Laden...</span>';
 
@@ -1829,25 +1828,14 @@ async function loadReport(days) {
 }
 
 function initReportSection() {
+  // Fix 102: overzicht verplaatst naar beheer scherm (modal tab)
   const section = document.getElementById('report-section');
-  if (!section) return;
-  // Tonen voor admin, manager en volunteer
-  if (_currentRole !== 'admin' && _currentRole !== 'manager' && _currentRole !== 'volunteer') return;
-  section.style.display = 'block';
-
-  // Periode knoppen
-  section.querySelectorAll('.rpt-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      section.querySelectorAll('.rpt-btn').forEach(b => {
-        b.style.background = '#fff'; b.style.color = '#1e293b';
-      });
-      btn.style.background = '#0aa879'; btn.style.color = '#fff';
-      loadReport(parseInt(btn.dataset.days, 10));
-    });
+  if (section) section.style.display = 'none';
+  // Custom event listener zodat admin.js loadReport kan aanroepen via modal
+  window.addEventListener('hornet:loadReport', (e) => {
+    const { days, targetId } = e.detail || {};
+    loadReport(days || 7, targetId || 'report-content-modal');
   });
-
-  // Eerste load
-  loadReport(_reportDays);
 }
 
 async function _initUserRole() {
@@ -1897,8 +1885,8 @@ async function _initUserRole() {
     const rawZones = Array.isArray(data?.zones) ? data.zones : [];
     _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
 
-    // Beheer knop tonen als admin
-    if (_currentRole === 'admin') {
+    // Beheer knop tonen voor admin, manager en volunteer (Fix 102)
+    if (_currentRole === 'admin' || _currentRole === 'manager' || _currentRole === 'volunteer') {
       $('btn-admin')?.classList.remove('hidden');
     }
     // Geoman tekenen: alleen tonen voor admin en manager
