@@ -1,4 +1,4 @@
-// app-core.js — Fix 102
+// app-core.js — Fix 103
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1637,11 +1637,22 @@ function boot(){
   const getSelGroup = () => $('sel-group');
   const getSelYear  = () => $('sel-year');
   if(getSelGroup()) getSelGroup().value = saved.group;
-  on(req('apply-scope'), 'click', ()=>{
+
+  // Fix 103: auto-wissel bij wijziging jaar of gebied (geen Toepassen-knop meer nodig)
+  function _doScopeChange() {
     const y = getSelYear()?.value || DEFAULT_YEAR;
     const g = getSelGroup()?.value || DEFAULT_GROUP;
     activateScope(y, g, /*reload=*/true);
+  }
+  // jaar: change event op het select element
+  if(selYear) selYear.addEventListener('change', _doScopeChange);
+  // gebied: change event, ook na _fillZoneDropdown (delegeer via document)
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.id === 'sel-group') _doScopeChange();
   });
+  // apply-scope knop: nog steeds beschikbaar als fallback maar verbergen
+  const applyBtn = $('apply-scope');
+  if (applyBtn) applyBtn.style.display = 'none';
   activateScope(saved.year, saved.group, /*reload=*/true);
   applyFilters();
   // Roles doc controleren: aanmaken als pending bij eerste login, daarna displayName + zones laden
@@ -1721,11 +1732,11 @@ async function loadReport(days, targetId = 'report-content') {
     const HDR = `<table style="width:100%;border-collapse:collapse;font-size:11px">
       <thead><tr style="border-bottom:2px solid #e2e8f0;color:#94a3b8">
         <th style="text-align:left;padding:3px 4px">Gebied / Polygoon</th>
-        <th style="text-align:center;padding:3px 4px" title="Waarnemingen">W</th>
-        <th style="text-align:center;padding:3px 4px" title="Lokpotten">L</th>
-        <th style="text-align:center;padding:3px 4px" title="Nesten">N</th>
-        <th style="text-align:center;padding:3px 4px" title="Geruimd">G</th>
-        <th style="text-align:center;padding:3px 4px" title="Vallen">V</th>
+        <th style="text-align:center;padding:3px 4px;cursor:help" title="Waarneming — hoornaar gezien"><span style="font-size:15px">🐝</span></th>
+        <th style="text-align:center;padding:3px 4px;cursor:help" title="Lokpot geplaatst"><span style="font-size:15px">🪤</span></th>
+        <th style="text-align:center;padding:3px 4px;cursor:help" title="Nest gevonden"><span style="font-size:15px">🪹</span></th>
+        <th style="text-align:center;padding:3px 4px;cursor:help" title="Nest geruimd"><span style="font-size:15px">✅</span></th>
+        <th style="text-align:center;padding:3px 4px;cursor:help" title="Val geplaatst"><span style="font-size:15px">🪝</span></th>
       </tr></thead><tbody>`;
 
     let totAll = emptyCount();
