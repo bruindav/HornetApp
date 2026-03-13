@@ -1019,9 +1019,7 @@ function _renderActionLog(){
     </div>`).join('');
 }
 
-// ======================= Kleur picker modal =======================
-function openColorModal(currentColor, onSave){
-
+// ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
   const m=marker._meta||{};
   const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
