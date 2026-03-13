@@ -1,4 +1,4 @@
-// app-core.js — Fix 103
+// app-core.js — Fix 104
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -413,18 +413,20 @@ async function searchPlaceNL(){
 //   13–14 : klein icoon, alleen emoji
 //   11–12 : gekleurde stip met letter
 //   <= 10 : kleine stip, geen tekst
-// Periode-slider stappen (index 0 = alles, 1..6 = steeds verder terug)
+// Periode-slider stappen (index 0 = alles, 1 = vandaag, 2..7 = steeds verder terug)
 const PERIOD_STEPS = [
-  { label: 'Alles',         days: null },
-  { label: 'Deze week',     days: 7    },
-  { label: '2 weken',       days: 14   },
-  { label: '3 weken',       days: 21   },
-  { label: 'Maand',         days: 30   },
-  { label: 'Half jaar',     days: 183  },
-  { label: 'Jaar',          days: 365  },
+  { label: 'Alles',         days: null    },
+  { label: 'Vandaag',       days: 'today' },
+  { label: 'Deze week',     days: 7       },
+  { label: '2 weken',       days: 14      },
+  { label: '3 weken',       days: 21      },
+  { label: 'Maand',         days: 30      },
+  { label: 'Half jaar',     days: 183     },
+  { label: 'Jaar',          days: 365     },
 ];
 function getDateFrom(days){
   if(!days) return null;
+  if(days === 'today') return new Date().toISOString().slice(0,10); // alleen vandaag
   const d = new Date(); d.setDate(d.getDate() - days);
   return d.toISOString().slice(0,10); // 'YYYY-MM-DD'
 }
@@ -1319,18 +1321,23 @@ function openUnifiedContextMenu(opts){
   document.addEventListener('keydown', escClose); document.addEventListener('click', closeContextMenuOnce, true);
 }
 // ======================= Filters =======================
-function getActiveFilters(){ return {
-  hoornaar: !!$('f_type_hoornaar')?.checked,
-  nest: !!$('f_type_nest')?.checked,
-  nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
-  lokpot: !!$('f_type_lokpot')?.checked,
-  val: !!$('f_type_val')?.checked,
-  pending: !!$('f_type_pending')?.checked,
-  dateFrom: (()=>{
-    const idx = parseInt($('f_period_slider')?.value||'0', 10);
-    return getDateFrom((PERIOD_STEPS[idx]||PERIOD_STEPS[0]).days);
-  })()
-};}
+function getActiveFilters(){ 
+  const idx = parseInt($('f_period_slider')?.value||'0', 10);
+  const step = PERIOD_STEPS[idx] || PERIOD_STEPS[0];
+  const isToday = step.days === 'today';
+  const todayStr = new Date().toISOString().slice(0,10);
+  return {
+    hoornaar: !!$('f_type_hoornaar')?.checked,
+    nest: !!$('f_type_nest')?.checked,
+    nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
+    lokpot: !!$('f_type_lokpot')?.checked,
+    val: !!$('f_type_val')?.checked,
+    pending: !!$('f_type_pending')?.checked,
+    dateFrom: isToday ? todayStr : getDateFrom(step.days),
+    dateOnlyToday: isToday,
+    todayStr: todayStr
+  };
+}
 function updatePeriodLabel(idx){
   const step = PERIOD_STEPS[idx] || PERIOD_STEPS[0];
   const lbl = $('f_period_label');
@@ -1341,7 +1348,12 @@ function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
-    if(f.dateFrom && meta.date){ if(meta.date < f.dateFrom) show=false; }
+    if(f.dateOnlyToday){
+      // Vandaag: alleen iconen waarvan datum === vandaag
+      if(!meta.date || meta.date !== f.todayStr) show=false;
+    } else if(f.dateFrom && meta.date){ 
+      if(meta.date < f.dateFrom) show=false; 
+    }
     if(show) markersGroup.addLayer(m); else markersGroup.removeLayer(m);
   });
   const visiblePotIds=new Set();
@@ -1724,8 +1736,12 @@ async function loadReport(days, targetId = 'report-content') {
       ? Object.keys(ZONE_META)
       : _currentZones.filter(z => ZONE_META[z]);
     const dateFrom = getDateFrom(days);
+    const isToday = days === 'today';
+    const todayStr = new Date().toISOString().slice(0,10);
 
-    const periodLabel = days===7?'afgelopen week':days===14?'afgelopen 2 weken':days===30?'afgelopen maand':'afgelopen jaar';
+    const periodLabel = isToday ? 'vandaag'
+      : days===7?'afgelopen week':days===14?'afgelopen 2 weken'
+      : days===30?'afgelopen maand':days===365?'afgelopen jaar':`afgelopen ${days} dagen`;
 
     let html = `<div style="color:#64748b;font-size:11px;margin-bottom:8px">${periodLabel}</div>`;
 
@@ -1755,7 +1771,9 @@ async function loadReport(days, targetId = 'report-content') {
       const markers = [];
       markerSnap.forEach(d => {
         const data = d.data();
-        if (dateFrom && data.date && data.date < dateFrom) return;
+        if (isToday) {
+          if (!data.date || data.date !== todayStr) return;
+        } else if (dateFrom && data.date && data.date < dateFrom) return;
         markers.push(data);
       });
 

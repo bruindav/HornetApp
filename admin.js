@@ -1,4 +1,4 @@
-// admin.js — Fix 102
+// admin.js — Fix 104
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -122,6 +122,9 @@ function createOverlay() {
     btn.addEventListener('click', () => {
       el.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      // Footer alleen zichtbaar bij Gebruikers-tab (Fix 104)
+      const footer = document.getElementById('admin-footer');
+      if (footer) footer.style.display = btn.dataset.tab === 'users' ? '' : 'none';
       if (btn.dataset.tab === 'users') startListening();
       else if (btn.dataset.tab === 'sync') openSyncTab();
       else if (btn.dataset.tab === 'gbif') openGbifTab();
@@ -167,12 +170,16 @@ export async function openAdminOverlay(callerRole) {
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
     const usersTab = document.querySelector('.adm-tab[data-tab="users"]');
     if (usersTab) usersTab.classList.add('active');
+    const footer = document.getElementById('admin-footer');
+    if (footer) footer.style.display = ''; // zichtbaar bij gebruikers
     startListening();
   } else if (myRole === 'manager' || myRole === 'volunteer') {
     // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
     const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
     if (overzichtTab) overzichtTab.classList.add('active');
+    const footer = document.getElementById('admin-footer');
+    if (footer) footer.style.display = 'none'; // verborgen bij overzicht
     openOverzichtTab();
   } else {
     setAdminBody(`<p style="color:red;padding:12px">Geen toegang. Jouw rol is: "${myRole}"</p>`);
@@ -904,9 +911,10 @@ function openOverzichtTab() {
   body.innerHTML = `
     <div style="padding:12px">
       <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="adm-rpt-btn active" data-days="7"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#0aa879;color:#fff;font-size:12px;cursor:pointer">Week</button>
-        <button class="adm-rpt-btn" data-days="14" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">2 weken</button>
-        <button class="adm-rpt-btn" data-days="30" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Maand</button>
+        <button class="adm-rpt-btn active" data-days="today" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#0aa879;color:#fff;font-size:12px;cursor:pointer">Vandaag</button>
+        <button class="adm-rpt-btn" data-days="7"   style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Week</button>
+        <button class="adm-rpt-btn" data-days="14"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">2 weken</button>
+        <button class="adm-rpt-btn" data-days="30"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Maand</button>
         <button class="adm-rpt-btn" data-days="365" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Jaar</button>
       </div>
       <div id="report-content-modal" style="font-size:12px">
@@ -926,7 +934,7 @@ function openOverzichtTab() {
   });
 
   // Laad het rapport via app-core
-  _triggerReportLoad(7);
+  _triggerReportLoad('today');
 }
 
 function _triggerReportLoad(days) {
