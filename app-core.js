@@ -201,7 +201,16 @@ function initMap(){
     toggle: false,
   });
 
-  // Icoon grootte aanpassen bij zoom
+  // Filter-knop in Geoman toolbar
+  map.pm.Toolbar.createCustomControl({
+    name: 'openFilter',
+    block: 'custom',
+    title: 'Filter',
+    className: 'pm-icon-filter',
+    onClick: () => openFilterModal(),
+    toggle: false,
+  });
+
   map.on('zoomend', () => {
     refreshAllMarkerIcons();
     refreshZoomVisibility();
@@ -619,9 +628,11 @@ function openMapContextMenu(latlng, x, y){
     closeContextMenu();
     openPropModal({
       type:b.dataset.type,
+      init:{ _latlng: latlng },
       onSave:(vals)=>{
         const m = createMarkerWithPropsAt(latlng, b.dataset.type, vals);
         persistMarker(m);
+        _logAction(b.dataset.type, vals);
       }
     });
   });
@@ -660,7 +671,7 @@ function openMarkerContextMenu(marker, x, y){
           }
         });
       } else if(act==='edit'){
-        openPropModal({ type: marker._meta.type, init: marker._meta, onSave:(vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }});
+        openPropModal({ type: marker._meta.type, init: {...marker._meta, _latlng: marker.getLatLng()}, onSave:(vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }});
       } else if(act==='new_line'){
         startSightLine(marker);
       } else if(act==='delete'){
@@ -828,6 +839,28 @@ function openPropModal({type, init={}, onSave}){
   }
   // Modal tonen
   modalEl2.classList.remove('hidden');
+  // Adres ophalen via reverse geocode
+  const pmAddr = document.getElementById('pm-address');
+  if(pmAddr){
+    pmAddr.textContent = '📍 adres ophalen…';
+    const ll = init._latlng || init.latlng;
+    const lat = ll?.lat ?? init.lat;
+    const lng = ll?.lng ?? init.lng;
+    if(lat != null && lng != null){
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`, {headers:{'Accept-Language':'nl'}})
+        .then(r=>r.json())
+        .then(d=>{
+          const a = d.address || {};
+          const road   = a.road || a.pedestrian || a.path || '';
+          const nr     = a.house_number || '';
+          const city   = a.city || a.town || a.village || a.hamlet || '';
+          pmAddr.textContent = '📍 ' + [road + (nr ? ' ' + nr : ''), city].filter(Boolean).join(', ');
+        })
+        .catch(()=>{ pmAddr.textContent = ''; });
+    } else {
+      pmAddr.textContent = '';
+    }
+  }
   function cleanup(){
     if(pmCancel2) pmCancel2.onclick=null;
     if(pmSave2) pmSave2.onclick=null;
@@ -860,7 +893,7 @@ function openPropModal({type, init={}, onSave}){
       if(vt) vals.valtype = vt;
       if(!isNaN(kn)) vals.koninginnen = kn;
     }
-    onSave && onSave(vals); cleanup();
+    onSave && onSave(vals); _logAction(type, vals); cleanup();
   };
 }
 
@@ -877,7 +910,118 @@ function openColorModal(currentColor, onSave){
   if(cmCancel) cmCancel.onclick = ()=>cleanup();
   if(cmSave) cmSave.onclick = ()=>{ onSave && onSave(cmColor?.value || '#0aa879'); cleanup(); };
 }
-// ======================= Marker workflow =======================
+// ======================= Filter modal =======================
+function openFilterModal(){
+  let modal = document.getElementById('filter-modal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'filter-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:20px 24px;min-width:260px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+        <h3 style="margin:0 0 14px;font-size:15px;color:#0f172a">🔽 Filter</h3>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:14px">
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_hoornaar" checked/> 🐝 Waarneming</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_nest" checked/> 🪹 Nest</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_nest_geruimd" checked/> ✅ Nest geruimd</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_lokpot" checked/> 🪤 Lokpot</label>
+          <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_val" checked/> 🪝 Val</label>
+          <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:13px;color:#475569">Periode</span>
+              <span id="fm_period_label" style="font-size:13px;font-weight:600;color:#0aa879">Alles</span>
+            </div>
+            <input type="range" id="fm_period_slider" min="0" max="7" value="0" style="width:100%;accent-color:#0aa879;cursor:pointer"/>
+            <div style="display:flex;justify-content:space-between;margin-top:2px">
+              <span style="font-size:10px;color:#94a3b8">Alles</span>
+              <span style="font-size:10px;color:#94a3b8">1 jaar</span>
+            </div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;border-top:1px solid #e2e8f0;padding-top:10px"><input type="checkbox" id="fm_poly_outline"/> Polygonen alleen omtrek</label>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button id="fm_reset" style="flex:1;padding:8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:13px">Reset</button>
+          <button id="fm_apply" style="flex:2;padding:8px;border-radius:6px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Toepassen</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    // Slider label
+    const sl = modal.querySelector('#fm_period_slider');
+    const lb = modal.querySelector('#fm_period_label');
+    sl.addEventListener('input', ()=>{ lb.textContent = (PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; });
+    // Reset
+    modal.querySelector('#fm_reset').addEventListener('click', ()=>{
+      ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
+      sl.value='0'; lb.textContent='Alles';
+      modal.querySelector('#fm_poly_outline').checked = false;
+    });
+    // Apply
+    modal.querySelector('#fm_apply').addEventListener('click', ()=>{
+      // Sync naar echte filter checkboxen in sidebar
+      [['fm_hoornaar','f_type_hoornaar'],['fm_nest','f_type_nest'],['fm_nest_geruimd','f_type_nest_geruimd'],
+       ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val']].forEach(([src,dst])=>{
+        const srcEl=modal.querySelector('#'+src); const dstEl=$( dst);
+        if(srcEl && dstEl) dstEl.checked=srcEl.checked;
+      });
+      const dstSlider=$('f_period_slider'); if(dstSlider){ dstSlider.value=sl.value; updatePeriodLabel(+sl.value); }
+      const dstOutline=$('f_poly_outline'); if(dstOutline) dstOutline.checked=modal.querySelector('#fm_poly_outline').checked;
+      applyFilters();
+      _closeFilterModal();
+      _updateFilterBadge();
+    });
+    modal.addEventListener('click', e=>{ if(e.target===modal) _closeFilterModal(); });
+  }
+  // Sync huidige staat van sidebar-filters naar modal
+  [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
+   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val']].forEach(([src,dst])=>{
+    const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
+    if(srcEl && dstEl) dstEl.checked=srcEl.checked;
+  });
+  const sl=$('f_period_slider'); const fmSl=modal.querySelector('#fm_period_slider');
+  if(sl && fmSl){ fmSl.value=sl.value; modal.querySelector('#fm_period_label').textContent=(PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; }
+  const fo=$('f_poly_outline'); const fmFo=modal.querySelector('#fm_poly_outline');
+  if(fo && fmFo) fmFo.checked=fo.checked;
+  modal.style.display='flex';
+}
+function _closeFilterModal(){ const m=document.getElementById('filter-modal'); if(m) m.style.display='none'; }
+function _updateFilterBadge(){
+  // Toon badge op filter-knop als filters actief zijn (niet alles aangevinkt en periode=0)
+  const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
+  const period = +($('f_period_slider')?.value||0);
+  const btn = document.querySelector('.pm-icon-filter');
+  if(btn){ btn.classList.toggle('filter-active', !allTypes || period>0); }
+}
+
+// ======================= Actie log =======================
+const _actionLog = [];
+function _logAction(type, meta){
+  const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' };
+  const icons  = { hoornaar:'🐝', nest:'🪹', nest_geruimd:'✅', lokpot:'🪤', val:'🪝', polygon:'⬡' };
+  const label  = labels[type] || type;
+  const icon   = icons[type]  || '📍';
+  const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||'' });
+  if(_actionLog.length > 50) _actionLog.pop();
+  _renderActionLog();
+}
+function _renderActionLog(){
+  const el = document.getElementById('action-log-list');
+  if(!el) return;
+  if(!_actionLog.length){ el.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:6px 0">Nog geen acties deze sessie.</div>'; return; }
+  el.innerHTML = _actionLog.map(a=>`
+    <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #e2e8f0">
+      <span style="font-size:16px;flex-shrink:0">${a.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:#1e293b">${a.label}</div>
+        ${a.note ? `<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.note}</div>`:''}
+      </div>
+      <span style="font-size:11px;color:#94a3b8;flex-shrink:0">${a.time}</span>
+    </div>`).join('');
+}
+
+// ======================= Kleur picker modal =======================
+function openColorModal(currentColor, onSave){
+
 function attachMarkerPopup(marker){
   const m=marker._meta||{};
   const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
@@ -1317,7 +1461,7 @@ function openUnifiedContextMenu(opts){
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     setTimeout(()=>{
-      if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); return; }
+      if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); _logAction(b.dataset.type, {}); return; }
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }

@@ -98,6 +98,9 @@
       .pm-icon-sat::after { content: '🛰️'; }
       .pm-icon-sat.active-sat::after { content: '🗺️'; }
       .pm-icon-sat.active-sat, .pm-icon-sat.active-sat a { background-color: #e8f5f0 !important; }
+      .pm-icon-filter { background-image: none !important; font-size: 16px; line-height: 30px; }
+      .pm-icon-filter::after { content: '🔽'; font-size: 14px; }
+      .pm-icon-filter.filter-active, .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; color: #0aa879 !important; }
 
       /* Kompas control */
       .compass-control { border-radius: 4px; overflow: hidden; }
@@ -206,34 +209,28 @@
             <button id="apply-scope">Toepassen</button>
           </div>
 
-          <h3 style="margin-top:16px">Filters</h3>
-          <div class="grid">
-            <label><input type="checkbox" id="f_type_hoornaar" checked/> Waarneming</label>
-            <label><input type="checkbox" id="f_type_nest" checked/> Nest</label>
-            <label><input type="checkbox" id="f_type_nest_geruimd" checked/> Nest geruimd</label>
-            <label><input type="checkbox" id="f_type_lokpot" checked/> Lokpot (incl. lijnen)</label>
-            <label><input type="checkbox" id="f_type_val" checked/> Val geplaatst</label>
-            <div style="margin-top:4px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                <span style="font-size:12px;color:#64748b">Periode</span>
-                <span id="f_period_label" style="font-size:12px;font-weight:600;color:#0aa879">Alles</span>
-              </div>
-              <input type="range" id="f_period_slider" min="0" max="7" value="0"
-                style="width:100%;accent-color:#0aa879;cursor:pointer"/>
-              <div style="display:flex;justify-content:space-between;margin-top:2px">
-                <span style="font-size:10px;color:#94a3b8">Alles</span>
-                <span style="font-size:10px;color:#94a3b8">1 jaar</span>
-              </div>
-            </div>
-            <div style="display:flex; gap:8px">
-              <button id="apply-filters">Toepassen</button>
-              <button id="reset-filters">Reset</button>
-            </div>
-            <label><input type="checkbox" id="f_poly_outline"/> Polygonen alleen omtrek</label>
+          <!-- Filters verplaatst naar filter popup (🔽 knop in kaart toolbar) -->
+          <!-- Verborgen filter-state elementen — worden gelezen door applyFilters() -->
+          <div style="display:none" aria-hidden="true">
+            <input type="checkbox" id="f_type_hoornaar" checked/>
+            <input type="checkbox" id="f_type_nest" checked/>
+            <input type="checkbox" id="f_type_nest_geruimd" checked/>
+            <input type="checkbox" id="f_type_lokpot" checked/>
+            <input type="checkbox" id="f_type_val" checked/>
+            <input type="range" id="f_period_slider" min="0" max="7" value="0"/>
+            <span id="f_period_label">Alles</span>
+            <input type="checkbox" id="f_poly_outline"/>
+            <button id="apply-filters"></button>
+            <button id="reset-filters"></button>
           </div>
 
 
           <!-- Fix 102: Overzicht verplaatst naar Beheer scherm (tab Overzicht) -->
+
+          <h3 style="margin-top:16px">Mijn acties</h3>
+          <div id="action-log-list" style="font-size:13px;max-height:260px;overflow-y:auto">
+            <div style="color:#94a3b8;font-size:12px;padding:6px 0">Nog geen acties deze sessie.</div>
+          </div>
 
         </aside>
         <div class="content">
@@ -249,6 +246,10 @@
       <div id="prop-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
         <div style="background:#fff;padding:20px;border-radius:10px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
           <h3 id="pm-title" style="margin:0 0 16px;font-size:15px"></h3>
+          <!-- Adres (reverse geocode) -->
+          <div id="pm-address-row" style="font-size:12px;color:#64748b;margin-bottom:10px;min-height:16px">
+            <span id="pm-address">📍 adres ophalen…</span>
+          </div>
           <div class="grid">
             <label style="font-size:13px">Datum <input id="pm-date" type="date" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
             <label style="font-size:13px">Door <input id="pm-by" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
