@@ -63,7 +63,7 @@ function updateSWStatus(){
   }catch{}
 }
 // ======================= Debounce =======================
-const SOFT_MS=150, HARD_MS=300; let DEBOUNCE_MS=SOFT_MS;
+const SOFT_MS=150; let DEBOUNCE_MS=SOFT_MS;
 const shouldDebounce = debounceEventGate(()=>DEBOUNCE_MS);
 // ======================= Map & Layers =======================
 let map; // maak globaal voor jouw tests (typeof map === "object")
@@ -289,6 +289,7 @@ function initUIBindings(){
     // Leaflet invalidate
     setTimeout(()=>{ try{ map?.invalidateSize(); }catch{} }, 150);
   }
+  window._setSidebar = setSidebar;
   on(req('toggle-sidebar'), 'click', ()=>{
     const willOpen = document.body.classList.contains('sidebar-collapsed');
     setSidebar(willOpen); // als dicht → open; als open → dicht
@@ -297,18 +298,14 @@ function initUIBindings(){
   // Init: op mobiel standaard dicht
   if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
 
-  // Harde debounce
-  on(req('hard-debounce'),'change', e=>{
-    DEBOUNCE_MS = e.target.checked ? HARD_MS : SOFT_MS;
-  });
   // Filters
   on(req('apply-filters'), 'click', applyFilters);
   // Live update bij checkbox wijziging
-  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_type_pending','f_poly_outline'].forEach(id => {
+  ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_poly_outline'].forEach(id => {
     const el = $(id); if(el) el.addEventListener('change', applyFilters);
   });
   on(req('reset-filters'), 'click', ()=>{
-    ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_type_pending']
+    ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val']
       .forEach(id => { const el = $(id); if(el) el.checked = true; });
     const sl = $('f_period_slider'); if(sl){ sl.value='0'; updatePeriodLabel(0); }
     const fo = $('f_poly_outline'); if(fo) fo.checked = false;
@@ -1332,7 +1329,6 @@ function getActiveFilters(){
     nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
     lokpot: !!$('f_type_lokpot')?.checked,
     val: !!$('f_type_val')?.checked,
-    pending: !!$('f_type_pending')?.checked,
     dateFrom: isToday ? todayStr : getDateFrom(step.days),
     dateOnlyToday: isToday,
     todayStr: todayStr
@@ -1655,6 +1651,7 @@ function boot(){
     const y = getSelYear()?.value || DEFAULT_YEAR;
     const g = getSelGroup()?.value || DEFAULT_GROUP;
     activateScope(y, g, /*reload=*/true);
+    window._setSidebar?.(false);
   }
   // jaar: change event op het select element
   if(selYear) selYear.addEventListener('change', _doScopeChange);
