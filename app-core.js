@@ -956,11 +956,22 @@ function placeMarkerAt(latlng, type='pending'){
   if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{draggable:false}); marker._meta={id,type,potId}; }
   else { marker=L.marker(latlng,{draggable:false}); marker._meta={id,type:(type||'pending')}; }
   marker.setIcon(getIconForMarker(marker._meta));
-  marker.on('contextmenu',e=>{
+  // Mobiel: long-press opent contextmenu (preventDefault stopt browser download-dialoog)
+  let _mLpTimer = null;
+  marker.on('contextmenu', e=>{
     e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
     if(shouldDebounce()) return;
     openMarkerContextMenu(marker, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
+  marker.on('touchstart', e=>{
+    e.originalEvent?.preventDefault();
+    const t = e.originalEvent?.touches?.[0];
+    _mLpTimer = setTimeout(()=>{
+      if(shouldDebounce()) return;
+      openMarkerContextMenu(marker, t?.clientX||0, t?.clientY||0);
+    }, 600);
+  }, {passive: false});
+  marker.on('touchend touchmove', ()=>clearTimeout(_mLpTimer));
   // Verplaatsen via drag
   if(canWrite()){
     marker.on('drag', () => {
@@ -1417,6 +1428,10 @@ function upsertMarkerFromCloud(doc){
     };
     m.setIcon(getIconForMarker(m._meta));
     m.on('contextmenu',e=>{ e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation(); if(shouldDebounce()) return; openMarkerContextMenu(m, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0); });
+    // Mobiel: long-press opent contextmenu (preventDefault stopt browser download-dialoog)
+    let _mLp = null;
+    m.on('touchstart', e=>{ e.originalEvent?.preventDefault(); const t=e.originalEvent?.touches?.[0]; _mLp=setTimeout(()=>{ if(shouldDebounce())return; openMarkerContextMenu(m, t?.clientX||0, t?.clientY||0); },600); },{passive:false});
+    m.on('touchend touchmove', ()=>clearTimeout(_mLp));
     if(canWrite()){
       m.on('drag', () => {
         if(m._meta?.type === 'lokpot' && m._meta?.potId) {

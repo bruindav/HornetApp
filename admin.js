@@ -80,8 +80,8 @@ function createOverlay() {
       .adm-btn-reject { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
       .adm-btn-delete { background: #fee2e2; color: #991b1b; border: 0; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 12px; }
       .adm-btn-icon { background: none; border: 0; cursor: pointer; font-size: 14px; padding: 2px; }
-      .adm-tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 0; }
-      .adm-tab { padding: 10px 18px; border: 0; background: none; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+      .adm-tabs { display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 0; flex-wrap: wrap; }
+      .adm-tab { padding: 8px 12px; border: 0; background: none; cursor: pointer; font-size: 12px; font-weight: 600; color: #64748b; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
       .adm-tab.active { color: #0aa879; border-bottom-color: #0aa879; }
       .adm-sync-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
       .adm-sync-input { flex: 1; padding: 7px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; font-family: monospace; }
@@ -929,7 +929,7 @@ function openOverzichtTab() {
         b.style.background = '#fff'; b.style.color = '#1e293b';
       });
       btn.style.background = '#0aa879'; btn.style.color = '#fff';
-      _triggerReportLoad(parseInt(btn.dataset.days, 10));
+      const d = btn.dataset.days; _triggerReportLoad(d === 'today' ? 'today' : parseInt(d, 10));
     });
   });
 
