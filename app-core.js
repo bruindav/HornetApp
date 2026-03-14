@@ -1,4 +1,4 @@
-// app-core.js — Fix 115
+// app-core.js — Fix 116
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -947,7 +947,7 @@ function openFilterModal(){
             </div>
           </div>
           <label style="display:flex;align-items:center;gap:8px;border-top:1px solid #e2e8f0;padding-top:10px"><input type="checkbox" id="fm_poly_outline"/> Polygonen alleen omtrek</label>
-          <label style="display:flex;align-items:center;gap:8px;padding-top:4px"><input type="checkbox" id="fm_show_gbif"/> 🌍 Toon GBIF waarnemingen</label>
+          <label style="display:flex;align-items:center;gap:8px;padding-top:4px"><input type="checkbox" id="fm_show_gbif"/> 🌍 Verberg GBIF waarnemingen</label>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px">
           <button id="fm_reset" style="flex:1;padding:8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:13px">Reset</button>
@@ -964,7 +964,7 @@ function openFilterModal(){
       ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
       sl.value='0'; lb.textContent='Alles';
       modal.querySelector('#fm_poly_outline').checked = false;
-      modal.querySelector('#fm_show_gbif').checked = false;
+      modal.querySelector('#fm_show_gbif').checked = false; // uit = GBIF zichtbaar
     });
     // Apply
     modal.querySelector('#fm_apply').addEventListener('click', ()=>{
@@ -1000,7 +1000,7 @@ function _closeFilterModal(){ const m=document.getElementById('filter-modal'); i
 function _updateFilterBadge(){
   const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
   const period = +($('f_period_slider')?.value||0);
-  const gbifOn = !!$('f_show_gbif')?.checked;
+  const gbifOn = !!$('f_show_gbif')?.checked; // checked = verberg GBIF = actief filter
   const btn = document.querySelector('.pm-icon-filter');
   if(btn){ btn.classList.toggle('filter-active', !allTypes || period>0 || gbifOn); }
 }
@@ -1581,7 +1581,7 @@ function getActiveFilters(){
     nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
     lokpot: !!$('f_type_lokpot')?.checked,
     val: !!$('f_type_val')?.checked,
-    showGbif: !!$('f_show_gbif')?.checked,
+    showGbif: !$('f_show_gbif')?.checked,  // checkbox = verberg, dus omgekeerd
     dateFrom: isToday ? todayStr : getDateFrom(step.days),
     dateOnlyToday: isToday,
     todayStr: todayStr
@@ -1697,7 +1697,7 @@ function upsertMarkerFromCloud(doc){
         }
       });
     }
-    allMarkers.push(m); markersGroup.addLayer(m);
+    allMarkers.push(m); markersGroup.addLayer(m); attachMarkerPopup(m);
   } else {
     m.setLatLng([doc.lat, doc.lng]);
     m._meta.type = doc.type;

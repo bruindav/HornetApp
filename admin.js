@@ -1,4 +1,4 @@
-// admin.js — Fix 116
+// admin.js — Fix 117
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -590,6 +590,7 @@ function openGbifTab() {
     '</div>' +
     '<button class="adm-sync-btn" id="gbif-sync-btn">&#9654; Synchroniseren</button>' +
     '<button id="gbif-clean-btn" style="padding:7px 12px;border-radius:6px;border:1px solid #fca5a5;background:#fff;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer">🗑️ Alle GBIF verwijderen</button>' +
+    '<button id="gbif-debug-btn" style="padding:7px 12px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:13px;cursor:pointer">🔍 Toon ruwe velden</button>' +
     '</div>' +
     (lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:0 0 12px">Laatste sync: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : '') +
     '<div id="gbif-log" class="adm-sync-log" style="min-height:80px">' +
@@ -600,6 +601,7 @@ function openGbifTab() {
 
   document.getElementById('gbif-sync-btn')?.addEventListener('click', runGbifSync);
   document.getElementById('gbif-clean-btn')?.addEventListener('click', runGbifCleanup);
+  document.getElementById('gbif-debug-btn')?.addEventListener('click', runGbifDebug);
 }
 
 function logGbif(msg, color) {
@@ -612,6 +614,76 @@ function logGbif(msg, color) {
   line.textContent = new Date().toLocaleTimeString('nl-NL') + ' \u2014 ' + msg;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
+}
+
+async function runGbifDebug() {
+  const log = document.getElementById('gbif-log');
+  if(log) log.innerHTML = '<span style="color:#94a3b8">Eerste waarneming ophalen…</span>';
+  try {
+    const zone = Object.keys(ZONE_WKT)[0];
+    const wkt = ZONE_WKT[zone];
+    const url = GBIF_API + '?taxonKey=' + GBIF_TAXON_KEY +
+      '&geometry=' + encodeURIComponent(wkt) +
+      '&hasCoordinate=true&limit=1';
+    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
+    const data = await resp.json();
+    const o = data.results?.[0];
+    if(!o){ logGbif('Geen resultaten gevonden.', '#f59e0b'); return; }
+
+    // Toon alle velden gesorteerd
+    const relevant = {
+      gbifID: o.gbifID,
+      decimalLatitude: o.decimalLatitude,
+      decimalLongitude: o.decimalLongitude,
+      verbatimLatitude: o.verbatimLatitude,
+      verbatimLongitude: o.verbatimLongitude,
+      coordinateUncertaintyInMeters: o.coordinateUncertaintyInMeters,
+      coordinatePrecision: o.coordinatePrecision,
+      eventDate: o.eventDate,
+      year: o.year, month: o.month, day: o.day,
+      recordedBy: o.recordedBy,
+      identifiedBy: o.identifiedBy,
+      individualCount: o.individualCount,
+      occurrenceRemarks: o.occurrenceRemarks,
+      behavior: o.behavior,
+      lifeStage: o.lifeStage,
+      sex: o.sex,
+      locality: o.locality,
+      municipality: o.municipality,
+      county: o.county,
+      stateProvince: o.stateProvince,
+      country: o.country,
+      basisOfRecord: o.basisOfRecord,
+      datasetName: o.datasetName,
+      collectionCode: o.collectionCode,
+      institutionCode: o.institutionCode,
+      occurrenceID: o.occurrenceID,
+      taxonMatchType: o.taxonMatchType,
+      issues: o.issues,
+      establishmentMeans: o.establishmentMeans,
+    };
+
+    // Toon in log als tabel
+    if(log){
+      let html = '<div style="font-size:11px;font-family:monospace">';
+      html += `<div style="font-weight:700;margin-bottom:6px;color:#0f172a">GBIF occurrence #${o.gbifID} (${zone})</div>`;
+      html += '<table style="border-collapse:collapse;width:100%">';
+      for(const [k,v] of Object.entries(relevant)){
+        const val = v == null ? '<span style="color:#cbd5e1">null</span>' :
+          Array.isArray(v) ? v.join(', ') : String(v);
+        const highlight = ['decimalLatitude','decimalLongitude','verbatimLatitude','verbatimLongitude','coordinateUncertaintyInMeters'].includes(k)
+          ? 'background:#fef3c7' : '';
+        html += `<tr style="${highlight}">
+          <td style="padding:2px 6px;color:#64748b;white-space:nowrap">${k}</td>
+          <td style="padding:2px 6px;color:#1e293b;word-break:break-all">${val}</td>
+        </tr>`;
+      }
+      html += '</table></div>';
+      log.innerHTML = html;
+    }
+  } catch(e) {
+    logGbif('Fout: ' + e.message, '#ef4444');
+  }
 }
 
 async function runGbifCleanup() {
