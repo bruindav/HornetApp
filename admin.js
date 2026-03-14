@@ -1,4 +1,4 @@
-// admin.js — Fix 104
+// admin.js — Fix 112
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -103,10 +103,10 @@ function createOverlay() {
         <button id="admin-close" title="Sluiten">✕</button>
       </div>
       <div class="adm-tabs" id="adm-tabs-bar">
-        <button class="adm-tab adm-tab-admin active" data-tab="users">👥 Gebruikers</button>
+        <button class="adm-tab active" data-tab="overzicht">📊 Overzicht</button>
+        <button class="adm-tab adm-tab-admin" data-tab="users">👥 Gebruikers</button>
         <button class="adm-tab adm-tab-admin" data-tab="sync">📄 CSV Import</button>
         <button class="adm-tab adm-tab-admin" data-tab="gbif">🌍 GBIF Sync</button>
-        <button class="adm-tab" data-tab="overzicht">📊 Overzicht</button>
       </div>
       <div id="admin-body"><p style="color:#64748b;padding:12px">Laden…</p></div>
       <p id="admin-footer">
@@ -958,15 +958,20 @@ function openOverzichtTab() {
   const body = document.getElementById('admin-body');
   if (!body) return;
 
+  const curY = new Date().getFullYear();
+  const yearOpts = Array.from({length: curY - 2019}, (_, i) => curY - i)
+    .map(y => `<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
+
   body.innerHTML = `
     <div style="padding:12px">
-      <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="rpt-year" style="padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;font-size:12px;cursor:pointer">${yearOpts}</select>
         <button class="adm-rpt-btn active" data-days="today" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#0aa879;color:#fff;font-size:12px;cursor:pointer">Vandaag</button>
         <button class="adm-rpt-btn" data-days="7"   style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Week</button>
         <button class="adm-rpt-btn" data-days="14"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">2 weken</button>
         <button class="adm-rpt-btn" data-days="30"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Maand</button>
         <button class="adm-rpt-btn" data-days="365" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Jaar</button>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#475569;margin-left:6px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#475569;margin-left:4px;cursor:pointer">
           <input type="checkbox" id="rpt-exclude-gbif"/> GBIF uitsluiten
         </label>
       </div>
@@ -985,6 +990,11 @@ function openOverzichtTab() {
     });
   });
 
+  body.querySelector('#rpt-year')?.addEventListener('change', () => {
+    const activeBtn = body.querySelector('.adm-rpt-btn[style*="#0aa879"]') || body.querySelector('.adm-rpt-btn');
+    if (activeBtn) { const d = activeBtn.dataset.days; _triggerReportLoad(d === 'today' ? 'today' : parseInt(d, 10)); }
+  });
+
   body.querySelector('#rpt-exclude-gbif')?.addEventListener('change', () => {
     const activeBtn = body.querySelector('.adm-rpt-btn[style*="#0aa879"]') || body.querySelector('.adm-rpt-btn');
     if (activeBtn) {
@@ -998,7 +1008,8 @@ function openOverzichtTab() {
 
 function _triggerReportLoad(days) {
   const excludeGbif = !!document.getElementById('rpt-exclude-gbif')?.checked;
+  const year = document.getElementById('rpt-year')?.value || null;
   window.dispatchEvent(new CustomEvent('hornet:loadReport', {
-    detail: { days, targetId: 'report-content-modal', excludeGbif }
+    detail: { days, targetId: 'report-content-modal', excludeGbif, year }
   }));
 }

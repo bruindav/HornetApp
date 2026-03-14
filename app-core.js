@@ -1,4 +1,4 @@
-// app-core.js — Fix 104
+// app-core.js — Fix 112
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1929,14 +1929,14 @@ function renderCountCells(c) {
   return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40') + v(c.vallen,'#8b6030');
 }
 
-async function loadReport(days, targetId = 'report-content', excludeGbif = false) {
+async function loadReport(days, targetId = 'report-content', excludeGbif = false, reportYear = null) {
   _reportDays = days;
   const el = document.getElementById(targetId);
   if (!el) return;
   el.innerHTML = '<span style="color:#94a3b8">Laden...</span>';
 
   try {
-    const year     = $('sel-year')?.value || DEFAULT_YEAR;
+    const year = reportYear || $('sel-year')?.value || DEFAULT_YEAR;
     // Admin ziet alle zones, manager/volunteer alleen eigen toegewezen zones
     const zones = (_currentRole === 'admin')
       ? Object.keys(ZONE_META)
@@ -2069,8 +2069,8 @@ function initReportSection() {
   if (section) section.style.display = 'none';
   // Custom event listener zodat admin.js loadReport kan aanroepen via modal
   window.addEventListener('hornet:loadReport', (e) => {
-    const { days, targetId, excludeGbif } = e.detail || {};
-    loadReport(days || 7, targetId || 'report-content-modal', !!excludeGbif);
+    const { days, targetId, excludeGbif, year } = e.detail || {};
+    loadReport(days || 7, targetId || 'report-content-modal', !!excludeGbif, year || null);
   });
 }
 
