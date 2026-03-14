@@ -1,4 +1,4 @@
-// admin.js — Fix 114
+// admin.js — Fix 116
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -706,15 +706,23 @@ async function runGbifSync() {
         const rawLng = o.decimalLongitude;
         if (!rawLat || !rawLng) continue;
 
-        // Detecteer afgeronde gridcoördinaten (≤2 decimalen = onnauwkeurig, ~1km+)
-        // Voeg kleine willekeurige spreiding toe zodat gestapelde markers zichtbaar worden
-        const latDecimals = (String(rawLat).split('.')[1] || '').length;
-        const lngDecimals = (String(rawLng).split('.')[1] || '').length;
+        // Gebruik verbatimLatitude/Longitude als die meer decimalen heeft dan decimalLatitude
+        // GBIF rondt decimalLatitude soms af bij ingest; verbatim bevat de originele waarde van waarneming.nl
+        function parseDeg(v) { if(v==null) return null; const n=parseFloat(String(v).replace(',','.')); return isNaN(n)?null:n; }
+        function decimals(v) { return (String(v).split('.')[1]||'').length; }
+        const verbLat = parseDeg(o.verbatimLatitude);
+        const verbLng = parseDeg(o.verbatimLongitude);
+        const useLat = (verbLat != null && decimals(verbLat) > decimals(rawLat)) ? verbLat : rawLat;
+        const useLng = (verbLng != null && decimals(verbLng) > decimals(rawLng)) ? verbLng : rawLng;
+
+        // Detecteer nog steeds afgeronde gridcoördinaten (≤2 decimalen = onnauwkeurig, ~1km+)
+        const latDecimals = decimals(useLat);
+        const lngDecimals = decimals(useLng);
         const isGridSnapped = latDecimals <= 2 || lngDecimals <= 2;
-        // Jitter: max ~200m spreiding (0.002 graden ≈ 200m)
+        // Jitter alleen als echt grid-snapped (verbatim had ook geen betere waarde)
         const jitter = () => (Math.random() - 0.5) * 0.004;
-        const lat = isGridSnapped ? rawLat + jitter() : rawLat;
-        const lng = isGridSnapped ? rawLng + jitter() : rawLng;
+        const lat = isGridSnapped ? useLat + jitter() : useLat;
+        const lng = isGridSnapped ? useLng + jitter() : useLng;
 
         const gbifId   = 'gbif_' + o.gbifID;
 
@@ -792,8 +800,9 @@ async function runGbifSync() {
           gbifCountry:   o.country || '',
         });
         totalImported++;
-        const unc = o.coordinateUncertaintyInMeters;
-        const coordNote = isGridSnapped ? ` ⚠️ grid (±${unc||'?'}m, gespreide coördinaat)` : '';
+        const coordNote = isGridSnapped
+          ? ` ⚠️ grid±${o.coordinateUncertaintyInMeters||'?'}m (gespreide coördinaat)`
+          : (verbLat && decimals(verbLat) > decimals(rawLat) ? ' 📍 verbatim coördinaat' : '');
         logGbif('\u2705 ' + date + ' | ' + (markerType==='nest'?'🪹 Nest':'🐝 Imago') + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : '') + coordNote, '#0aa879');
       }
     }
