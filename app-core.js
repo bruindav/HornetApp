@@ -1838,10 +1838,18 @@ function boot(){
   initUIBindings();
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
-  if(selYear && ![...selYear.options].some(o=>o.value===saved.year)){
-    selYear.insertAdjacentHTML('afterbegin', `<option value="${saved.year}">${saved.year}</option>`);
+  // Jaar dropdown vullen: 2020 t/m huidig jaar (nieuwste bovenaan)
+  if(selYear){
+    selYear.innerHTML = '';
+    const curY = new Date().getFullYear();
+    for(let y = curY; y >= 2020; y--){
+      const opt = document.createElement('option');
+      opt.value = String(y); opt.textContent = String(y);
+      selYear.appendChild(opt);
+    }
+    selYear.value = saved.year;
+    if(!selYear.value) selYear.value = DEFAULT_YEAR;
   }
-  if(selYear) selYear.value = saved.year;
   // sel-group NIET als vaste variabele opslaan: _fillZoneDropdown() vervangt het element later
   const getSelGroup = () => $('sel-group');
   const getSelYear  = () => $('sel-year');
