@@ -210,6 +210,14 @@ function initMap(){
     onClick: () => openFilterModal(),
     toggle: false,
   });
+  // SVG direct in de knop injecteren — CSS ::after werkt niet betrouwbaar in Geoman
+  setTimeout(() => {
+    const filterBtn = document.querySelector('.pm-icon-filter a, .pm-icon-filter button');
+    if (filterBtn) {
+      filterBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" style="display:block;margin:auto"><path fill="#d97706" d="M3 4h18l-7 9v6l-4-2v-4Z"/></svg>`;
+      filterBtn.style.cssText += ';display:flex;align-items:center;justify-content:center;';
+    }
+  }, 200);
 
   map.on('zoomend', () => {
     refreshAllMarkerIcons();
@@ -1000,9 +1008,12 @@ function _closeFilterModal(){ const m=document.getElementById('filter-modal'); i
 function _updateFilterBadge(){
   const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
   const period = +($('f_period_slider')?.value||0);
-  const gbifOn = !!$('f_show_gbif')?.checked; // checked = verberg GBIF = actief filter
-  const btn = document.querySelector('.pm-icon-filter');
-  if(btn){ btn.classList.toggle('filter-active', !allTypes || period>0 || gbifOn); }
+  const gbifOn = !!$('f_show_gbif')?.checked;
+  const active = !allTypes || period>0 || gbifOn;
+  const wrapper = document.querySelector('.pm-icon-filter');
+  if(wrapper) wrapper.classList.toggle('filter-active', active);
+  const svgPath = document.querySelector('.pm-icon-filter path');
+  if(svgPath) svgPath.setAttribute('fill', active ? '#0aa879' : '#d97706');
 }
 
 // ======================= Actie log =======================
