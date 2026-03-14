@@ -727,6 +727,7 @@ async function runGbifSync() {
           gbifIssues:    issues,
           gbifUrl:       o.occurrenceID || ('https://www.gbif.org/occurrence/' + o.gbifID),
           gbifCoordPrec: o.coordinatePrecision != null ? String(o.coordinatePrecision) : '',
+          gbifCoordUncertainty: o.coordinateUncertaintyInMeters != null ? String(o.coordinateUncertaintyInMeters) : '',
           gbifCountry:   o.country || '',
         });
         totalImported++;

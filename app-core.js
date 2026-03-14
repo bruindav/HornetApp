@@ -632,7 +632,7 @@ function openMapContextMenu(latlng, x, y){
       onSave:(vals)=>{
         const m = createMarkerWithPropsAt(latlng, b.dataset.type, vals);
         persistMarker(m);
-        _logAction(b.dataset.type, vals);
+        _logAction(b.dataset.type, vals, m);
       }
     });
   });
@@ -720,7 +720,7 @@ function openLineNoteModal(line){
 }
 // ======================= Modal (icon properties) =======================
 // prop-modal elementen worden in openPropModal opgezocht
-function openPropModal({type, init={}, onSave}){
+function openPropModal({type, init={}, onSave, readOnly=false}){
   const modalEl2 = document.getElementById('prop-modal');
   if(!modalEl2){ console.warn('[UI] prop-modal ontbreekt'); return; }
   const pmDate2   = document.getElementById('pm-date');
@@ -825,6 +825,7 @@ function openPropModal({type, init={}, onSave}){
         srcRow('Registratietype', BASIS[init.gbifBasis] || init.gbifBasis);
         srcRow('Land', init.gbifCountry);
         if (init.gbifCoordPrec) srcRow('Nauwkeurigheid', '±' + init.gbifCoordPrec + 'm');
+        if (init.gbifCoordUncertainty) srcRow('Onzekerheid coord.', '±' + init.gbifCoordUncertainty + 'm');
         if (init.gbifIssues) srcRow('Opmerkingen', init.gbifIssues);
         if (init.gbifUrl) srcRow('GBIF link', 'Bekijk op gbif.org', init.gbifUrl);
       } else {
@@ -837,6 +838,13 @@ function openPropModal({type, init={}, onSave}){
       srcBlock.style.display = 'none';
     }
   }
+  // Read-only modus (geïmporteerde waarnemingen)
+  const ro = readOnly || !onSave;
+  const fields = ['pm-date','pm-by','pm-amount','pm-note','pm-nesttype','pm-ruimer','pm-methode','pm-valtype','pm-koninginnen'];
+  fields.forEach(id=>{ const el=document.getElementById(id); if(el){ el.disabled=ro; el.style.opacity=ro?'0.7':''; } });
+  ['pm-sender-ja','pm-sender-nee','pm-succes-ja','pm-succes-nee'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=ro; });
+  if(pmSave2) pmSave2.style.display = ro ? 'none' : '';
+  if(pmCancel2) pmCancel2.textContent = ro ? 'Sluiten' : 'Annuleren';
   // Modal tonen
   modalEl2.classList.remove('hidden');
   // Adres ophalen via reverse geocode
@@ -994,13 +1002,13 @@ function _updateFilterBadge(){
 
 // ======================= Actie log =======================
 const _actionLog = [];
-function _logAction(type, meta){
+function _logAction(type, meta, marker){
   const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' };
-  const icons  = { hoornaar:'🐝', nest:'🪹', nest_geruimd:'✅', lokpot:'🪤', val:'🪝', polygon:'⬡' };
+  const icons  = { hoornaar:'\u{1F41D}', nest:'\u{1FAB9}', nest_geruimd:'\u2705', lokpot:'\u{1FA24}', val:'\u{1FA9D}', polygon:'\u2B21' };
   const label  = labels[type] || type;
-  const icon   = icons[type]  || '📍';
+  const icon   = icons[type]  || '\u{1F4CD}';
   const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
-  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||'' });
+  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||'', marker, type });
   if(_actionLog.length > 50) _actionLog.pop();
   _renderActionLog();
 }
@@ -1008,66 +1016,93 @@ function _renderActionLog(){
   const el = document.getElementById('action-log-list');
   if(!el) return;
   if(!_actionLog.length){ el.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:6px 0">Nog geen acties deze sessie.</div>'; return; }
-  el.innerHTML = _actionLog.map(a=>`
-    <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #e2e8f0">
-      <span style="font-size:16px;flex-shrink:0">${a.icon}</span>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:13px;font-weight:600;color:#1e293b">${a.label}</div>
-        ${a.note ? `<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.note}</div>`:''}
-      </div>
-      <span style="font-size:11px;color:#94a3b8;flex-shrink:0">${a.time}</span>
-    </div>`).join('');
+  el.innerHTML = '';
+  _actionLog.forEach((a, idx) => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #e2e8f0;cursor:pointer;border-radius:4px';
+    div.innerHTML = '<span style="font-size:16px;flex-shrink:0">'+a.icon+'</span>'
+      + '<div style="flex:1;min-width:0">'
+      + '<div style="font-size:13px;font-weight:600;color:#1e293b">'+a.label+'</div>'
+      + (a.note ? '<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+a.note+'</div>' : '')
+      + (a.by ? '<div style="font-size:11px;color:#94a3b8">'+a.by+'</div>' : '')
+      + '</div>'
+      + '<span style="font-size:11px;color:#94a3b8;flex-shrink:0">'+a.time+'</span>';
+    div.addEventListener('mouseenter', ()=>div.style.background='#f1f5f9');
+    div.addEventListener('mouseleave', ()=>div.style.background='');
+    if(a.marker){
+      div.title = 'Klik om eigenschappen te bewerken';
+      div.addEventListener('click', ()=>{
+        window._setSidebar?.(false);
+        openPropModal({
+          type: a.type,
+          init: {...a.marker._meta, _latlng: a.marker.getLatLng()},
+          onSave:(vals)=>{ applyPropsToMarker(a.marker, vals); persistMarker(a.marker); _actionLog[idx].note=vals.note||''; _renderActionLog(); }
+        });
+      });
+    }
+    el.appendChild(div);
+  });
 }
 
 // ======================= Marker workflow =======================
 function attachMarkerPopup(marker){
   const m=marker._meta||{};
   const cap = s => s ? s.charAt(0).toUpperCase()+s.slice(1) : '';
-  // Label per type
-  const typeLabel = m.type==='hoornaar'?(m.aantal?'Waarneming (×'+m.aantal+')':'Waarneming')
+  const typeLabel = m.type==='hoornaar'?(m.aantal?'Waarneming (\u00d7'+m.aantal+')':'Waarneming')
     :m.type==='nest'?'Nest gevonden':m.type==='nest_geruimd'?'Nest geruimd'
     :m.type==='lokpot'?'Lokpot':m.type==='val'?'Val geplaatst':'Icoon';
-  // Bouw rijen als array: eerst basisrijen, dan extra rijen
-  const row = (lbl,val) => '<div style="display:flex;gap:6px;margin-top:3px"><span style="color:#94a3b8;font-size:11px;min-width:82px;flex-shrink:0">'+lbl+'</span><span style="font-size:12px;color:#1e293b">'+val+'</span></div>';
-  // Basisrijen (altijd zichtbaar)
-  let base = '';
-  if(m.date) base += row('Datum', m.date);
-  if(m.by)   base += row('Door',  m.by);
-  // Extra rijen (in inklapbaar blok)
-  let extra = '';
-  if(m.type==='hoornaar' && m.aantal) extra += row('Aantal', String(m.aantal));
-  if(m.type==='lokpot' && m.sender)   extra += row('Zender', m.sender==='ja'?'Ja':'Nee');
-  if(m.type==='nest' && m.nesttype)   extra += row('Nesttype', cap(m.nesttype));
+  const row = (lbl,val) => '<div style="display:flex;gap:6px;margin-top:4px"><span style="color:#94a3b8;font-size:11px;min-width:90px;flex-shrink:0">'+lbl+'</span><span style="font-size:12px;color:#1e293b;word-break:break-word">'+val+'</span></div>';
+  const rowLink = (lbl,txt,href) => '<div style="display:flex;gap:6px;margin-top:4px"><span style="color:#94a3b8;font-size:11px;min-width:90px;flex-shrink:0">'+lbl+'</span><a href="'+href+'" target="_blank" style="font-size:12px;color:#0aa879;text-decoration:none">'+txt+'</a></div>';
+  let rows = '';
+  if(m.date) rows += row('Datum', m.date);
+  if(m.by)   rows += row('Door', m.by);
+  if(m.type==='hoornaar' && m.aantal) rows += row('Aantal', String(m.aantal));
+  if(m.type==='lokpot' && m.sender)   rows += row('Zender', m.sender==='ja'?'Ja':'Nee');
+  if(m.type==='nest' && m.nesttype)   rows += row('Nesttype', cap(m.nesttype));
   if(m.type==='nest_geruimd'){
-    if(m.ruimer)  extra += row('Geruimd door', m.ruimer);
-    if(m.methode) extra += row('Methode', cap(m.methode));
-    if(m.succes)  extra += row('Succesvol', m.succes==='ja'?'Ja':'Nee');
+    if(m.ruimer)  rows += row('Geruimd door', m.ruimer);
+    if(m.methode) rows += row('Methode', cap(m.methode));
+    if(m.succes)  rows += row('Succesvol', m.succes==='ja'?'Ja':'Nee');
   }
   if(m.type==='val'){
-    if(m.valtype)           extra += row('Type val', cap(m.valtype));
-    if(m.koninginnen!=null) extra += row('Koninginnen', String(m.koninginnen));
+    if(m.valtype)           rows += row('Type val', cap(m.valtype));
+    if(m.koninginnen!=null) rows += row('Koninginnen', String(m.koninginnen));
   }
-  if(m.note) extra += '<div style="margin-top:5px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">'+m.note+'</div>';
-  // Samenvoegen — meer knop alleen als er extra rijen zijn
-  const meerBtn = extra
-    ? '<div style="margin-top:5px">'
-      + '<span id="pm-meer-lnk" style="font-size:11px;color:#0aa879;cursor:pointer;user-select:none" onclick="_toggleMeer()">meer &#9660;</span>'
-      + '<div id="pm-meer-blk" style="display:none;margin-top:2px">'+extra+'</div>'
-      + '</div>'
-    : '';
-  const popup = '<div style="min-width:170px;max-width:240px"><strong style="font-size:13px">'+typeLabel+'</strong>'+base+meerBtn+'</div>';
+  if(m.note) rows += '<div style="margin-top:5px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">'+m.note+'</div>';
+  let srcRows = '';
+  if(m.source==='GBIF' || m.source==='waarneming.nl'){
+    const LIFE={'ADULT':'Volwassen','JUVENILE':'Juveniel','LARVA':'Larve','PUPA':'Pop','EGG':'Ei'};
+    const SEX={'FEMALE':'Vrouwtje','MALE':'Mannetje'};
+    srcRows += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid #e2e8f0">';
+    srcRows += '<div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">\ud83d\udce1 Bron: '+m.source+'</div>';
+    if(m.source==='GBIF'){
+      if(m.gbifDataset)   srcRows += row('Dataset', m.gbifDataset);
+      if(m.gbifLocality)  srcRows += row('Locatie', m.gbifLocality);
+      if(m.gbifLifestage && LIFE[m.gbifLifestage]) srcRows += row('Stadium', LIFE[m.gbifLifestage]);
+      if(m.gbifSex && SEX[m.gbifSex]) srcRows += row('Geslacht', SEX[m.gbifSex]);
+      if(m.gbifBehavior)  srcRows += row('Gedrag', m.gbifBehavior);
+      if(m.gbifCoordPrec) srcRows += row('Nauwkeurigheid', '\u00b1'+m.gbifCoordPrec+'m');
+      if(m.gbifIssues)    srcRows += row('Issues', m.gbifIssues);
+      if(m.gbifUrl)       srcRows += rowLink('GBIF link', 'Bekijk op gbif.org', m.gbifUrl);
+    } else {
+      if(m.location)         srcRows += row('Locatie', m.location);
+      if(m.validationStatus) srcRows += row('Validatie', m.validationStatus);
+      if(m.permalink)        srcRows += rowLink('Link', 'waarneming.nl', m.permalink);
+    }
+    srcRows += '</div>';
+  }
+  // Klik op marker opent eigenschappen in prop-modal (inclusief GBIF brondata)
   marker.unbindPopup();
-  marker.bindPopup(popup, {maxWidth:260, minWidth:170});
   marker.unbindTooltip();
-  // Koppel meer/minder toggle via popupopen (werkt ook in module-scope)
-  marker.off('popupopen').on('popupopen', function(){
-    var lnk = document.getElementById('pm-meer-lnk');
-    var blk = document.getElementById('pm-meer-blk');
-    if(!lnk||!blk) return;
-    lnk.onclick = function(){
-      if(blk.style.display==='none'){ blk.style.display='block'; lnk.innerHTML='minder &#9650;'; }
-      else { blk.style.display='none'; lnk.innerHTML='meer &#9660;'; }
-    };
+  marker.on('click', (e)=>{
+    L.DomEvent.stopPropagation(e);
+    const isImport = m.source === 'GBIF' || m.source === 'waarneming.nl';
+    openPropModal({
+      type: m.type,
+      init: {...m, _latlng: marker.getLatLng()},
+      readOnly: isImport,
+      onSave: isImport ? null : (vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }
+    });
   });
 }
 function applyPropsToMarker(marker, vals){
@@ -1563,6 +1598,7 @@ function upsertMarkerFromCloud(doc){
       gbifLifestage: doc.gbifLifestage||null, gbifSex: doc.gbifSex||null,
       gbifBasis: doc.gbifBasis||null, gbifIssues: doc.gbifIssues||null,
       gbifUrl: doc.gbifUrl||null, gbifCoordPrec: doc.gbifCoordPrec||null,
+      gbifCoordUncertainty: doc.gbifCoordUncertainty||null,
       gbifCountry: doc.gbifCountry||null,
       // waarneming.nl CSV
       validationStatus: doc.validationStatus||null, permalink: doc.permalink||null,
@@ -1621,6 +1657,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.gbifIssues = doc.gbifIssues||null;
     m._meta.gbifUrl = doc.gbifUrl||null;
     m._meta.gbifCoordPrec = doc.gbifCoordPrec||null;
+    m._meta.gbifCoordUncertainty = doc.gbifCoordUncertainty||null;
     m._meta.gbifCountry = doc.gbifCountry||null;
     m._meta.validationStatus = doc.validationStatus||null;
     m._meta.permalink = doc.permalink||null;

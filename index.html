@@ -98,9 +98,10 @@
       .pm-icon-sat::after { content: '🛰️'; }
       .pm-icon-sat.active-sat::after { content: '🗺️'; }
       .pm-icon-sat.active-sat, .pm-icon-sat.active-sat a { background-color: #e8f5f0 !important; }
-      .pm-icon-filter { background-image: none !important; font-size: 16px; line-height: 30px; }
-      .pm-icon-filter::after { content: '🔽'; font-size: 14px; }
-      .pm-icon-filter.filter-active, .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; color: #0aa879 !important; }
+      .pm-icon-filter { background-image: none !important; line-height: 30px; }
+      .pm-icon-filter::after { content: '🔽'; font-size: 18px; filter: grayscale(1) brightness(0); }
+      .pm-icon-filter.filter-active, .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; }
+      .pm-icon-filter.filter-active::after { filter: none; color: #0aa879; }
 
       /* Kompas control */
       .compass-control { border-radius: 4px; overflow: hidden; }
