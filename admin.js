@@ -166,13 +166,14 @@ export async function openAdminOverlay(callerRole) {
   });
 
   if (isAdmin) {
-    // Admin: standaard op Gebruikers tab
+    // Admin: standaard op Overzicht tab (net als andere rollen)
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
-    const usersTab = document.querySelector('.adm-tab[data-tab="users"]');
-    if (usersTab) usersTab.classList.add('active');
+    const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
+    if (overzichtTab) overzichtTab.classList.add('active');
     const footer = document.getElementById('admin-footer');
-    if (footer) footer.style.display = ''; // zichtbaar bij gebruikers
+    if (footer) footer.style.display = 'none';
     startListening();
+    openOverzichtTab();
   } else if (myRole === 'manager' || myRole === 'volunteer') {
     // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
@@ -588,6 +589,7 @@ function openGbifTab() {
     '<input type="date" id="gbif-date" class="adm-sync-input" style="max-width:170px" value="' + defaultDate + '"/>' +
     '</div>' +
     '<button class="adm-sync-btn" id="gbif-sync-btn">&#9654; Synchroniseren</button>' +
+    '<button id="gbif-clean-btn" style="padding:7px 12px;border-radius:6px;border:1px solid #fca5a5;background:#fff;color:#dc2626;font-size:13px;font-weight:600;cursor:pointer">🗑️ Alle GBIF verwijderen</button>' +
     '</div>' +
     (lastSync ? '<p style="font-size:11px;color:#94a3b8;margin:0 0 12px">Laatste sync: ' + new Date(lastSync).toLocaleString('nl-NL') + '</p>' : '') +
     '<div id="gbif-log" class="adm-sync-log" style="min-height:80px">' +
@@ -597,6 +599,7 @@ function openGbifTab() {
   );
 
   document.getElementById('gbif-sync-btn')?.addEventListener('click', runGbifSync);
+  document.getElementById('gbif-clean-btn')?.addEventListener('click', runGbifCleanup);
 }
 
 function logGbif(msg, color) {
@@ -609,6 +612,41 @@ function logGbif(msg, color) {
   line.textContent = new Date().toLocaleTimeString('nl-NL') + ' \u2014 ' + msg;
   log.appendChild(line);
   log.scrollTop = log.scrollHeight;
+}
+
+async function runGbifCleanup() {
+  if (!confirm('Alle GBIF waarnemingen verwijderen uit alle jaren en zones?\nDit kan niet ongedaan worden gemaakt.')) return;
+  const btn = document.getElementById('gbif-clean-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Bezig…'; }
+  logGbif('Start verwijderen van alle GBIF markers…', '#f59e0b');
+
+  let total = 0;
+  try {
+    // Loop door alle bekende zones en jaren (haal jaren dynamisch op)
+    const zoneNames = Object.keys(ZONE_WKT);
+    // Jaren: haal alle subcollecties op via maps/{year} — we proberen 2020-huidig jaar
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let y = 2020; y <= currentYear; y++) years.push(String(y));
+
+    for (const year of years) {
+      for (const zone of zoneNames) {
+        const colRef = collection(db, 'maps', year, zone, 'data', 'markers');
+        const snap = await getDocs(query(colRef, where('source', '==', 'GBIF')));
+        if (snap.empty) continue;
+        logGbif(`${year}/${zone}: ${snap.size} GBIF markers gevonden`, '#64748b');
+        for (const d of snap.docs) {
+          await deleteDoc(doc(db, 'maps', year, zone, 'data', 'markers', d.id));
+          total++;
+        }
+      }
+    }
+    logGbif(`✅ Klaar — ${total} GBIF markers verwijderd.`, '#0aa879');
+  } catch(e) {
+    logGbif('Fout bij verwijderen: ' + e.message, '#ef4444');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗑️ Alle GBIF verwijderen'; }
+  }
 }
 
 async function runGbifSync() {
@@ -706,12 +744,21 @@ async function runGbifSync() {
         if (o.occurrenceRemarks) noteParts.push(o.occurrenceRemarks);
         if (locName) noteParts.push('\uD83D\uDCCD ' + locName);
 
+        // Bepaal marker type: nest of hoornaar (imago)
+        const remarksLower = (o.occurrenceRemarks || '').toLowerCase();
+        const behaviorLower = behavior.toLowerCase();
+        const isNest = remarksLower.includes('nest') || behaviorLower.includes('nest')
+          || lifestage === 'WORKER' && remarksLower.includes('nest')
+          || (o.occurrenceRemarks || '').toLowerCase().includes('nid')   // Frans
+          || (o.occurrenceRemarks || '').toLowerCase().includes('colony');
+        const markerType = isNest ? 'nest' : 'hoornaar';
+
         // Duplicaat check
         const existing = await getDocs(query(collection(db, base, 'markers'), where('externalId', '==', gbifId)));
         if (!existing.empty) { totalDuplicates++; continue; }
 
         await setDoc(doc(db, base, 'markers', gbifId), {
-          id: gbifId, type: 'hoornaar',
+          id: gbifId, type: markerType,
           lat, lng, date,
           by: observer,
           aantal,
@@ -734,7 +781,7 @@ async function runGbifSync() {
           gbifCountry:   o.country || '',
         });
         totalImported++;
-        logGbif('\u2705 ' + date + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : ''), '#0aa879');
+        logGbif('\u2705 ' + date + ' | ' + (markerType==='nest'?'🪹 Nest':'🐝 Imago') + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : ''), '#0aa879');
       }
     }
 
@@ -911,22 +958,23 @@ function openOverzichtTab() {
   const body = document.getElementById('admin-body');
   if (!body) return;
 
-  // Bouw de container — app-core.js vult 'report-content-modal' via loadReportInto()
   body.innerHTML = `
     <div style="padding:12px">
-      <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <button class="adm-rpt-btn active" data-days="today" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#0aa879;color:#fff;font-size:12px;cursor:pointer">Vandaag</button>
         <button class="adm-rpt-btn" data-days="7"   style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Week</button>
         <button class="adm-rpt-btn" data-days="14"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">2 weken</button>
         <button class="adm-rpt-btn" data-days="30"  style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Maand</button>
         <button class="adm-rpt-btn" data-days="365" style="padding:5px 10px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#1e293b;font-size:12px;cursor:pointer">Jaar</button>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#475569;margin-left:6px;cursor:pointer">
+          <input type="checkbox" id="rpt-exclude-gbif"/> GBIF uitsluiten
+        </label>
       </div>
       <div id="report-content-modal" style="font-size:12px">
         <span style="color:#94a3b8">Laden...</span>
       </div>
     </div>`;
 
-  // Periode knoppen
   body.querySelectorAll('.adm-rpt-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       body.querySelectorAll('.adm-rpt-btn').forEach(b => {
@@ -937,14 +985,20 @@ function openOverzichtTab() {
     });
   });
 
-  // Laad het rapport via app-core
+  body.querySelector('#rpt-exclude-gbif')?.addEventListener('change', () => {
+    const activeBtn = body.querySelector('.adm-rpt-btn[style*="#0aa879"]') || body.querySelector('.adm-rpt-btn');
+    if (activeBtn) {
+      const d = activeBtn.dataset.days;
+      _triggerReportLoad(d === 'today' ? 'today' : parseInt(d, 10));
+    }
+  });
+
   _triggerReportLoad('today');
 }
 
 function _triggerReportLoad(days) {
-  // app-core.js exporteert loadReportInto() vanaf Fix 102
-  // We dispatchen een custom event zodat app-core kan reageren
+  const excludeGbif = !!document.getElementById('rpt-exclude-gbif')?.checked;
   window.dispatchEvent(new CustomEvent('hornet:loadReport', {
-    detail: { days, targetId: 'report-content-modal' }
+    detail: { days, targetId: 'report-content-modal', excludeGbif }
   }));
 }

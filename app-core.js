@@ -1921,7 +1921,7 @@ function renderCountCells(c) {
   return v(c.waarnemingen,'#cc2222') + v(c.lokpotten,'#2d6b50') + v(c.nesten,'#334466') + v(c.geruimd,'#1a7a40') + v(c.vallen,'#8b6030');
 }
 
-async function loadReport(days, targetId = 'report-content') {
+async function loadReport(days, targetId = 'report-content', excludeGbif = false) {
   _reportDays = days;
   const el = document.getElementById(targetId);
   if (!el) return;
@@ -1965,10 +1965,11 @@ async function loadReport(days, targetId = 'report-content') {
         getDocs(collection(_db, base, 'polygons'))
       ]);
 
-      // Markers filteren op periode
+      // Markers filteren op periode en optioneel GBIF uitsluiten
       const markers = [];
       markerSnap.forEach(d => {
         const data = d.data();
+        if (excludeGbif && data.source === 'GBIF') return;
         if (isToday) {
           if (!data.date || data.date !== todayStr) return;
         } else if (dateFrom && data.date && data.date < dateFrom) return;
@@ -2060,8 +2061,8 @@ function initReportSection() {
   if (section) section.style.display = 'none';
   // Custom event listener zodat admin.js loadReport kan aanroepen via modal
   window.addEventListener('hornet:loadReport', (e) => {
-    const { days, targetId } = e.detail || {};
-    loadReport(days || 7, targetId || 'report-content-modal');
+    const { days, targetId, excludeGbif } = e.detail || {};
+    loadReport(days || 7, targetId || 'report-content-modal', !!excludeGbif);
   });
 }
 
