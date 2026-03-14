@@ -1,4 +1,4 @@
-// admin.js — Fix 112
+// admin.js — Fix 114
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -702,9 +702,19 @@ async function runGbifSync() {
 
       for (let oi = 0; oi < pageObs.length; oi++) {
         const o = pageObs[oi];
-        const lat = o.decimalLatitude;
-        const lng = o.decimalLongitude;
-        if (!lat || !lng) continue;
+        const rawLat = o.decimalLatitude;
+        const rawLng = o.decimalLongitude;
+        if (!rawLat || !rawLng) continue;
+
+        // Detecteer afgeronde gridcoördinaten (≤2 decimalen = onnauwkeurig, ~1km+)
+        // Voeg kleine willekeurige spreiding toe zodat gestapelde markers zichtbaar worden
+        const latDecimals = (String(rawLat).split('.')[1] || '').length;
+        const lngDecimals = (String(rawLng).split('.')[1] || '').length;
+        const isGridSnapped = latDecimals <= 2 || lngDecimals <= 2;
+        // Jitter: max ~200m spreiding (0.002 graden ≈ 200m)
+        const jitter = () => (Math.random() - 0.5) * 0.004;
+        const lat = isGridSnapped ? rawLat + jitter() : rawLat;
+        const lng = isGridSnapped ? rawLng + jitter() : rawLng;
 
         const gbifId   = 'gbif_' + o.gbifID;
 
@@ -778,10 +788,13 @@ async function runGbifSync() {
           gbifUrl:       o.occurrenceID || ('https://www.gbif.org/occurrence/' + o.gbifID),
           gbifCoordPrec: o.coordinatePrecision != null ? String(o.coordinatePrecision) : '',
           gbifCoordUncertainty: o.coordinateUncertaintyInMeters != null ? String(o.coordinateUncertaintyInMeters) : '',
+          gbifCoordJittered: isGridSnapped,
           gbifCountry:   o.country || '',
         });
         totalImported++;
-        logGbif('\u2705 ' + date + ' | ' + (markerType==='nest'?'🪹 Nest':'🐝 Imago') + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : ''), '#0aa879');
+        const unc = o.coordinateUncertaintyInMeters;
+        const coordNote = isGridSnapped ? ` ⚠️ grid (±${unc||'?'}m, gespreide coördinaat)` : '';
+        logGbif('\u2705 ' + date + ' | ' + (markerType==='nest'?'🪹 Nest':'🐝 Imago') + ' | ' + observer + ' | ' + zone + (locName ? ' | ' + locName : '') + coordNote, '#0aa879');
       }
     }
 

@@ -1,4 +1,4 @@
-// app-core.js — Fix 112
+// app-core.js — Fix 114
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -826,6 +826,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
         srcRow('Land', init.gbifCountry);
         if (init.gbifCoordPrec) srcRow('Nauwkeurigheid', '±' + init.gbifCoordPrec + 'm');
         if (init.gbifCoordUncertainty) srcRow('Onzekerheid coord.', '±' + init.gbifCoordUncertainty + 'm');
+        if (init.gbifCoordJittered) srcRow('Locatie', '⚠️ Afgeronde coördinaat — positie bij benadering');
         if (init.gbifIssues) srcRow('Opmerkingen', init.gbifIssues);
         if (init.gbifUrl) srcRow('GBIF link', 'Bekijk op gbif.org', init.gbifUrl);
       } else {
@@ -1606,6 +1607,7 @@ function upsertMarkerFromCloud(doc){
       gbifBasis: doc.gbifBasis||null, gbifIssues: doc.gbifIssues||null,
       gbifUrl: doc.gbifUrl||null, gbifCoordPrec: doc.gbifCoordPrec||null,
       gbifCoordUncertainty: doc.gbifCoordUncertainty||null,
+      gbifCoordJittered: doc.gbifCoordJittered||false,
       gbifCountry: doc.gbifCountry||null,
       // waarneming.nl CSV
       validationStatus: doc.validationStatus||null, permalink: doc.permalink||null,
@@ -1665,6 +1667,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.gbifUrl = doc.gbifUrl||null;
     m._meta.gbifCoordPrec = doc.gbifCoordPrec||null;
     m._meta.gbifCoordUncertainty = doc.gbifCoordUncertainty||null;
+    m._meta.gbifCoordJittered = doc.gbifCoordJittered||false;
     m._meta.gbifCountry = doc.gbifCountry||null;
     m._meta.validationStatus = doc.validationStatus||null;
     m._meta.permalink = doc.permalink||null;
