@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 112 -->
+<!-- index.html — Fix 115 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -99,13 +99,8 @@
       .pm-icon-sat.active-sat::after { content: '🗺️'; }
       .pm-icon-sat.active-sat, .pm-icon-sat.active-sat a { background-color: #e8f5f0 !important; }
       .pm-icon-filter { background-image: none !important; line-height: 30px; }
-      .pm-icon-filter a::after { content: ''; display:inline-block; width:16px; height:16px; vertical-align:middle;
-        background-color: #d97706;
-        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 4h18l-7 9v6l-4-2v-4L3 4z'/%3E%3C/svg%3E") center/contain no-repeat;
-        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M3 4h18l-7 9v6l-4-2v-4L3 4z'/%3E%3C/svg%3E") center/contain no-repeat;
-      }
-      .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; }
-      .pm-icon-filter.filter-active a::after { background-color: #0aa879; }
+      .pm-icon-filter a { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%23d97706' d='M3 4h18l-7 9v6l-4-2v-4Z'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: center !important; background-size: 18px !important; }
+      .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24'%3E%3Cpath fill='%230aa879' d='M3 4h18l-7 9v6l-4-2v-4Z'/%3E%3C/svg%3E") !important; background-repeat: no-repeat !important; background-position: center !important; background-size: 18px !important; }
 
       /* Kompas control */
       .compass-control { border-radius: 4px; overflow: hidden; }

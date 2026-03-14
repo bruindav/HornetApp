@@ -1,4 +1,4 @@
-// app-core.js — Fix 114
+// app-core.js — Fix 115
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1457,6 +1457,64 @@ function initPolygon(layer){
   });
   layer.on('mouseup touchend', () => clearTimeout(_polyLp));
 }
+async function _copyPolygonToYear(layer){
+  const curYear = $('sel-year')?.value || DEFAULT_YEAR;
+  const curY = new Date().getFullYear();
+  // Bouw jaar-opties: 2020 t/m huidig, exclusief huidig jaar
+  const options = [];
+  for(let y = curY; y >= 2020; y--) if(String(y) !== curYear) options.push(String(y));
+  if(!options.length){ alert('Geen andere jaren beschikbaar.'); return; }
+
+  // Toon een kleine modal met jaar-keuze
+  const existing = document.getElementById('poly-copy-modal');
+  if(existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'poly-copy-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9200;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45)';
+  modal.innerHTML = `<div style="background:#fff;border-radius:12px;padding:20px 24px;min-width:240px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+    <h3 style="margin:0 0 14px;font-size:15px">📋 Kopiëren naar jaar</h3>
+    <p style="font-size:13px;color:#475569;margin:0 0 12px">Polygoon: <strong>${layer._props?.label||'(geen naam)'}</strong><br>Vanuit jaar: ${curYear}</p>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px" id="poly-copy-years">
+      ${options.map(y=>`<label style="display:flex;align-items:center;gap:8px;font-size:14px"><input type="checkbox" value="${y}"/> ${y}</label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px">
+      <button id="poly-copy-cancel" style="flex:1;padding:8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer">Annuleren</button>
+      <button id="poly-copy-ok" style="flex:2;padding:8px;border-radius:6px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-weight:600">Kopiëren</button>
+    </div>
+    <div id="poly-copy-status" style="font-size:12px;margin-top:8px;min-height:16px;color:#64748b"></div>
+  </div>`;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#poly-copy-cancel').onclick = ()=>modal.remove();
+  modal.querySelector('#poly-copy-ok').onclick = async ()=>{
+    const checked = [...modal.querySelectorAll('#poly-copy-years input:checked')].map(i=>i.value);
+    if(!checked.length){ alert('Selecteer minimaal één jaar.'); return; }
+    const status = modal.querySelector('#poly-copy-status');
+    const okBtn = modal.querySelector('#poly-copy-ok');
+    okBtn.disabled = true; okBtn.textContent = '⏳ Bezig…';
+
+    const props = layer._props || {};
+    const latlngs = layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}));
+    const group = props.zoneId || normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
+    const _db2 = getFirestore(app);
+
+    let done = 0;
+    for(const yr of checked){
+      try{
+        const newId = genId('poly');
+        const path = `maps/${yr}/${group}/data/polygons/${newId}`;
+        await setDoc(doc(_db2, path), { id:newId, label:props.label||'', color:props.color||'#0aa879', latlngs, zoneId:group });
+        done++;
+        status.textContent = `✅ Gekopieerd naar ${yr}`;
+      } catch(e){
+        status.textContent = `❌ Fout bij ${yr}: ${e.message}`;
+      }
+    }
+    okBtn.textContent = `✅ Klaar (${done} jaar${done!==1?'en':''})`;
+    setTimeout(()=>modal.remove(), 1500);
+  };
+}
+
 function persistPolygon(layer){
   const id = layer._props?.id || genId('poly'); layer._props.id = id;
   const latlngs = layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}));
@@ -1479,6 +1537,7 @@ function openUnifiedContextMenu(opts){
     <button data-act="poly_label">✏️ Label wijzigen</button>
     <button data-act="poly_color">🎨 Kleur wijzigen</button>
     <button data-act="poly_edit">✍️ Vorm bewerken aan/uit</button>
+    <button data-act="poly_copy">📋 Kopiëren naar jaar…</button>
     <button data-act="poly_delete">🗑️ Verwijderen</button>
     <hr/>`;
     } else {
@@ -1503,7 +1562,7 @@ function openUnifiedContextMenu(opts){
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }
-      else if(act==='poly_edit'){ const enabled = opts.polygonLayer.pm?.enabled(); if(enabled) opts.polygonLayer.pm.disable(); else opts.polygonLayer.pm.enable(); }
+      else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } _removePolygonLayer(opts.polygonLayer); }
     },0);
   });
