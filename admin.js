@@ -669,7 +669,6 @@ async function runGbifSync() {
         if (!lat || !lng) continue;
 
         const gbifId   = 'gbif_' + o.gbifID;
-        const base     = 'maps/' + year + '/' + zone + '/data';
 
         // Datum opbouwen
         const date = o.eventDate
@@ -677,6 +676,10 @@ async function runGbifSync() {
           : (o.year
             ? o.year + '-' + String(o.month || 1).padStart(2, '0') + '-' + String(o.day || 1).padStart(2, '0')
             : new Date().toISOString().slice(0, 10));
+
+        // Jaar uit datum halen voor Firestore pad — waarneming hoort onder het jaar van observatie
+        const obsYear = date.slice(0, 4);
+        const base    = 'maps/' + obsYear + '/' + zone + '/data';
 
         // Waarnemer — GBIF geeft soms meerdere namen gescheiden door |
         const observer = o.recordedBy || o.identifiedBy || o.institutionCode || 'GBIF';

@@ -946,6 +946,7 @@ function openFilterModal(){
             </div>
           </div>
           <label style="display:flex;align-items:center;gap:8px;border-top:1px solid #e2e8f0;padding-top:10px"><input type="checkbox" id="fm_poly_outline"/> Polygonen alleen omtrek</label>
+          <label style="display:flex;align-items:center;gap:8px;padding-top:4px"><input type="checkbox" id="fm_show_gbif"/> 🌍 Toon GBIF waarnemingen</label>
         </div>
         <div style="display:flex;gap:8px;margin-top:16px">
           <button id="fm_reset" style="flex:1;padding:8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:13px">Reset</button>
@@ -962,24 +963,25 @@ function openFilterModal(){
       ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
       sl.value='0'; lb.textContent='Alles';
       modal.querySelector('#fm_poly_outline').checked = false;
+      modal.querySelector('#fm_show_gbif').checked = false;
     });
     // Apply
     modal.querySelector('#fm_apply').addEventListener('click', ()=>{
-      // Sync naar echte filter checkboxen in sidebar
       [['fm_hoornaar','f_type_hoornaar'],['fm_nest','f_type_nest'],['fm_nest_geruimd','f_type_nest_geruimd'],
        ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val']].forEach(([src,dst])=>{
-        const srcEl=modal.querySelector('#'+src); const dstEl=$( dst);
+        const srcEl=modal.querySelector('#'+src); const dstEl=$(dst);
         if(srcEl && dstEl) dstEl.checked=srcEl.checked;
       });
       const dstSlider=$('f_period_slider'); if(dstSlider){ dstSlider.value=sl.value; updatePeriodLabel(+sl.value); }
       const dstOutline=$('f_poly_outline'); if(dstOutline) dstOutline.checked=modal.querySelector('#fm_poly_outline').checked;
+      const dstGbif=$('f_show_gbif'); if(dstGbif) dstGbif.checked=modal.querySelector('#fm_show_gbif').checked;
       applyFilters();
       _closeFilterModal();
       _updateFilterBadge();
     });
     modal.addEventListener('click', e=>{ if(e.target===modal) _closeFilterModal(); });
   }
-  // Sync huidige staat van sidebar-filters naar modal
+  // Sync huidige staat naar modal
   [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
    ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val']].forEach(([src,dst])=>{
     const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
@@ -989,15 +991,17 @@ function openFilterModal(){
   if(sl && fmSl){ fmSl.value=sl.value; modal.querySelector('#fm_period_label').textContent=(PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; }
   const fo=$('f_poly_outline'); const fmFo=modal.querySelector('#fm_poly_outline');
   if(fo && fmFo) fmFo.checked=fo.checked;
+  const fmGbif=modal.querySelector('#fm_show_gbif'); const dstGbifEl=$('f_show_gbif');
+  if(fmGbif && dstGbifEl) fmGbif.checked=dstGbifEl.checked;
   modal.style.display='flex';
 }
 function _closeFilterModal(){ const m=document.getElementById('filter-modal'); if(m) m.style.display='none'; }
 function _updateFilterBadge(){
-  // Toon badge op filter-knop als filters actief zijn (niet alles aangevinkt en periode=0)
   const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
   const period = +($('f_period_slider')?.value||0);
+  const gbifOn = !!$('f_show_gbif')?.checked;
   const btn = document.querySelector('.pm-icon-filter');
-  if(btn){ btn.classList.toggle('filter-active', !allTypes || period>0); }
+  if(btn){ btn.classList.toggle('filter-active', !allTypes || period>0 || gbifOn); }
 }
 
 // ======================= Actie log =======================
@@ -1517,6 +1521,7 @@ function getActiveFilters(){
     nest_geruimd: !!$('f_type_nest_geruimd')?.checked,
     lokpot: !!$('f_type_lokpot')?.checked,
     val: !!$('f_type_val')?.checked,
+    showGbif: !!$('f_show_gbif')?.checked,
     dateFrom: isToday ? todayStr : getDateFrom(step.days),
     dateOnlyToday: isToday,
     todayStr: todayStr
@@ -1532,6 +1537,8 @@ function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
+    // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
+    if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
       // Vandaag: alleen iconen waarvan datum === vandaag
       if(!meta.date || meta.date !== f.todayStr) show=false;
