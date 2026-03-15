@@ -1,4 +1,4 @@
-// admin.js — Fix 121
+// admin.js — Fix 122
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -196,14 +196,13 @@ export async function openAdminOverlay(callerRole) {
   });
 
   if (isAdmin) {
-    // Admin: standaard op Overzicht tab (net als andere rollen)
+    // Admin: standaard op Gebruikers tab
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
-    const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
-    if (overzichtTab) overzichtTab.classList.add('active');
+    const usersTab = document.querySelector('.adm-tab[data-tab="users"]');
+    if (usersTab) usersTab.classList.add('active');
     const footer = document.getElementById('admin-footer');
-    if (footer) footer.style.display = 'none';
+    if (footer) footer.style.display = '';
     startListening();
-    openOverzichtTab();
   } else if (myRole === 'manager' || myRole === 'volunteer') {
     // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
@@ -775,32 +774,77 @@ function _showZoneEditModal(zone, isNew, onSave) {
     });
   }
 
-  // Helper: update kaartpreview op basis van huidige bbox-waarden
-  function _updatePreview() {
+  // Tweede Leaflet kaart voor bbox visualisatie en aanpassing
+  let bboxMap = null;
+  let bboxRect = null;
+
+  function _initBboxMap() {
+    if (bboxMap) return; // al geïnitialiseerd
+    const container = modal.querySelector('#ze-map-preview');
+    container.style.display = 'block';
+    container.innerHTML = `<div id="ze-bbox-map" style="height:200px;border-radius:8px 8px 0 0"></div>
+      <div style="font-size:11px;color:#64748b;padding:5px 8px;background:#f8fafc;display:flex;justify-content:space-between">
+        <span id="ze-bbox-coords">–</span>
+        <span style="color:#94a3b8">Sleep hoekpunten om de box aan te passen</span>
+      </div>`;
+    bboxMap = L.map('ze-bbox-map', { zoomControl: true, attributionControl: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(bboxMap);
+    setTimeout(() => bboxMap.invalidateSize(), 100);
+  }
+
+  function _updateBboxMap() {
     const minLat = parseFloat(modal.querySelector('#ze-bmin-lat').value);
     const minLon = parseFloat(modal.querySelector('#ze-bmin-lon').value);
     const maxLat = parseFloat(modal.querySelector('#ze-bmax-lat').value);
     const maxLon = parseFloat(modal.querySelector('#ze-bmax-lon').value);
     if (isNaN(minLat)||isNaN(minLon)||isNaN(maxLat)||isNaN(maxLon)) return;
-    // OpenStreetMap staticmap via openstreetmap.org bbox link als iframe is niet mogelijk
-    // Gebruik OSM tile-gebaseerde static image via geoapify of gewoon een OSM bbox URL als img
-    const w = 340, h = 180;
-    const url = `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=${w}&height=${h}&area=rect:${minLon},${minLat},${maxLon},${maxLat}&apiKey=e5d4bbfd4ec84b4aab96ab97e7f7c35b`;
-    // Fallback: gebruik OSM tile via bbox
-    const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik`;
-    const preview = modal.querySelector('#ze-map-preview');
-    const img = modal.querySelector('#ze-map-img');
-    // Gebruik een iframe-gebaseerde preview via OSM embed
-    preview.style.display = 'block';
-    // Vervang img door iframe voor OSM embed
-    if (!preview.querySelector('iframe')) {
-      preview.innerHTML = `<iframe id="ze-map-iframe" style="width:100%;height:180px;border:0;display:block" sandbox="allow-scripts allow-same-origin"></iframe>
-        <div id="ze-map-label" style="font-size:11px;color:#64748b;padding:4px 8px;background:#f8fafc"></div>`;
-    }
-    const iframe = preview.querySelector('#ze-map-iframe');
-    if (iframe) iframe.src = osmUrl;
-    const lbl = preview.querySelector('#ze-map-label');
-    if (lbl) lbl.textContent = `bbox: ${minLat.toFixed(3)},${minLon.toFixed(3)} → ${maxLat.toFixed(3)},${maxLon.toFixed(3)}`;
+
+    _initBboxMap();
+
+    // Verwijder bestaande rechthoek en hoekmarkers
+    if (bboxRect) { bboxMap.removeLayer(bboxRect); bboxRect = null; }
+    if (bboxMap._cornerMarkers) { bboxMap._cornerMarkers.forEach(m => bboxMap.removeLayer(m)); }
+    bboxMap._cornerMarkers = [];
+
+    // Teken rechthoek
+    bboxRect = L.rectangle([[minLat, minLon],[maxLat, maxLon]], {
+      color: '#0aa879', weight: 2, fillOpacity: 0.15
+    }).addTo(bboxMap);
+    bboxMap.fitBounds([[minLat, minLon],[maxLat, maxLon]], { padding: [20,20] });
+
+    // Label bijwerken
+    const lbl = modal.querySelector('#ze-bbox-coords');
+    if (lbl) lbl.textContent = `${minLat.toFixed(3)},${minLon.toFixed(3)} → ${maxLat.toFixed(3)},${maxLon.toFixed(3)}`;
+
+    // Hoekmarkers toevoegen voor aanpassen
+    const corners = [
+      { lat: minLat, lon: minLon, updateMinLat: true,  updateMinLon: true  },
+      { lat: maxLat, lon: minLon, updateMinLat: false, updateMinLon: true  },
+      { lat: maxLat, lon: maxLon, updateMinLat: false, updateMinLon: false },
+      { lat: minLat, lon: maxLon, updateMinLat: true,  updateMinLon: false },
+    ];
+    const cornerIcon = L.divIcon({ html:'<div style="width:12px;height:12px;background:#0aa879;border:2px solid #fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>', iconSize:[12,12], iconAnchor:[6,6], className:'' });
+
+    corners.forEach(c => {
+      const m = L.marker([c.lat, c.lon], { icon: cornerIcon, draggable: true }).addTo(bboxMap);
+      m.on('drag', e => {
+        const { lat, lng } = e.latlng;
+        if (c.updateMinLat) modal.querySelector('#ze-bmin-lat').value = lat.toFixed(4);
+        else                modal.querySelector('#ze-bmax-lat').value = lat.toFixed(4);
+        if (c.updateMinLon) modal.querySelector('#ze-bmin-lon').value = lng.toFixed(4);
+        else                modal.querySelector('#ze-bmax-lon').value = lng.toFixed(4);
+        // Rechthoek live updaten
+        const nMinLat = parseFloat(modal.querySelector('#ze-bmin-lat').value);
+        const nMinLon = parseFloat(modal.querySelector('#ze-bmin-lon').value);
+        const nMaxLat = parseFloat(modal.querySelector('#ze-bmax-lat').value);
+        const nMaxLon = parseFloat(modal.querySelector('#ze-bmax-lon').value);
+        bboxRect?.setBounds([[nMinLat,nMinLon],[nMaxLat,nMaxLon]]);
+        const lbl2 = modal.querySelector('#ze-bbox-coords');
+        if (lbl2) lbl2.textContent = `${nMinLat.toFixed(3)},${nMinLon.toFixed(3)} → ${nMaxLat.toFixed(3)},${nMaxLon.toFixed(3)}`;
+      });
+      m.on('dragend', () => _updateBboxMap()); // herrender alle hoekmarkers
+      bboxMap._cornerMarkers.push(m);
+    });
   }
 
   // Bbox opzoeken via Nominatim bij lat/lon
@@ -836,7 +880,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
         modal.querySelector('#ze-bmax-lat').value = maxLat.toFixed(4);
         modal.querySelector('#ze-bmax-lon').value = maxLon.toFixed(4);
         if (src) src.textContent = `📍 ${d.display_name?.split(',').slice(0,2).join(',')||'Nominatim'}`;
-        _updatePreview();
+        _updateBboxMap();
       } else {
         modal.querySelector('#ze-error').textContent = 'Geen bbox gevonden voor deze coördinaat';
       }
@@ -853,9 +897,9 @@ function _showZoneEditModal(zone, isNew, onSave) {
   });
 
   // Direct preview tonen als bbox al ingevuld is
-  if (zone.bbox) _updatePreview();
+  if (zone.bbox) _updateBboxMap();
 
-  modal.querySelector('#ze-cancel').onclick = () => { pickerMap.remove(); modal.remove(); };
+  modal.querySelector('#ze-cancel').onclick = () => { pickerMap.remove(); if(bboxMap) bboxMap.remove(); modal.remove(); };
   modal.querySelector('#ze-save').onclick = () => {
     const label = modal.querySelector('#ze-label').value.trim();
     const key   = modal.querySelector('#ze-key').value.trim();
@@ -876,7 +920,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
     const wkt = `POLYGON((${bMinLon} ${bMinLat},${bMaxLon} ${bMinLat},${bMaxLon} ${bMaxLat},${bMinLon} ${bMaxLat},${bMinLon} ${bMinLat}))`;
 
     onSave({ key, label, lat, lon, zoom, bbox, wkt });
-    pickerMap.remove(); modal.remove();
+    pickerMap.remove(); if(bboxMap) bboxMap.remove(); modal.remove();
   };
 }
 
