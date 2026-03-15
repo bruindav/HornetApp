@@ -1,4 +1,4 @@
-// admin.js — Fix 122
+// admin.js — Fix 124
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -174,6 +174,8 @@ export async function openAdminOverlay(callerRole) {
 
   await _loadZonesAdmin(); // zones altijd vers laden bij openen beheer
   createOverlay();
+  // Altijd alle tab-actief states resetten bij heropenen
+  document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('admin-overlay').classList.add('open');
 
   // Role bepalen: gebruik meegegeven rol (sneller), of haal op uit Firestore
@@ -196,13 +198,14 @@ export async function openAdminOverlay(callerRole) {
   });
 
   if (isAdmin) {
-    // Admin: standaard op Gebruikers tab
+    // Admin: standaard op Overzicht tab
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
-    const usersTab = document.querySelector('.adm-tab[data-tab="users"]');
-    if (usersTab) usersTab.classList.add('active');
+    const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
+    if (overzichtTab) overzichtTab.classList.add('active');
     const footer = document.getElementById('admin-footer');
-    if (footer) footer.style.display = '';
+    if (footer) footer.style.display = 'none';
     startListening();
+    openOverzichtTab();
   } else if (myRole === 'manager' || myRole === 'volunteer') {
     // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
@@ -893,7 +896,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
 
   // Preview updaten bij handmatige bbox-aanpassing
   ['ze-bmin-lat','ze-bmin-lon','ze-bmax-lat','ze-bmax-lon'].forEach(id => {
-    modal.querySelector('#'+id).addEventListener('change', _updatePreview);
+    modal.querySelector('#'+id).addEventListener('change', _updateBboxMap);
   });
 
   // Direct preview tonen als bbox al ingevuld is
