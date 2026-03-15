@@ -371,14 +371,6 @@ function initUIBindings(){
       document.getElementById('help-admin').style.display     = btn.dataset.tab === 'admin'     ? '' : 'none';
     });
   });
-
-  on(req('btn-reset-cache'), 'click', async()=>{
-    try{
-      if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
-      if('serviceWorker' in navigator){ const regs=await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r=>r.unregister())); }
-      localStorage.clear(); alert('Cache & SW gereset. Herladen…'); location.reload(true);
-    }catch{ alert('Reset mislukt'); }
-  });
   updateSWStatus();
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
