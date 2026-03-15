@@ -1,4 +1,4 @@
-// admin.js — Fix 119
+// admin.js — Fix 120
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -685,12 +685,11 @@ function _showZoneEditModal(zone, isNew, onSave) {
   modal.id = 'zone-edit-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
 
-  // Bbox berekenen als hint: centrum ± ~0.07 graden (~7km)
   const dfl = zone.lat || 52.09;
   const dfo = zone.lon || 5.12;
 
   modal.innerHTML = `
-    <div style="background:#fff;border-radius:12px;padding:20px 24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto">
+    <div style="background:#fff;border-radius:12px;padding:20px 24px;width:380px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);max-height:92vh;overflow-y:auto">
       <h3 style="margin:0 0 16px;font-size:15px">${isNew ? '➕ Nieuw gebied' : '✏️ Gebied bewerken'}</h3>
       <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
         <label>Naam (weergave)
@@ -699,22 +698,32 @@ function _showZoneEditModal(zone, isNew, onSave) {
         <label>Sleutel (interne ID, geen spaties)
           <input id="ze-key" value="${zone.key||''}" ${isNew?'':'readonly style="opacity:0.6"'} style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box" placeholder="bijv. Doorn"/>
         </label>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
           <label>Lat centrum<input id="ze-lat" type="number" step="0.0001" value="${dfl}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
           <label>Lon centrum<input id="ze-lon" type="number" step="0.0001" value="${dfo}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
+          <button id="ze-lookup" style="padding:6px 8px;border-radius:5px;border:1px solid #0aa879;background:#f0fdf4;color:#0aa879;cursor:pointer;font-size:12px;font-weight:600;white-space:nowrap">🔍 Zoek bbox</button>
         </div>
         <label>Zoom niveau (11–15)
           <input id="ze-zoom" type="number" min="11" max="15" value="${zone.zoom||13}" style="width:80px;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px"/>
         </label>
+
+        <!-- Kaartpreview -->
+        <div id="ze-map-preview" style="display:none;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
+          <img id="ze-map-img" style="width:100%;display:block" alt="Kaartpreview"/>
+          <div id="ze-map-label" style="font-size:11px;color:#64748b;padding:4px 8px;background:#f8fafc"></div>
+        </div>
+
         <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:12px;color:#475569">
-          <strong>Bounding box</strong> (voor CSV import & GBIF)<br>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <strong>Bounding box</strong>
+            <span id="ze-bbox-src" style="font-size:11px;color:#94a3b8"></span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
             <label>Min lat<input id="ze-bmin-lat" type="number" step="0.001" value="${zone.bbox?zone.bbox[0]:(dfl-0.07).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
             <label>Min lon<input id="ze-bmin-lon" type="number" step="0.001" value="${zone.bbox?zone.bbox[1]:(dfo-0.1).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
             <label>Max lat<input id="ze-bmax-lat" type="number" step="0.001" value="${zone.bbox?zone.bbox[2]:(dfl+0.07).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
             <label>Max lon<input id="ze-bmax-lon" type="number" step="0.001" value="${zone.bbox?zone.bbox[3]:(dfo+0.1).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
           </div>
-          <div style="margin-top:6px;color:#94a3b8">Tip: gebruik <a href="https://boundingbox.klokantech.com" target="_blank" style="color:#0aa879">boundingbox.klokantech.com</a> om coördinaten op te zoeken</div>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:16px">
@@ -732,6 +741,73 @@ function _showZoneEditModal(zone, isNew, onSave) {
       modal.querySelector('#ze-key').value = key;
     });
   }
+
+  // Helper: update kaartpreview op basis van huidige bbox-waarden
+  function _updatePreview() {
+    const minLat = parseFloat(modal.querySelector('#ze-bmin-lat').value);
+    const minLon = parseFloat(modal.querySelector('#ze-bmin-lon').value);
+    const maxLat = parseFloat(modal.querySelector('#ze-bmax-lat').value);
+    const maxLon = parseFloat(modal.querySelector('#ze-bmax-lon').value);
+    if (isNaN(minLat)||isNaN(minLon)||isNaN(maxLat)||isNaN(maxLon)) return;
+    // OpenStreetMap staticmap via openstreetmap.org bbox link als iframe is niet mogelijk
+    // Gebruik OSM tile-gebaseerde static image via geoapify of gewoon een OSM bbox URL als img
+    const w = 340, h = 180;
+    const url = `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=${w}&height=${h}&area=rect:${minLon},${minLat},${maxLon},${maxLat}&apiKey=e5d4bbfd4ec84b4aab96ab97e7f7c35b`;
+    // Fallback: gebruik OSM tile via bbox
+    const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${minLon},${minLat},${maxLon},${maxLat}&layer=mapnik`;
+    const preview = modal.querySelector('#ze-map-preview');
+    const img = modal.querySelector('#ze-map-img');
+    // Gebruik een iframe-gebaseerde preview via OSM embed
+    preview.style.display = 'block';
+    // Vervang img door iframe voor OSM embed
+    if (!preview.querySelector('iframe')) {
+      preview.innerHTML = `<iframe id="ze-map-iframe" style="width:100%;height:180px;border:0;display:block" sandbox="allow-scripts allow-same-origin"></iframe>
+        <div id="ze-map-label" style="font-size:11px;color:#64748b;padding:4px 8px;background:#f8fafc"></div>`;
+    }
+    const iframe = preview.querySelector('#ze-map-iframe');
+    if (iframe) iframe.src = osmUrl;
+    const lbl = preview.querySelector('#ze-map-label');
+    if (lbl) lbl.textContent = `bbox: ${minLat.toFixed(3)},${minLon.toFixed(3)} → ${maxLat.toFixed(3)},${maxLon.toFixed(3)}`;
+  }
+
+  // Bbox opzoeken via Nominatim bij lat/lon
+  modal.querySelector('#ze-lookup').addEventListener('click', async () => {
+    const lat = parseFloat(modal.querySelector('#ze-lat').value);
+    const lon = parseFloat(modal.querySelector('#ze-lon').value);
+    const btn = modal.querySelector('#ze-lookup');
+    const src = modal.querySelector('#ze-bbox-src');
+    if (isNaN(lat)||isNaN(lon)) { modal.querySelector('#ze-error').textContent='Vul eerst een coördinaat in'; return; }
+    btn.textContent = '⏳'; btn.disabled = true;
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=12`, {headers:{'Accept-Language':'nl'}});
+      const d = await r.json();
+      const bb = d.boundingbox; // [minLat, maxLat, minLon, maxLon] — Nominatim volgorde!
+      if (bb && bb.length === 4) {
+        const minLat = parseFloat(bb[0]), maxLat = parseFloat(bb[1]);
+        const minLon = parseFloat(bb[2]), maxLon = parseFloat(bb[3]);
+        modal.querySelector('#ze-bmin-lat').value = minLat.toFixed(4);
+        modal.querySelector('#ze-bmin-lon').value = minLon.toFixed(4);
+        modal.querySelector('#ze-bmax-lat').value = maxLat.toFixed(4);
+        modal.querySelector('#ze-bmax-lon').value = maxLon.toFixed(4);
+        if (src) src.textContent = `📍 ${d.display_name?.split(',').slice(0,2).join(',')||'Nominatim'}`;
+        _updatePreview();
+      } else {
+        modal.querySelector('#ze-error').textContent = 'Geen bbox gevonden voor deze coördinaat';
+      }
+    } catch(e) {
+      modal.querySelector('#ze-error').textContent = 'Fout: ' + e.message;
+    } finally {
+      btn.textContent = '🔍 Zoek bbox'; btn.disabled = false;
+    }
+  });
+
+  // Preview updaten bij handmatige bbox-aanpassing
+  ['ze-bmin-lat','ze-bmin-lon','ze-bmax-lat','ze-bmax-lon'].forEach(id => {
+    modal.querySelector('#'+id).addEventListener('change', _updatePreview);
+  });
+
+  // Direct preview tonen als bbox al ingevuld is
+  if (zone.bbox) _updatePreview();
 
   modal.querySelector('#ze-cancel').onclick = () => modal.remove();
   modal.querySelector('#ze-save').onclick = () => {
@@ -751,7 +827,6 @@ function _showZoneEditModal(zone, isNew, onSave) {
     if (isNaN(lat) || isNaN(lon)) { errEl.textContent = 'Vul geldige coördinaten in'; return; }
 
     const bbox = [bMinLat, bMinLon, bMaxLat, bMaxLon];
-    // WKT voor GBIF: POLYGON((minLon minLat, maxLon minLat, maxLon maxLat, minLon maxLat, minLon minLat))
     const wkt = `POLYGON((${bMinLon} ${bMinLat},${bMaxLon} ${bMinLat},${bMaxLon} ${bMaxLat},${bMinLon} ${bMaxLat},${bMinLon} ${bMinLat}))`;
 
     onSave({ key, label, lat, lon, zoom, bbox, wkt });

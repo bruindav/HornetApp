@@ -2208,10 +2208,12 @@ async function _initUserRole() {
     if (data?.displayName) {
       _currentDisplayName = data.displayName;
     }
-    // Rol en zones opslaan
+    // Rol en zones opslaan — zones eerst herladen zodat nieuwe zones beschikbaar zijn
     _currentRole  = data?.role || '';
     updateHeaderRole(_currentRole, data?.displayName || auth.currentUser?.displayName || '');
     const rawZones = Array.isArray(data?.zones) ? data.zones : [];
+    // Zones herladen om nieuwe gebieden mee te nemen, daarna filteren
+    await _loadZonesFromFirestore();
     _currentZones = rawZones.map(normalizeZone).filter(z => ZONE_META[z]);
 
     // Beheer knop tonen voor admin, manager en volunteer (Fix 102)
