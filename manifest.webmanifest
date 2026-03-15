@@ -1,9 +1,654 @@
-{
-  "name": "Hornet Mapper NL — v6.1.0-r2.1-fix17",
-  "short_name": "HorMap",
-  "start_url": ".",
-  "display": "standalone",
-  "background_color": "#0e1116",
-  "theme_color": "#0aa879",
-  "lang": "nl-NL"
-}
+<!DOCTYPE html>
+<!-- index.html — Fix 125 -->
+<html lang="nl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>HornetApp — Aziatische hoornaar</title>
+    <meta name="description" content="Monitoring en coördinatie van Aziatische hoornaar voor vrijwilligers en beheerders." />
+    <meta name="application-name" content="HornetApp" />
+    <meta name="theme-color" content="#0aa879" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+
+    <!-- Favicons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="./icons/icon-16x16.png" />
+    <link rel="icon" href="./icons/favicon.ico" />
+
+    <!-- iOS / Safari PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="HornetApp" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="./icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-180x180.png" />
+
+    <!-- Android / Chrome -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="msapplication-TileColor" content="#0f172a" />
+    <meta name="msapplication-TileImage" content="./icons/icon-144x144.png" />
+    <link rel="stylesheet" href="./app.css" />
+
+    <!-- Leaflet & Geoman (volgorde is belangrijk) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+    <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+    <style>
+      :root { --header-h: 58px; }
+      html, body { margin:0; height:100%; overflow:hidden; font-family: system-ui, Arial, sans-serif; }
+      .hidden { display: none !important; }
+      /* App shell vult volledig scherm — header fixed zodat hij nooit verdwijnt */
+      #app-shell { display:flex; flex-direction:column; height:100vh; height:100dvh; overflow:hidden; }
+      header { position:relative; z-index:5; background:#0f172a; color:#fff; padding:10px 12px; display:flex; align-items:center; gap:6px; flex-shrink:0; }
+      /* Mobiel: knoppen compact, tekst verbergen */
+      /* Statusbalk onder header — alleen mobiel */
+      #hdr-statusbar {
+        display: none;
+        background: #1e293b;
+        color: #94a3b8;
+        font-size: 12px;
+        padding: 4px 12px;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 8px;
+        border-bottom: 1px solid #334155;
+      }
+      #hdr-statusbar.visible { display: flex; }
+      #hdr-statusbar .sb-role { color: #e2e8f0; font-weight: 600; }
+      #hdr-statusbar .sb-scope { color: #0aa879; font-weight: 600; }
+      @media (max-width:540px) {
+        header { padding:8px 10px; gap:4px; }
+        header strong { font-size:14px; }
+        .hdr-text-label { display:none; }
+        #hdr-role-wrap { display:none !important; } /* op mobiel via statusbalk */
+        header button { padding:6px 8px !important; font-size:15px; margin-left:2px !important; }
+        #btn-admin { font-size:13px !important; padding:5px 7px !important; }
+        #hdr-statusbar { display:none; } /* wordt 'visible' via JS als ingelogd */
+        #hdr-statusbar.visible { display:flex; }
+      }
+      @media (min-width:541px) {
+        #hdr-statusbar { display:none !important; } /* desktop: nooit tonen */
+      }
+      header .spacer { flex:1; }
+      /* .app vult resterende ruimte onder header */
+      .app { display:flex; flex:1; overflow:hidden; min-height:0; }
+      .sidebar { width:300px; background:#f1f5f9; border-right:1px solid #cbd5e1; padding:12px; overflow:auto; transition:width 0.25s ease, padding 0.25s ease, opacity 0.25s ease; flex-shrink:0; }
+      .sidebar-collapsed .sidebar { width:0; padding:0; overflow:hidden; opacity:0; }
+      .content { flex:1; position:relative; overflow:hidden; min-width:0; }
+      #map { position:absolute; inset:0; width:100%; height:100%; }
+      .hidden { display:none !important; }
+      .ctx-menu {
+        position:fixed; background:#fff; border:1px solid #cbd5e1;
+        border-radius:10px; padding:6px; box-shadow:0 6px 24px rgba(15,23,42,.2);
+        z-index:9999; max-height:85vh; overflow-y:auto;
+      }
+      .ctx-menu h4 {
+        margin:0 0 4px; padding:4px 8px 6px; font-size:12px;
+        color:#64748b; border-bottom:1px solid #e2e8f0; font-weight:600;
+      }
+      .ctx-menu button {
+        display:block; width:100%; text-align:left;
+        padding:9px 12px; border:0; background:none;
+        border-radius:6px; cursor:pointer; font-size:14px;
+        white-space:nowrap; color:#1e293b;
+      }
+      .ctx-menu button:hover, .ctx-menu button:active { background:#f1f5f9; }
+      .ctx-menu hr { border:0; border-top:1px solid #e2e8f0; margin:4px 0; }
+      @media (max-width:600px) {
+        .ctx-menu { border-radius:14px 14px 14px 14px; padding:8px; min-width:200px; }
+        .ctx-menu button { padding:12px 14px; font-size:15px; }
+        .ctx-menu h4 { font-size:13px; padding:6px 10px 8px; }
+      }
+      .poly-label { background:#fff; border:2px solid #0aa879; color:#111; font-weight:600; }
+      .line-label { background:#111; color:#fff; border:0; }
+      .line-handle div { width:12px; height:12px; border-radius:50%; background:#111; border:2px solid #fff; box-shadow:0 0 0 2px #111; }
+      .login { display:grid; place-items:center; min-height: 70vh; }
+      .login .card { padding:24px; border:1px solid #e2e8f0; border-radius:8px; }
+      .status { font-size: 12px; color:#475569; }
+      .grid { display:grid; gap:8px; }
+      .only-hoornaar { display:none; grid-template-columns: 1fr 1fr; gap:8px; }
+      .tab-btn { color: #64748b; border-bottom: 2px solid transparent; }
+
+      /* Geoman sateliet knop */
+      .pm-icon-sat { background-image: none !important; font-size: 16px; line-height: 30px; }
+      .pm-icon-sat::after { content: '🛰️'; }
+      .pm-icon-sat.active-sat::after { content: '🗺️'; }
+      .pm-icon-sat.active-sat, .pm-icon-sat.active-sat a { background-color: #e8f5f0 !important; }
+      .pm-icon-filter { background-image: none !important; line-height: 30px; }
+      .pm-icon-filter::after { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'%3E%3Cpath fill='%23d97706' d='M3 4h18l-7 9v6l-4-2v-4Z'/%3E%3C/svg%3E"); display:block; line-height:1; }
+      .pm-icon-filter.filter-active, .pm-icon-filter.filter-active a { background-color: #e8f5f0 !important; }
+      .pm-icon-filter.filter-active::after { content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24'%3E%3Cpath fill='%230aa879' d='M3 4h18l-7 9v6l-4-2v-4Z'/%3E%3C/svg%3E"); }
+
+      /* Kompas control */
+      .compass-control { border-radius: 4px; overflow: hidden; }
+
+      /* Schaalregel iets opgetild boven de toggle knop */
+      .leaflet-control-scale { margin-bottom: 8px !important; }
+      .tab-btn.active { color: #0aa879; border-bottom-color: #0aa879; }
+    </style>
+  </head>
+  <body class="sidebar-collapsed">
+    <!-- Login screen -->
+    <section id="login-screen" class="login">
+      <div class="card" style="min-width:320px;max-width:420px;width:90%">
+        <h2 style="margin:0 0 4px">🐝 HornetApp</h2>
+        <p style="margin:0 0 20px;color:#64748b;font-size:14px">Aziatische hoornaar monitoring</p>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;margin-bottom:20px">
+          <button id="tab-login" class="tab-btn active" style="flex:1;padding:8px;border:0;background:none;cursor:pointer;font-weight:600;margin-bottom:-2px">Inloggen</button>
+          <button id="tab-register" class="tab-btn" style="flex:1;padding:8px;border:0;background:none;cursor:pointer;font-weight:600;margin-bottom:-2px">Registreren</button>
+        </div>
+
+        <!-- Foutmelding -->
+        <div id="login-error" class="hidden" style="background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:6px;font-size:13px;margin-bottom:12px"></div>
+
+        <!-- Inloggen panel -->
+        <div id="panel-login">
+          <div class="grid">
+            <input id="login-email" type="email" placeholder="E-mailadres" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="login-pass" type="password" placeholder="Wachtwoord" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <button id="btn-login-email" style="padding:9px;background:#0aa879;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Inloggen</button>
+            <button id="btn-forgot" style="background:none;border:0;color:#64748b;font-size:13px;cursor:pointer;text-align:left;padding:0">Wachtwoord vergeten?</button>
+            <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0"/>
+            <button class="btn-google" style="padding:9px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"/> Inloggen met Google
+            </button>
+          </div>
+        </div>
+
+        <!-- Registreren panel -->
+        <div id="panel-register" class="hidden">
+          <div class="grid">
+            <input id="reg-email" type="email" placeholder="E-mailadres" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="reg-pass" type="password" placeholder="Wachtwoord (min. 6 tekens)" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <input id="reg-pass2" type="password" placeholder="Wachtwoord herhalen" style="padding:8px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px"/>
+            <button id="btn-register-email" style="padding:9px;background:#0aa879;color:#fff;border:0;border-radius:6px;font-weight:600;cursor:pointer">Account aanmaken</button>
+            <hr style="border:0;border-top:1px solid #e2e8f0;margin:4px 0"/>
+            <button class="btn-google" style="padding:9px;background:#fff;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18"/> Registreren met Google
+            </button>
+          </div>
+        </div>
+
+        <p class="status" style="margin-top:16px"><span id="status-sw">SW:</span> · <span id="status-geo">Geo:</span></p>
+      </div>
+    </section>
+
+    <!-- Pending scherm — getoond als rol = pending -->
+    <section id="pending-screen" class="hidden" style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f8fafc">
+      <div style="text-align:center;max-width:380px;padding:32px;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.12)">
+        <div style="font-size:48px;margin-bottom:16px">⏳</div>
+        <h2 style="margin:0 0 12px;color:#1e293b">Account in afwachting</h2>
+        <p style="color:#64748b;line-height:1.6;margin:0 0 20px">
+          Je account is aangemaakt en wacht op goedkeuring door een beheerder.<br>
+          Je ontvangt een e-mail zodra je toegang hebt.
+        </p>
+        <p id="pending-email" style="font-size:13px;color:#94a3b8;margin:0 0 24px"></p>
+        <button id="pending-logout" style="padding:10px 24px;border:0;border-radius:8px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer;font-size:14px">
+          Uitloggen
+        </button>
+      </div>
+    </section>
+
+    <!-- App shell -->
+    <section id="app-shell" class="hidden">
+      <header>
+        <button id="toggle-sidebar">☰</button>
+        <strong>HornetApp</strong>
+        <div class="spacer"></div>
+        <div id="hdr-role-wrap" style="display:flex;gap:8px;align-items:center;font-size:13px">
+          <span id="hdr-role" style="opacity:.85"></span>
+          <span id="hdr-scope-wrap" class="hidden">📍 <span id="hdr-scope">–</span></span>
+        </div>
+        <button id="btn-admin" class="hidden" style="margin-left:4px" title="Beheer">⚙️ <span class="hdr-text-label">Beheer</span></button>
+        <button id="btn-help" title="Help" style="margin-left:4px">❓</button>
+        <button id="logoutBtn" style="margin-left:4px" title="Uitloggen"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:2px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span class="hdr-text-label">Uitloggen</span></button>
+      </header>
+      <!-- Statusbalk — alleen zichtbaar op mobiel als ingelogd -->
+      <div id="hdr-statusbar">
+        <span>👤</span>
+        <span id="sb-role" class="sb-role"></span>
+        <span style="opacity:.4">·</span>
+        <span>📍</span>
+        <span id="sb-scope" class="sb-scope">–</span>
+      </div>
+      <div class="app">
+        <aside class="sidebar">
+          <div id="sidebar-userblock" style="padding:6px 2px 10px;border-bottom:1px solid #cbd5e1;margin-bottom:10px;font-size:13px;color:#475569;display:none">
+            👤 <span id="hdr-user"></span>
+          </div>
+          <h3>Scope</h3>
+          <div class="grid">
+            <label>Jaar <select id="sel-year"></select></label>
+            <label>Gebied <input id="sel-group" list="groups" placeholder="Hoornaar_Zeist"/></label>
+            <datalist id="groups"><option value="Hoornaar_Zeist"></option></datalist>
+            <button id="apply-scope">Toepassen</button>
+          </div>
+
+          <!-- Filters verplaatst naar filter popup (🔽 knop in kaart toolbar) -->
+          <!-- Verborgen filter-state elementen — worden gelezen door applyFilters() -->
+          <div style="display:none" aria-hidden="true">
+            <input type="checkbox" id="f_type_hoornaar" checked/>
+            <input type="checkbox" id="f_type_nest" checked/>
+            <input type="checkbox" id="f_type_nest_geruimd" checked/>
+            <input type="checkbox" id="f_type_lokpot" checked/>
+            <input type="checkbox" id="f_type_val" checked/>
+            <input type="range" id="f_period_slider" min="0" max="7" value="0"/>
+            <span id="f_period_label">Alles</span>
+            <input type="checkbox" id="f_poly_outline"/>
+            <input type="checkbox" id="f_show_gbif"/>
+            <button id="apply-filters"></button>
+            <button id="reset-filters"></button>
+          </div>
+
+
+          <!-- Fix 102: Overzicht verplaatst naar Beheer scherm (tab Overzicht) -->
+
+          <h3 style="margin-top:16px">Mijn acties</h3>
+          <div id="action-log-list" style="font-size:13px;max-height:260px;overflow-y:auto">
+            <div style="color:#94a3b8;font-size:12px;padding:6px 0">Nog geen acties deze sessie.</div>
+          </div>
+
+        </aside>
+        <div class="content">
+          <div id="map"></div>
+        </div>
+      </div>
+
+      <!-- Backdrop for mobile sidebar -->
+      <div id="sidebar-backdrop" class="hidden" aria-hidden="true"></div>
+
+      <!-- Properties modal -->
+      <!-- Icoon eigenschappen modal -->
+      <div id="prop-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 id="pm-title" style="margin:0 0 16px;font-size:15px"></h3>
+          <!-- Adres (reverse geocode) -->
+          <div id="pm-address-row" style="font-size:12px;color:#64748b;margin-bottom:10px;min-height:16px">
+            <span id="pm-address">📍 adres ophalen…</span>
+          </div>
+          <div class="grid">
+            <label style="font-size:13px">Datum <input id="pm-date" type="date" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
+            <label style="font-size:13px">Door <input id="pm-by" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
+            <div class="only-hoornaar">
+              <label style="font-size:13px">Aantal <input id="pm-amount" type="number" min="0" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px"/></label>
+            </div>
+            <div id="pm-sender-row" style="display:none">
+              <label style="font-size:13px;display:flex;align-items:center;gap:10px;padding:6px 0">
+                Goed voor zenderactie?
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-sender" id="pm-sender-ja" value="ja"/> Ja</label>
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-sender" id="pm-sender-nee" value="nee" checked/> Nee</label>
+              </label>
+            </div>
+
+            <!-- Nest gevonden: nesttype -->
+            <div id="pm-nesttype-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block">Nesttype
+                <select id="pm-nesttype" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="embryonaal">Embryonaal</option>
+                  <option value="primair">Primair</option>
+                  <option value="secundair">Secundair</option>
+                  <option value="verlaten">Verlaten</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Nest geruimd: ruimer, methode, succes -->
+            <div id="pm-ruiming-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block;margin-bottom:6px">Geruimd door
+                <input id="pm-ruimer" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px" placeholder="Naam ruimer"/>
+              </label>
+              <label style="font-size:13px;display:block;margin-bottom:6px">Methode
+                <select id="pm-methode" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="wegzuigen">Wegzuigen</option>
+                  <option value="inspuiten">Inspuiten</option>
+                  <option value="anders">Anders</option>
+                </select>
+              </label>
+              <div style="font-size:13px;margin-bottom:4px">Succesvol geruimd</div>
+              <div style="display:flex;gap:12px">
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-succes" id="pm-succes-ja" value="ja"/> Ja</label>
+                <label style="display:flex;align-items:center;gap:4px;font-weight:normal"><input type="radio" name="pm-succes" id="pm-succes-nee" value="nee" checked/> Nee</label>
+              </div>
+            </div>
+
+            <!-- Val geplaatst: type val + koninginnen -->
+            <div id="pm-val-row" style="display:none;margin-top:8px">
+              <label style="font-size:13px;display:block;margin-bottom:6px">Type val
+                <select id="pm-valtype" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px">
+                  <option value="">&#8212; selecteer &#8212;</option>
+                  <option value="glazen pot">Glazen pot</option>
+                  <option value="ahembriox">Ahembriox</option>
+                  <option value="anders">Anders</option>
+                </select>
+              </label>
+              <label style="font-size:13px;display:block">Koninginnen gevangen
+                <input id="pm-koninginnen" type="number" min="0" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px" placeholder="0"/>
+              </label>
+            </div>
+
+            <label id="pm-note-row" style="font-size:13px;display:block">
+              Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
+            </label>
+            <!-- Broninfo — alleen zichtbaar bij geïmporteerde waarnemingen -->
+            <div id="pm-source-block" style="display:none;margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:10px;font-size:12px">
+              <div style="font-weight:600;color:#475569;margin-bottom:6px">📡 Brongegevens (alleen lezen)</div>
+              <div id="pm-source-rows" style="display:grid;gap:4px"></div>
+            </div>
+            <label id="pm-color-row" class="hidden" style="font-size:13px;display:flex;align-items:center;gap:8px">
+              Kleur gebied <input id="pm-color" type="color" style="width:48px;height:32px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;padding:2px"/>
+            </label>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+              <button id="pm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+              <button id="pm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Polygon kleur modal (apart voor bestaande polygonen) -->
+      <div id="color-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:260px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 style="margin:0 0 16px;font-size:15px">Kleur gebied</h3>
+          <input id="cm-color" type="color" style="width:100%;height:48px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;padding:3px"/>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button id="cm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+            <button id="cm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Zichtlijn opmerking modal -->
+      <div id="line-note-modal" class="hidden" role="dialog" aria-modal="true" style="position:fixed;inset:0;display:grid;place-items:center;background:rgba(0,0,0,.4);z-index:8000">
+        <div style="background:#fff;padding:20px;border-radius:10px;min-width:300px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+          <h3 style="margin:0 0 12px;font-size:15px">📝 Opmerking zichtlijn</h3>
+          <textarea id="lnm-note" rows="4" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font-family:inherit;font-size:13px;resize:vertical" placeholder="Bijv. wat je hebt waargenomen..."></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+            <button id="lnm-cancel" style="padding:7px 14px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;cursor:pointer">Annuleren</button>
+            <button id="lnm-save" style="padding:7px 14px;border:0;border-radius:6px;background:#0aa879;color:#fff;font-weight:600;cursor:pointer">Opslaan</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- App entry (auth-gated) -->
+    <script type="module" src="./main.js?v=610r21f17"></script>
+
+    <!-- ═══════════════════════ HELP OVERLAY ═══════════════════════ -->
+    <div id="help-overlay" style="display:none;position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.5);align-items:flex-start;justify-content:center;padding-top:48px">
+      <div id="help-panel" style="background:#fff;border-radius:14px;width:92%;max-width:600px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden">
+
+        <!-- Header -->
+        <div style="background:#0f172a;color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:22px">🐝</span>
+            <div>
+              <div style="font-weight:700;font-size:16px">HornetApp Help</div>
+              <div style="font-size:11px;opacity:.7">Aziatische hoornaar monitoring</div>
+            </div>
+          </div>
+          <button id="help-close" style="background:none;border:0;color:#fff;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;line-height:1">✕</button>
+        </div>
+
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:2px solid #e2e8f0;flex-shrink:0">
+          <button class="help-tab active" data-tab="volunteer" style="flex:1;padding:11px;border:0;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#0aa879;border-bottom:3px solid #0aa879;margin-bottom:-2px">
+            👤 Vrijwilliger
+          </button>
+          <button class="help-tab" data-tab="admin" style="flex:1;padding:11px;border:0;background:none;cursor:pointer;font-size:13px;font-weight:600;color:#64748b;border-bottom:3px solid transparent;margin-bottom:-2px">
+            ⚙️ Beheerder
+          </button>
+        </div>
+
+        <!-- Content -->
+        <div id="help-body" style="overflow-y:auto;flex:1;padding:0">
+
+          <!-- ── VRIJWILLIGER TAB ── -->
+          <div id="help-volunteer" class="help-page">
+
+            <div style="padding:16px 20px 0">
+              <p style="margin:0 0 16px;color:#475569;font-size:13px;line-height:1.6">
+                Welkom bij HornetApp. Hieronder vind je uitleg over de belangrijkste functies die je als vrijwilliger gebruikt.
+              </p>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🗺️ De kaart</div>
+              <div class="help-row">
+                <div class="help-icon">☰</div>
+                <div><strong>Sidebar openen/sluiten</strong> — Klik op het hamburger-menu linksboven om de zijbalk te tonen of verbergen. Op mobiel sluit de kaart dan volledig.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📍</div>
+                <div><strong>Huidige locatie</strong> — Klik op de locatieknop op de kaart om naar jouw positie te navigeren. Het kompas draait mee met jouw richting.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🛰️</div>
+                <div><strong>Satellietweergave</strong> — Houd de kaart ingedrukt (of rechtermuisknop op desktop) om het kaartmenu te openen. Kies <em>Satelliet/Kaart</em> om te wisselen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🔎</div>
+                <div><strong>Icoon schaling</strong> — Iconen worden groter en tonen meer detail naarmate je verder inzoomt.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📌 Waarnemingen vastleggen</div>
+              <div class="help-row">
+                <div class="help-icon">➕</div>
+                <div><strong>Nieuw icoon plaatsen</strong> — Houd de kaart ingedrukt op de gewenste locatie (of rechtermuisknop). Kies het type:</div>
+              </div>
+              <div style="padding:0 12px 12px 52px;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#cc2222;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🐝</span><span style="font-size:13px"><strong>Waarneming</strong> — je ziet een hoornaar</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#334466;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🪹</span><span style="font-size:13px"><strong>Nest gevonden</strong> — een bevestigd nest</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#1a7a40;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✅</span><span style="font-size:13px"><strong>Nest geruimd</strong> — nest is verwijderd</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#2d6b50;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🪤</span><span style="font-size:13px"><strong>Lokpot</strong> — geplaatste vangpot</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#8b6030;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🪝</span><span style="font-size:13px"><strong>Val geplaatst</strong> — geplaatste val</span></div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✏️</div>
+                <div><strong>Eigenschappen bekijken/bewerken</strong> — Tik op een icoon om datum, waarnemer, aantal en opmerking te zien. Eigen iconen zijn bewerkbaar via <em>Opslaan</em>.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✋</div>
+                <div><strong>Icoon verplaatsen</strong> — Houd een bestaand icoon ingedrukt en kies <em>Verplaatsen</em> in het menu.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Icoon verwijderen</strong> — Houd het icoon ingedrukt en kies <em>Verwijderen</em>.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🔽 Filteren</div>
+              <div class="help-row">
+                <div class="help-icon">🔽</div>
+                <div><strong>Filterknop</strong> — Klik op het gele trechter-icoon in de kaartbalk linksboven. Er opent een popup met alle filteropties. Bevestig met <em>Toepassen</em>. Het icoon kleurt groen als een filter actief is.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">☑️</div>
+                <div><strong>Type filters</strong> — Vink aan welke typen je wilt zien: Waarneming 🐝, Nest 🪹, Nest geruimd ✅, Lokpot 🪤, Val 🪝. Standaard zijn alle typen zichtbaar.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📅</div>
+                <div><strong>Periodefilter</strong> — Schuif de slider om te filteren op vandaag, week, 2 weken, maand of jaar. Helemaal links = alles tonen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🌍</div>
+                <div><strong>GBIF waarnemingen</strong> — GBIF-data van waarneming.nl is standaard zichtbaar. Vink <em>Verberg GBIF</em> aan om alleen eigen waarnemingen te zien.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">⬜</div>
+                <div><strong>Polygonen alleen omtrek</strong> — Zet de gebiedsvulling uit zodat je de kaart beter ziet.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📍 Gebied en jaar wisselen</div>
+              <div class="help-row">
+                <div class="help-icon">🔄</div>
+                <div><strong>Automatisch wisselen</strong> — Kies bovenin de sidebar een ander jaar of gebied. De kaart herlaadt direct zonder op Toepassen te klikken. De sidebar sluit automatisch.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📋 Mijn acties</div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div><strong>Actie-log</strong> — Onderin de sidebar staat een lijst van jouw acties in de huidige sessie. Klik op een actie om de eigenschappen te bewerken.</div>
+              </div>
+            </div>
+
+            <div class="help-section" style="margin-bottom:20px">
+              <div class="help-section-title">📊 Overzicht</div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div>Het overzicht vind je in het <strong>⚙️ Beheer</strong>-scherm, tab <em>📊 Overzicht</em>. Het toont het aantal waarnemingen 🐝, lokpotten 🪤, nesten 🪹, geruimd ✅ en vallen 🪝 per gebied. Kies een jaar en periode bovenin.</div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ── BEHEERDER TAB ── -->
+          <div id="help-admin" class="help-page" style="display:none">
+
+            <div style="padding:16px 20px 0">
+              <p style="margin:0 0 16px;color:#475569;font-size:13px;line-height:1.6">
+                Als beheerder (manager) heb je toegang tot tekenen en het overzichtsrapport. Als admin heb je daarnaast ook gebruikersbeheer, gebiedenbeheer en data-import.
+              </p>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">⚙️ Beheer-scherm openen</div>
+              <div class="help-row">
+                <div class="help-icon">⚙️</div>
+                <div><strong>Beheer-knop</strong> — Klik op <em>⚙️ Beheer</em> rechtsboven. Het scherm opent altijd op de <em>📊 Overzicht</em>-tab. Als admin heb je ook toegang tot Gebruikers, Gebieden, CSV Import en GBIF Sync.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📊 Overzicht (Beheer → Overzicht)</div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div><strong>Perioderapport</strong> — Kies een jaar en periode (Vandaag, Week, Maand…). Je ziet per gebied en polygoon het aantal: 🐝 Waarnemingen, 🪤 Lokpotten, 🪹 Nesten, ✅ Geruimd en 🪝 Vallen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🌍</div>
+                <div><strong>GBIF uitsluiten</strong> — Vink <em>GBIF uitsluiten</em> aan om alleen eigen waarnemingen in de tellingen te zien.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📍 Gebiedenbeheer (⚙️ Beheer → Gebieden)</div>
+              <div class="help-row">
+                <div class="help-icon">➕</div>
+                <div><strong>Nieuw gebied toevoegen</strong> — Klik op <em>+ Nieuw gebied</em>. Vul naam, interne sleutel, centrumcoördinaten en de bounding box in. De bounding box bepaalt welke CSV- en GBIF-waarnemingen aan dit gebied worden gekoppeld.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✏️</div>
+                <div><strong>Gebied bewerken</strong> — Klik op het ✏️-icoon naast een gebied om naam of coördinaten aan te passen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Gebied verwijderen</strong> — Klik op 🗑️. De kaartdata blijft bewaard maar het gebied is niet meer selecteerbaar. Gebruikers moeten de app herladen.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🖊️ Tekenen (manager + admin)</div>
+              <div class="help-row">
+                <div class="help-icon">▭</div>
+                <div><strong>Gebieden tekenen</strong> — De tekenknopppen verschijnen linksboven op de kaart. Teken polygonen om werkgebieden af te bakenen. Ze worden opgeslagen per zone en jaar.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div><strong>Polygoon kopiëren naar jaar</strong> — Rechtsklik op een polygoon → <em>Kopiëren naar jaar…</em> om een gebied naar een ander jaar te kopiëren.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">💬</div>
+                <div><strong>Naam en kleur</strong> — Houd een gebied ingedrukt (of rechtermuisknop) en kies <em>Naam/kleur</em> om het gebied een herkenbare naam en kleur te geven.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">👥 Gebruikersbeheer (⚙️ Beheer → Gebruikers)</div>
+              <div class="help-row">
+                <div class="help-icon">⏳</div>
+                <div><strong>Nieuwe gebruikers accepteren</strong> — Nieuwe aanmeldingen staan bovenaan als <em>pending</em>. Stel naam, rol en toegestane gebieden in.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗂️</div>
+                <div><strong>Rollen</strong> — <strong>Vrijwilliger</strong>: iconen plaatsen + overzicht. <strong>Manager</strong>: ook tekenen in eigen gebieden. <strong>Admin</strong>: alles inclusief gebruikers- en gebiedenbeheer.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📍</div>
+                <div><strong>Gebieden toewijzen</strong> — Per gebruiker geef je aan in welke zones hij/zij actief is. Nieuwe gebieden verschijnen automatisch in de lijst zodra ze zijn aangemaakt.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">🌍 GBIF Sync (⚙️ Beheer → GBIF Sync)</div>
+              <div class="help-row">
+                <div class="help-icon">▶️</div>
+                <div><strong>Synchroniseren</strong> — Haalt waarnemingen van Aziatische hoornaar op via de GBIF API. Kies een startdatum. Waarnemingen worden per jaar en zone opgeslagen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Alle GBIF verwijderen</strong> — Verwijdert alle geïmporteerde GBIF-markers uit alle jaren. Gebruik dit voor een schone herstart na een fout.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🔍</div>
+                <div><strong>Toon ruwe velden</strong> — Toont alle velden die GBIF teruggeeft voor één waarneming. Handig om te controleren welke coördinaten beschikbaar zijn.</div>
+              </div>
+            </div>
+
+            <div class="help-section" style="margin-bottom:20px">
+              <div class="help-section-title">🔄 CSV Import (⚙️ Beheer → CSV Import)</div>
+              <div class="help-row">
+                <div class="help-icon">📥</div>
+                <div><strong>CSV importeren</strong> — Exporteer waarnemingen van Aziatische hoornaar als CSV via waarneming.nl en upload het bestand. Duplicaten worden automatisch overgeslagen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📌</div>
+                <div><strong>Automatische zone-koppeling</strong> — Geïmporteerde waarnemingen worden automatisch aan de juiste zone gekoppeld op basis van de coördinaten en de bounding box van elk gebied.</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:10px 20px;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#f8fafc">
+          <span style="font-size:11px;color:#94a3b8">HornetApp — Aziatische hoornaar monitoring</span>
+          <button id="help-close-btn" style="padding:7px 18px;background:#0aa879;color:#fff;border:0;border-radius:7px;font-weight:600;cursor:pointer;font-size:13px">Sluiten</button>
+        </div>
+
+      </div>
+    </div>
+
+    <style>
+      #help-overlay.open { display:flex !important; }
+      .help-tab { transition: color .15s, border-color .15s; }
+      .help-tab.active { color:#0aa879 !important; border-bottom-color:#0aa879 !important; }
+      .help-section { padding:0 20px 4px; border-bottom:1px solid #f1f5f9; margin-bottom:4px; }
+      .help-section:last-child { border-bottom:0; }
+      .help-section-title { font-weight:700; font-size:13px; color:#0f172a; margin:14px 0 10px; display:flex; align-items:center; gap:6px; }
+      .help-row { display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; font-size:13px; color:#334155; line-height:1.5; }
+      .help-icon { width:28px; height:28px; background:#f1f5f9; border-radius:7px; display:flex; align-items:center; justify-content:center; font-size:15px; flex-shrink:0; margin-top:1px; }
+      @media (max-width:600px) {
+        #help-panel { width:100%; max-width:100%; border-radius:14px 14px 0 0; max-height:90vh; }
+        #help-overlay { padding-top:0; align-items:flex-end; }
+      }
+    </style>
+
+  </body>
+</html>

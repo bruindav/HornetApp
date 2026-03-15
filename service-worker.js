@@ -1,53 +1,47 @@
-// service-worker.js — Fix 43
-const CACHE = 'hornet-v43-fix43';
-
-self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll([
-      '/',
-      '/index.html',
-      '/app.css',
-      '/favicon.ico',
-      '/manifest.webmanifest',
-      // bewust geen main.js hier, zodat we geen oude versie pinnen
-    ]))
-  );
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    const names = await caches.keys();
-    await Promise.all(names.map(n => n !== CACHE && caches.delete(n)));
-    await self.clients.claim();
-  })());
-});
-
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-
-  if (req.destination === 'script') {
-    // network-first voor scripts (zoals main.js)
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        return fresh;
-      } catch {
-        const cache = await caches.open(CACHE);
-        const cached = await cache.match(req);
-        return cached || Response.error();
-      }
-    })());
-    return;
-  }
-
-  // default: cache-first
-  event.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-    const cached = await cache.match(req);
-    if (cached) return cached;
-    const fresh = await fetch(req);
-    cache.put(req, fresh.clone());
-    return fresh;
-  })());
-});
+{
+  "name": "HornetApp — Aziatische hoornaar",
+  "short_name": "HornetApp",
+  "description": "Monitoring en coördinatie van Aziatische hoornaar (Vespa velutina) voor vrijwilligers en beheerders.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0aa879",
+  "lang": "nl-NL",
+  "categories": ["nature", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-72x72.png",   "sizes": "72x72",   "type": "image/png" },
+    { "src": "/icons/icon-96x96.png",   "sizes": "96x96",   "type": "image/png" },
+    { "src": "/icons/icon-128x128.png", "sizes": "128x128", "type": "image/png" },
+    { "src": "/icons/icon-144x144.png", "sizes": "144x144", "type": "image/png" },
+    { "src": "/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-256x256.png", "sizes": "256x256", "type": "image/png" },
+    { "src": "/icons/icon-384x384.png", "sizes": "384x384", "type": "image/png" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "/icons/screenshot-mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "HornetApp kaartweergave"
+    },
+    {
+      "src": "/icons/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "HornetApp desktop"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Kaart openen",
+      "url": "/",
+      "icons": [{ "src": "/icons/icon-96x96.png", "sizes": "96x96" }]
+    }
+  ]
+}
