@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "io.github.bruindav.twa",
+        "sha256_cert_fingerprints": ["4F:44:2D:C9:AB:86:57:99:C2:E1:21:E2:18:52:79:DB:E2:71:09:CB:41:1E:8D:E9:A5:F0:73:CF:D8:A7:8C:41"]
+      }
+    }]
