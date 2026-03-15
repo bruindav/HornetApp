@@ -1,16 +1,16 @@
-// service-worker.js — Fix 125
+// service-worker.js — Fix 128
 const CACHE_STATIC = 'hornet-static-v125';
 const CACHE_DYNAMIC = 'hornet-dynamic-v125';
 
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/app.css',
-  '/manifest.webmanifest',
-  '/icons/icon-192x192.png',
-  '/icons/icon-512x512.png',
-  '/icons/apple-touch-icon.png',
-  '/icons/favicon.ico',
+  './',
+  './index.html',
+  './app.css',
+  './manifest.webmanifest',
+  './icons/icon-192x192.png',
+  './icons/icon-512x512.png',
+  './icons/apple-touch-icon.png',
+  './icons/favicon.ico',
 ];
 
 // Install: cache statische assets
@@ -70,7 +70,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Iconen en statische bestanden: cache-first
-  if (req.destination === 'image' || url.pathname.startsWith('/icons/')) {
+  if (req.destination === 'image' || url.pathname.includes('/icons/')) {
     event.respondWith((async () => {
       const staticCache = await caches.open(CACHE_STATIC);
       const cached = await staticCache.match(req);
@@ -93,7 +93,7 @@ self.addEventListener('fetch', (event) => {
         return await fetch(req);
       } catch {
         const cache = await caches.open(CACHE_STATIC);
-        return await cache.match('/index.html') || Response.error();
+        return await cache.match('./index.html') || Response.error();
       }
     })());
     return;
@@ -117,11 +117,11 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE).then((cache) => cache.addAll([
-      '/',
-      '/index.html',
-      '/app.css',
+      './',
+      './index.html',
+      './app.css',
       '/favicon.ico',
-      '/manifest.webmanifest',
+      './manifest.webmanifest',
       // bewust geen main.js hier, zodat we geen oude versie pinnen
     ]))
   );
