@@ -1,7 +1,7 @@
 {
-  "id": "nl.hornetapp.vespa-velutina",
-  "name": "HornetApp — Aziatische hoornaar",
-  "short_name": "HornetApp",
+  "id": "nl.hoornaarzoeken.vespa-velutina",
+  "name": "HoornaarZoeken",
+  "short_name": "HoornaarZoeken",
   "description": "Monitoring en coördinatie van Aziatische hoornaar (Vespa velutina) voor vrijwilligers en beheerders.",
   "start_url": "./",
   "scope": "./",
