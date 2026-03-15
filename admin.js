@@ -1,4 +1,4 @@
-// admin.js — Fix 120
+// admin.js — Fix 121
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -698,6 +698,14 @@ function _showZoneEditModal(zone, isNew, onSave) {
         <label>Sleutel (interne ID, geen spaties)
           <input id="ze-key" value="${zone.key||''}" ${isNew?'':'readonly style="opacity:0.6"'} style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box" placeholder="bijv. Doorn"/>
         </label>
+
+        <!-- Kaart-picker voor centrumcoördinaat -->
+        <div>
+          <div style="font-size:12px;color:#475569;margin-bottom:4px;font-weight:600">📍 Klik op de kaart om het centrum te kiezen</div>
+          <div id="ze-picker-map" style="height:200px;border-radius:8px;border:1px solid #cbd5e1;overflow:hidden;cursor:crosshair"></div>
+          <div id="ze-picker-hint" style="font-size:11px;color:#94a3b8;margin-top:3px">Klik op een locatie — coördinaten worden automatisch ingevuld</div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end">
           <label>Lat centrum<input id="ze-lat" type="number" step="0.0001" value="${dfl}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
           <label>Lon centrum<input id="ze-lon" type="number" step="0.0001" value="${dfo}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
@@ -707,7 +715,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
           <input id="ze-zoom" type="number" min="11" max="15" value="${zone.zoom||13}" style="width:80px;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px"/>
         </label>
 
-        <!-- Kaartpreview -->
+        <!-- Bbox preview -->
         <div id="ze-map-preview" style="display:none;border-radius:8px;overflow:hidden;border:1px solid #e2e8f0">
           <img id="ze-map-img" style="width:100%;display:block" alt="Kaartpreview"/>
           <div id="ze-map-label" style="font-size:11px;color:#64748b;padding:4px 8px;background:#f8fafc"></div>
@@ -733,6 +741,31 @@ function _showZoneEditModal(zone, isNew, onSave) {
       <div id="ze-error" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>
     </div>`;
   document.body.appendChild(modal);
+
+  // Initialiseer Leaflet picker kaart
+  let pickerMarker = null;
+  const pickerMap = L.map('ze-picker-map', { zoomControl: true, attributionControl: false }).setView([dfl, dfo], 11);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(pickerMap);
+
+  // Toon bestaand centrum als marker
+  if (zone.lat && zone.lon) {
+    pickerMarker = L.marker([zone.lat, zone.lon]).addTo(pickerMap);
+  }
+
+  pickerMap.on('click', (e) => {
+    const { lat, lng } = e.latlng;
+    // Marker plaatsen of verplaatsen
+    if (pickerMarker) pickerMarker.setLatLng([lat, lng]);
+    else pickerMarker = L.marker([lat, lng]).addTo(pickerMap);
+    // Velden invullen (4 decimalen)
+    modal.querySelector('#ze-lat').value = lat.toFixed(5);
+    modal.querySelector('#ze-lon').value = lng.toFixed(5);
+    modal.querySelector('#ze-picker-hint').textContent = `📍 ${lat.toFixed(5)}, ${lng.toFixed(5)} — klik op 🔍 Zoek bbox`;
+    modal.querySelector('#ze-picker-hint').style.color = '#0aa879';
+  });
+
+  // Leaflet heeft invalidateSize nodig als de container net zichtbaar is
+  setTimeout(() => pickerMap.invalidateSize(), 100);
 
   // Auto-fill sleutel vanuit naam
   if (isNew) {
@@ -771,6 +804,19 @@ function _showZoneEditModal(zone, isNew, onSave) {
   }
 
   // Bbox opzoeken via Nominatim bij lat/lon
+  // Handmatige invoer lat/lon → marker op kaart bijwerken
+  ['ze-lat','ze-lon'].forEach(id => {
+    modal.querySelector('#'+id).addEventListener('change', () => {
+      const lat = parseFloat(modal.querySelector('#ze-lat').value);
+      const lon = parseFloat(modal.querySelector('#ze-lon').value);
+      if (!isNaN(lat) && !isNaN(lon)) {
+        if (pickerMarker) pickerMarker.setLatLng([lat, lon]);
+        else pickerMarker = L.marker([lat, lon]).addTo(pickerMap);
+        pickerMap.setView([lat, lon], pickerMap.getZoom());
+      }
+    });
+  });
+
   modal.querySelector('#ze-lookup').addEventListener('click', async () => {
     const lat = parseFloat(modal.querySelector('#ze-lat').value);
     const lon = parseFloat(modal.querySelector('#ze-lon').value);
@@ -809,7 +855,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
   // Direct preview tonen als bbox al ingevuld is
   if (zone.bbox) _updatePreview();
 
-  modal.querySelector('#ze-cancel').onclick = () => modal.remove();
+  modal.querySelector('#ze-cancel').onclick = () => { pickerMap.remove(); modal.remove(); };
   modal.querySelector('#ze-save').onclick = () => {
     const label = modal.querySelector('#ze-label').value.trim();
     const key   = modal.querySelector('#ze-key').value.trim();
@@ -830,7 +876,7 @@ function _showZoneEditModal(zone, isNew, onSave) {
     const wkt = `POLYGON((${bMinLon} ${bMinLat},${bMaxLon} ${bMinLat},${bMaxLon} ${bMaxLat},${bMinLon} ${bMaxLat},${bMinLon} ${bMinLat}))`;
 
     onSave({ key, label, lat, lon, zoom, bbox, wkt });
-    modal.remove();
+    pickerMap.remove(); modal.remove();
   };
 }
 
