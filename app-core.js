@@ -1813,8 +1813,8 @@ const LS_SCOPE = "hornet_scope_v610"; // {year, group}
 const DEFAULT_YEAR = String(new Date().getFullYear());
 const DEFAULT_GROUP = "Zeist";
 
-// Zones: interne sleutel → weergavenaam + kaartcentrum
-const ZONE_META = {
+// Zones: worden geladen uit Firestore config/zones — hier de fallback
+let ZONE_META = {
   'Zeist':       { label: 'Zeist',       lat: 52.0893, lon: 5.2425, zoom: 13 },
   'Bilthoven':   { label: 'Bilthoven',   lat: 52.1267, lon: 5.1986, zoom: 13 },
   'Driebergen':  { label: 'Driebergen',  lat: 52.0561, lon: 5.2867, zoom: 13 },
@@ -1827,6 +1827,25 @@ const ZONE_ALIAS = {
   'Hoornaar_Driebergen': 'Driebergen',
   'Hoornaar_Utrecht':    'Utrecht',
 };
+
+async function _loadZonesFromFirestore() {
+  try {
+    const snap = await getDoc(doc(_db, 'config', 'zones'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.zones) && data.zones.length) {
+        const newMeta = {};
+        data.zones.forEach(z => {
+          if (z.key) newMeta[z.key] = { label: z.label||z.key, lat: z.lat||52.09, lon: z.lon||5.12, zoom: z.zoom||13 };
+        });
+        if (Object.keys(newMeta).length) ZONE_META = newMeta;
+        console.log('[zones] geladen uit Firestore:', Object.keys(ZONE_META));
+      }
+    }
+  } catch(e) {
+    console.warn('[zones] fallback op hard-coded zones:', e.message);
+  }
+}
 function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
 function zoomToZone(zone) {
   const z = normalizeZone(zone);
@@ -1906,7 +1925,8 @@ function activateScope(year, group, reload=false){
   updateHeaderScope(group, year);
 }
 // ======================= DOMContentLoaded: alles starten =======================
-function boot(){
+async function boot(){
+  await _loadZonesFromFirestore();
   initMap();
   initUIBindings();
   const selYear = $('sel-year');

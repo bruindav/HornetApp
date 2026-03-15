@@ -1,6 +1,6 @@
-// firestore.rules — Fix 54
-// Wijziging t.o.v. Fix 39:
-// - canWriteZone: geldige Firestore Rules syntax (geen let, geen string +)
+// firestore.rules — Fix 119
+// Wijziging t.o.v. Fix 54:
+// - config/zones: leesbaar voor iedereen ingelogd, schrijfbaar alleen voor admin
 
 rules_version = '2';
 service cloud.firestore {
@@ -66,6 +66,12 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == uid;
       allow update, delete: if isAdmin();
+    }
+
+    match /config/{docId} {
+      // Zones config: leesbaar voor iedereen ingelogd, schrijfbaar alleen voor admin
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }

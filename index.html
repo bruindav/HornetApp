@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 118 -->
+<!-- index.html — Fix 119 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -403,7 +403,7 @@
               <div class="help-section-title">🗺️ De kaart</div>
               <div class="help-row">
                 <div class="help-icon">☰</div>
-                <div><strong>Sidebar openen/sluiten</strong> — Klik op het hamburger-menu linksboven om de filterbalk te tonen of verbergen. Op mobiel sluit de kaart dan volledig.</div>
+                <div><strong>Sidebar openen/sluiten</strong> — Klik op het hamburger-menu linksboven om de zijbalk te tonen of verbergen. Op mobiel sluit de kaart dan volledig.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">📍</div>
@@ -415,7 +415,7 @@
               </div>
               <div class="help-row">
                 <div class="help-icon">🔎</div>
-                <div><strong>Icoon schaling</strong> — Iconen worden groter en tonen meer detail naarmate je verder inzoomt. Zoom voorbij niveau 15 voor het volledige icoon met tekst.</div>
+                <div><strong>Icoon schaling</strong> — Iconen worden groter en tonen meer detail naarmate je verder inzoomt.</div>
               </div>
             </div>
 
@@ -426,7 +426,7 @@
                 <div><strong>Nieuw icoon plaatsen</strong> — Houd de kaart ingedrukt op de gewenste locatie (of rechtermuisknop). Kies het type:</div>
               </div>
               <div style="padding:0 12px 12px 52px;display:flex;flex-direction:column;gap:6px">
-                <div style="display:flex;align-items:center;gap:8px"><span style="background:#cc2222;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🐝</span><span style="font-size:13px"><strong>Waarneming</strong> — je ziet een hoornaar of nest in de buurt</span></div>
+                <div style="display:flex;align-items:center;gap:8px"><span style="background:#cc2222;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🐝</span><span style="font-size:13px"><strong>Waarneming</strong> — je ziet een hoornaar</span></div>
                 <div style="display:flex;align-items:center;gap:8px"><span style="background:#334466;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🪹</span><span style="font-size:13px"><strong>Nest gevonden</strong> — een bevestigd nest</span></div>
                 <div style="display:flex;align-items:center;gap:8px"><span style="background:#1a7a40;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">✅</span><span style="font-size:13px"><strong>Nest geruimd</strong> — nest is verwijderd</span></div>
                 <div style="display:flex;align-items:center;gap:8px"><span style="background:#2d6b50;color:#fff;border-radius:50%;width:24px;height:24px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0">🪤</span><span style="font-size:13px"><strong>Lokpot</strong> — geplaatste vangpot</span></div>
@@ -434,11 +434,11 @@
               </div>
               <div class="help-row">
                 <div class="help-icon">✏️</div>
-                <div><strong>Eigenschappen bewerken</strong> — Tik op een icoon om datum, waarnemer, aantal en opmerking in te stellen. Klik op <em>Opslaan</em>.</div>
+                <div><strong>Eigenschappen bekijken/bewerken</strong> — Tik op een icoon om datum, waarnemer, aantal en opmerking te zien. Eigen iconen zijn bewerkbaar via <em>Opslaan</em>.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">✋</div>
-                <div><strong>Icoon verplaatsen</strong> — Houd een bestaand icoon ingedrukt en kies <em>Verplaatsen</em>. Sleep het naar de juiste positie.</div>
+                <div><strong>Icoon verplaatsen</strong> — Houd een bestaand icoon ingedrukt en kies <em>Verplaatsen</em> in het menu.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">🗑️</div>
@@ -447,18 +447,26 @@
             </div>
 
             <div class="help-section">
-              <div class="help-section-title">🔍 Filteren</div>
+              <div class="help-section-title">🔽 Filteren</div>
+              <div class="help-row">
+                <div class="help-icon">🔽</div>
+                <div><strong>Filterknop</strong> — Klik op het gele trechter-icoon in de kaartbalk linksboven. Er opent een popup met alle filteropties. Bevestig met <em>Toepassen</em>. Het icoon kleurt groen als een filter actief is.</div>
+              </div>
               <div class="help-row">
                 <div class="help-icon">☑️</div>
-                <div><strong>Type filters</strong> — Vink in de sidebar aan welke typen je wilt zien: Waarneming, Nest, Nest geruimd, Lokpot, Val of Pending.</div>
+                <div><strong>Type filters</strong> — Vink aan welke typen je wilt zien: Waarneming 🐝, Nest 🪹, Nest geruimd ✅, Lokpot 🪤, Val 🪝. Standaard zijn alle typen zichtbaar.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">📅</div>
-                <div><strong>Periodefilter</strong> — Schuif de slider om alleen waarnemingen van vandaag, de afgelopen week, 2 weken, maand of jaar te tonen. Helemaal links = alles.</div>
+                <div><strong>Periodefilter</strong> — Schuif de slider om te filteren op vandaag, week, 2 weken, maand of jaar. Helemaal links = alles tonen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🌍</div>
+                <div><strong>GBIF waarnemingen</strong> — GBIF-data van waarneming.nl is standaard zichtbaar. Vink <em>Verberg GBIF</em> aan om alleen eigen waarnemingen te zien.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">⬜</div>
-                <div><strong>Polygonen alleen omtrek</strong> — Zet de gebiedskleur uit zodat je de kaart beter ziet door de gebieden heen.</div>
+                <div><strong>Polygonen alleen omtrek</strong> — Zet de gebiedsvulling uit zodat je de kaart beter ziet.</div>
               </div>
             </div>
 
@@ -466,7 +474,15 @@
               <div class="help-section-title">📍 Gebied en jaar wisselen</div>
               <div class="help-row">
                 <div class="help-icon">🔄</div>
-                <div><strong>Automatisch wisselen</strong> — Kies bovenin de sidebar een ander jaar of gebied. De kaart herlaadt direct — je hoeft niet op <em>Toepassen</em> te klikken.</div>
+                <div><strong>Automatisch wisselen</strong> — Kies bovenin de sidebar een ander jaar of gebied. De kaart herlaadt direct zonder op Toepassen te klikken. De sidebar sluit automatisch.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📋 Mijn acties</div>
+              <div class="help-row">
+                <div class="help-icon">📋</div>
+                <div><strong>Actie-log</strong> — Onderin de sidebar staat een lijst van jouw acties in de huidige sessie. Klik op een actie om de eigenschappen te bewerken.</div>
               </div>
             </div>
 
@@ -474,7 +490,7 @@
               <div class="help-section-title">📊 Overzicht</div>
               <div class="help-row">
                 <div class="help-icon">📋</div>
-                <div>Het overzicht vind je in het <strong>⚙️ Beheer</strong>-scherm, tab <em>📊 Overzicht</em>. Het toont het aantal waarnemingen 🐝, lokpotten 🪤, nesten 🪹, geruimd ✅ en vallen 🪝 per gebied voor de gekozen periode.</div>
+                <div>Het overzicht vind je in het <strong>⚙️ Beheer</strong>-scherm, tab <em>📊 Overzicht</em>. Het toont het aantal waarnemingen 🐝, lokpotten 🪤, nesten 🪹, geruimd ✅ en vallen 🪝 per gebied. Kies een jaar en periode bovenin.</div>
               </div>
             </div>
 
@@ -485,7 +501,7 @@
 
             <div style="padding:16px 20px 0">
               <p style="margin:0 0 16px;color:#475569;font-size:13px;line-height:1.6">
-                Als beheerder (manager) of admin heb je toegang tot extra functies: tekenen, gebruikersbeheer, data-import en het overzichtsrapport.
+                Als beheerder (manager) of admin heb je toegang tot extra functies: tekenen, gebruikersbeheer, gebiedenbeheer, data-import en het overzichtsrapport.
               </p>
             </div>
 
@@ -493,7 +509,7 @@
               <div class="help-section-title">⚙️ Beheer-scherm openen</div>
               <div class="help-row">
                 <div class="help-icon">⚙️</div>
-                <div><strong>Beheer-knop</strong> — Klik op <em>⚙️ Beheer</em> rechtsboven. Als vrijwilliger of beheerder zie je alleen de <em>📊 Overzicht</em>-tab. Als admin heb je ook toegang tot Gebruikers, CSV Import en GBIF Sync.</div>
+                <div><strong>Beheer-knop</strong> — Klik op <em>⚙️ Beheer</em> rechtsboven. Het scherm opent altijd op de <em>📊 Overzicht</em>-tab. Als admin heb je ook toegang tot Gebruikers, Gebieden, CSV Import en GBIF Sync.</div>
               </div>
             </div>
 
@@ -501,7 +517,27 @@
               <div class="help-section-title">📊 Overzicht (Beheer → Overzicht)</div>
               <div class="help-row">
                 <div class="help-icon">📋</div>
-                <div><strong>Perioderapport</strong> — Kies Week, 2 weken, Maand of Jaar. Je ziet per gebied en polygoon het aantal: 🐝 Waarnemingen, 🪤 Lokpotten, 🪹 Nesten, ✅ Geruimd en 🪝 Vallen. Houd een kolomkop ingedrukt voor uitleg.</div>
+                <div><strong>Perioderapport</strong> — Kies een jaar en periode (Vandaag, Week, Maand…). Je ziet per gebied en polygoon het aantal: 🐝 Waarnemingen, 🪤 Lokpotten, 🪹 Nesten, ✅ Geruimd en 🪝 Vallen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🌍</div>
+                <div><strong>GBIF uitsluiten</strong> — Vink <em>GBIF uitsluiten</em> aan om alleen eigen waarnemingen in de tellingen te zien.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
+              <div class="help-section-title">📍 Gebiedenbeheer (⚙️ Beheer → Gebieden)</div>
+              <div class="help-row">
+                <div class="help-icon">➕</div>
+                <div><strong>Nieuw gebied toevoegen</strong> — Klik op <em>+ Nieuw gebied</em>. Vul naam, interne sleutel, centrumcoördinaten en de bounding box in. De bounding box bepaalt welke CSV- en GBIF-waarnemingen aan dit gebied worden gekoppeld.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">✏️</div>
+                <div><strong>Gebied bewerken</strong> — Klik op het ✏️-icoon naast een gebied om naam of coördinaten aan te passen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Gebied verwijderen</strong> — Klik op 🗑️. De kaartdata blijft bewaard maar het gebied is niet meer selecteerbaar. Gebruikers moeten de app herladen.</div>
               </div>
             </div>
 
@@ -512,16 +548,12 @@
                 <div><strong>Gebieden tekenen</strong> — De tekenknopppen verschijnen linksboven op de kaart. Teken polygonen om werkgebieden af te bakenen. Ze worden opgeslagen per zone en jaar.</div>
               </div>
               <div class="help-row">
-                <div class="help-icon">✏️</div>
-                <div><strong>Gebied bewerken</strong> — Klik op een bestaand gebied om het te selecteren, dan op de bewerk-knop om punten te verslepen.</div>
+                <div class="help-icon">📋</div>
+                <div><strong>Polygoon kopiëren naar jaar</strong> — Rechtsklik op een polygoon → <em>Kopiëren naar jaar…</em> om een gebied naar een ander jaar te kopiëren.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">💬</div>
                 <div><strong>Naam en kleur</strong> — Houd een gebied ingedrukt (of rechtermuisknop) en kies <em>Naam/kleur</em> om het gebied een herkenbare naam en kleur te geven.</div>
-              </div>
-              <div class="help-row">
-                <div class="help-icon">📏</div>
-                <div><strong>Zichtlijnen en sectoren</strong> — Via het contextmenu op een lokpot kun je zichtlijnen naar omliggende punten tekenen om dekking te visualiseren.</div>
               </div>
             </div>
 
@@ -529,47 +561,43 @@
               <div class="help-section-title">👥 Gebruikersbeheer (⚙️ Beheer → Gebruikers)</div>
               <div class="help-row">
                 <div class="help-icon">⏳</div>
-                <div><strong>Nieuwe gebruikers accepteren</strong> — Nieuwe aanmeldingen staan bovenaan als <em>pending</em>. Stel naam, rol en toegestane gebieden in en kies de juiste rol.</div>
+                <div><strong>Nieuwe gebruikers accepteren</strong> — Nieuwe aanmeldingen staan bovenaan als <em>pending</em>. Stel naam, rol en toegestane gebieden in.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">🗂️</div>
-                <div><strong>Rollen</strong> — Er zijn drie rollen: <strong>Vrijwilliger</strong> (iconen plaatsen + overzicht), <strong>Manager</strong> (ook tekenen in eigen gebieden + overzicht), <strong>Admin</strong> (alles inclusief gebruikersbeheer).</div>
+                <div><strong>Rollen</strong> — <strong>Vrijwilliger</strong>: iconen plaatsen + overzicht. <strong>Manager</strong>: ook tekenen in eigen gebieden. <strong>Admin</strong>: alles inclusief gebruikers- en gebiedenbeheer.</div>
               </div>
               <div class="help-row">
                 <div class="help-icon">📍</div>
-                <div><strong>Gebieden toewijzen</strong> — Per gebruiker geef je aan in welke zones hij/zij actief is. Een manager kan alleen in eigen zones tekenen.</div>
-              </div>
-              <div class="help-row">
-                <div class="help-icon">📧</div>
-                <div><strong>Welkomstmail</strong> — Na acceptatie ontvangt de gebruiker automatisch een e-mail met zijn rol en gebieden via EmailJS.</div>
+                <div><strong>Gebieden toewijzen</strong> — Per gebruiker geef je aan in welke zones hij/zij actief is. Nieuwe gebieden verschijnen automatisch in de lijst zodra ze zijn aangemaakt.</div>
               </div>
             </div>
 
             <div class="help-section">
+              <div class="help-section-title">🌍 GBIF Sync (⚙️ Beheer → GBIF Sync)</div>
+              <div class="help-row">
+                <div class="help-icon">▶️</div>
+                <div><strong>Synchroniseren</strong> — Haalt waarnemingen van Aziatische hoornaar op via de GBIF API. Kies een startdatum. Waarnemingen worden per jaar en zone opgeslagen.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗑️</div>
+                <div><strong>Alle GBIF verwijderen</strong> — Verwijdert alle geïmporteerde GBIF-markers uit alle jaren. Gebruik dit voor een schone herstart na een fout.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🔍</div>
+                <div><strong>Toon ruwe velden</strong> — Toont alle velden die GBIF teruggeeft voor één waarneming. Handig om te controleren welke coördinaten beschikbaar zijn.</div>
+              </div>
+            </div>
+
+            <div class="help-section" style="margin-bottom:20px">
               <div class="help-section-title">🔄 CSV Import (⚙️ Beheer → CSV Import)</div>
               <div class="help-row">
                 <div class="help-icon">📥</div>
                 <div><strong>CSV importeren</strong> — Exporteer waarnemingen van Aziatische hoornaar als CSV via waarneming.nl en upload het bestand. Duplicaten worden automatisch overgeslagen.</div>
               </div>
               <div class="help-row">
-                <div class="help-icon">🗓️</div>
-                <div><strong>Exporteren vanuit waarneming.nl</strong> — Ga naar waarneming.nl → Verkennen → zoek "Aziatische hoornaar" → filter op regio → Exporteren → CSV.</div>
-              </div>
-              <div class="help-row">
                 <div class="help-icon">📌</div>
-                <div><strong>Automatische zone-koppeling</strong> — Geïmporteerde waarnemingen worden automatisch aan de juiste zone gekoppeld op basis van de coördinaten.</div>
-              </div>
-            </div>
-
-            <div class="help-section" style="margin-bottom:20px">
-              <div class="help-section-title">⚙️ Overige beheertools</div>
-              <div class="help-row">
-                <div class="help-icon">↺</div>
-                <div><strong>Cache resetten</strong> — De ↺ knop rechtsboven reset de serviceworker cache en herlaadt de app. Gebruik dit als de app een oude versie toont.</div>
-              </div>
-              <div class="help-row">
-                <div class="help-icon">🔄</div>
-                <div><strong>Scope wisselen</strong> — Kies bovenin de sidebar het jaar of gebied. De kaart herlaadt <strong>direct</strong> zonder op Toepassen te klikken.</div>
+                <div><strong>Automatische zone-koppeling</strong> — Geïmporteerde waarnemingen worden automatisch aan de juiste zone gekoppeld op basis van de coördinaten en de bounding box van elk gebied.</div>
               </div>
             </div>
 

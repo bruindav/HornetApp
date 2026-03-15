@@ -1,4 +1,4 @@
-// admin.js — Fix 117
+// admin.js — Fix 119
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -24,12 +24,39 @@ const EMAILJS_SERVICE_ID  = 'service_am7yhzo';
 const EMAILJS_TEMPLATE_ID = 'template_8jyfjkf';
 const EMAILJS_PUBLIC_KEY  = 'grly1relpuAh_73z7';
 
-const KNOWN_ZONES = [
-  'Zeist',
-  'Bilthoven',
-  'Driebergen',
-  'Utrecht',
-];
+// Zones — worden dynamisch geladen uit Firestore config/zones
+// Fallback waarden voor als Firestore nog niet bereikbaar is
+let KNOWN_ZONES = ['Zeist','Bilthoven','Driebergen','Utrecht'];
+let ZONE_BOUNDS = {
+  'Zeist':      [52.05, 5.17, 52.14, 5.33],
+  'Bilthoven':  [52.09, 5.14, 52.18, 5.26],
+  'Driebergen': [52.02, 5.24, 52.09, 5.35],
+  'Utrecht':    [52.04, 5.03, 52.15, 5.18],
+};
+let ZONE_WKT = {
+  'Zeist':      'POLYGON((5.17 52.05,5.33 52.05,5.33 52.14,5.17 52.14,5.17 52.05))',
+  'Bilthoven':  'POLYGON((5.14 52.09,5.26 52.09,5.26 52.18,5.14 52.18,5.14 52.09))',
+  'Driebergen': 'POLYGON((5.24 52.02,5.35 52.02,5.35 52.09,5.24 52.09,5.24 52.02))',
+  'Utrecht':    'POLYGON((5.03 52.04,5.18 52.04,5.18 52.15,5.03 52.15,5.03 52.04))',
+};
+
+async function _loadZonesAdmin() {
+  try {
+    const snap = await getDoc(doc(db, 'config', 'zones'));
+    if (snap.exists()) {
+      const data = snap.data();
+      if (Array.isArray(data.zones) && data.zones.length) {
+        KNOWN_ZONES = data.zones.map(z => z.key);
+        ZONE_BOUNDS = {};
+        ZONE_WKT = {};
+        data.zones.forEach(z => {
+          if (z.bbox) ZONE_BOUNDS[z.key] = z.bbox;
+          if (z.wkt)  ZONE_WKT[z.key]   = z.wkt;
+        });
+      }
+    }
+  } catch(e) { console.warn('[admin] zones fallback:', e.message); }
+}
 
 const ACCEPTED_ROLES = ['volunteer', 'manager', 'admin'];
 
@@ -105,6 +132,7 @@ function createOverlay() {
       <div class="adm-tabs" id="adm-tabs-bar">
         <button class="adm-tab active" data-tab="overzicht">📊 Overzicht</button>
         <button class="adm-tab adm-tab-admin" data-tab="users">👥 Gebruikers</button>
+        <button class="adm-tab adm-tab-admin" data-tab="gebieden">📍 Gebieden</button>
         <button class="adm-tab adm-tab-admin" data-tab="sync">📄 CSV Import</button>
         <button class="adm-tab adm-tab-admin" data-tab="gbif">🌍 GBIF Sync</button>
       </div>
@@ -128,6 +156,7 @@ function createOverlay() {
       if (btn.dataset.tab === 'users') startListening();
       else if (btn.dataset.tab === 'sync') openSyncTab();
       else if (btn.dataset.tab === 'gbif') openGbifTab();
+      else if (btn.dataset.tab === 'gebieden') openGebiedenTab();
       else if (btn.dataset.tab === 'overzicht') openOverzichtTab();
     });
   });
@@ -143,6 +172,7 @@ export async function openAdminOverlay(callerRole) {
   if (!uid) { alert('Niet ingelogd.'); return; }
   _adminUid = uid;
 
+  await _loadZonesAdmin(); // zones altijd vers laden bij openen beheer
   createOverlay();
   document.getElementById('admin-overlay').classList.add('open');
 
@@ -368,12 +398,7 @@ async function adminConfirmAccept(uid, email, name, role, zones) {
 
 // ======================= Waarneming.nl CSV Import =======================
 // Zones met hun bounding boxes [minLat, minLng, maxLat, maxLng]
-const ZONE_BOUNDS = {
-  'Zeist':      [52.05, 5.17, 52.14, 5.33],
-  'Bilthoven':  [52.09, 5.14, 52.18, 5.26],
-  'Driebergen': [52.02, 5.24, 52.09, 5.35],
-  'Utrecht':    [52.04, 5.03, 52.15, 5.18],
-};
+// ZONE_BOUNDS en ZONE_WKT worden nu dynamisch geladen via _loadZonesAdmin()
 
 function openSyncTab() {
   const lastSync = localStorage.getItem('wn_last_sync') || '';
@@ -558,13 +583,183 @@ async function runCsvImport(file) {
 const GBIF_TAXON_KEY = 1311477;
 const GBIF_API = 'https://api.gbif.org/v1/occurrence/search';
 
-// WKT bounding box per zone (POLYGON lon lat volgorde voor GBIF)
-const ZONE_WKT = {
-  'Zeist':      'POLYGON((5.17 52.05,5.33 52.05,5.33 52.14,5.17 52.14,5.17 52.05))',
-  'Bilthoven':  'POLYGON((5.14 52.09,5.26 52.09,5.26 52.18,5.14 52.18,5.14 52.09))',
-  'Driebergen': 'POLYGON((5.24 52.02,5.35 52.02,5.35 52.09,5.24 52.09,5.24 52.02))',
-  'Utrecht':    'POLYGON((5.03 52.04,5.18 52.04,5.18 52.15,5.03 52.15,5.03 52.04))',
-};
+function openGebiedenTab() {
+  const body = document.getElementById('admin-body');
+  if (!body) return;
+  _renderGebiedenTab(body);
+}
+
+async function _renderGebiedenTab(body) {
+  body.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:13px">Gebieden laden…</div>';
+  // Zones altijd vers laden
+  await _loadZonesAdmin();
+
+  // Huidige zones uit Firestore (volledig object met alle velden)
+  let allZones = [];
+  try {
+    const snap = await getDoc(doc(db, 'config', 'zones'));
+    if (snap.exists() && Array.isArray(snap.data().zones)) {
+      allZones = snap.data().zones;
+    }
+  } catch(e) {}
+
+  // Als nog leeg, initialiseer met defaults
+  if (!allZones.length) {
+    allZones = [
+      { key:'Zeist',      label:'Zeist',      lat:52.0893, lon:5.2425, zoom:13, bbox:[52.05,5.17,52.14,5.33] },
+      { key:'Bilthoven',  label:'Bilthoven',  lat:52.1267, lon:5.1986, zoom:13, bbox:[52.09,5.14,52.18,5.26] },
+      { key:'Driebergen', label:'Driebergen', lat:52.0561, lon:5.2867, zoom:13, bbox:[52.02,5.24,52.09,5.35] },
+      { key:'Utrecht',    label:'Utrecht',    lat:52.0907, lon:5.1214, zoom:13, bbox:[52.04,5.03,52.15,5.18] },
+    ];
+  }
+
+  const rows = allZones.map((z,i) => `
+    <tr style="border-bottom:1px solid #f1f5f9">
+      <td style="padding:6px 8px;font-weight:600;color:#1e293b">${z.label}</td>
+      <td style="padding:6px 8px;color:#64748b;font-size:12px">${z.key}</td>
+      <td style="padding:6px 8px;color:#64748b;font-size:12px">${z.lat?.toFixed(4)}, ${z.lon?.toFixed(4)}</td>
+      <td style="padding:6px 8px">
+        <button onclick="window._editZone(${i})" style="padding:3px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff">✏️</button>
+        <button onclick="window._deleteZone('${z.key}')" style="padding:3px 8px;font-size:12px;border:1px solid #fca5a5;border-radius:4px;cursor:pointer;background:#fff;color:#dc2626">🗑️</button>
+      </td>
+    </tr>`).join('');
+
+  body.innerHTML = `
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0;font-size:14px;color:#1e293b">📍 Gebieden beheren</h3>
+        <button id="zone-add-btn" style="padding:6px 14px;border-radius:6px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Nieuw gebied</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:#f8fafc;color:#64748b;font-size:11px">
+          <th style="text-align:left;padding:6px 8px">Naam</th>
+          <th style="text-align:left;padding:6px 8px">Sleutel</th>
+          <th style="text-align:left;padding:6px 8px">Centrum</th>
+          <th style="padding:6px 8px"></th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="font-size:11px;color:#94a3b8;margin-top:12px">
+        Gebieden worden direct beschikbaar na opslaan. Gebruikers moeten de app herladen.
+      </p>
+    </div>`;
+
+  document.getElementById('zone-add-btn')?.addEventListener('click', () => window._editZone(-1));
+
+  // Edit/delete handlers
+  window._zoneData = allZones;
+
+  window._deleteZone = async (key) => {
+    if (!confirm(`Gebied "${key}" verwijderen?\n\nDe kaartdata blijft bewaard maar het gebied is niet meer selecteerbaar.`)) return;
+    const updated = allZones.filter(z => z.key !== key);
+    await setDoc(doc(db, 'config', 'zones'), { zones: updated });
+    _renderGebiedenTab(body);
+  };
+
+  window._editZone = (idx) => {
+    const zone = idx >= 0 ? allZones[idx] : { key:'', label:'', lat:52.09, lon:5.12, zoom:13, bbox:null };
+    const isNew = idx < 0;
+    _showZoneEditModal(zone, isNew, async (updated) => {
+      let newList;
+      if (isNew) {
+        // Check duplicate key
+        if (allZones.some(z => z.key === updated.key)) {
+          alert(`Sleutel "${updated.key}" bestaat al.`); return;
+        }
+        newList = [...allZones, updated];
+      } else {
+        newList = allZones.map((z,i) => i === idx ? updated : z);
+      }
+      await setDoc(doc(db, 'config', 'zones'), { zones: newList });
+      await _loadZonesAdmin();
+      _renderGebiedenTab(body);
+    });
+  };
+}
+
+function _showZoneEditModal(zone, isNew, onSave) {
+  const existing = document.getElementById('zone-edit-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'zone-edit-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+
+  // Bbox berekenen als hint: centrum ± ~0.07 graden (~7km)
+  const dfl = zone.lat || 52.09;
+  const dfo = zone.lon || 5.12;
+
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:20px 24px;width:340px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.25);max-height:90vh;overflow-y:auto">
+      <h3 style="margin:0 0 16px;font-size:15px">${isNew ? '➕ Nieuw gebied' : '✏️ Gebied bewerken'}</h3>
+      <div style="display:flex;flex-direction:column;gap:10px;font-size:13px">
+        <label>Naam (weergave)
+          <input id="ze-label" value="${zone.label||''}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/>
+        </label>
+        <label>Sleutel (interne ID, geen spaties)
+          <input id="ze-key" value="${zone.key||''}" ${isNew?'':'readonly style="opacity:0.6"'} style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box" placeholder="bijv. Doorn"/>
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <label>Lat centrum<input id="ze-lat" type="number" step="0.0001" value="${dfl}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
+          <label>Lon centrum<input id="ze-lon" type="number" step="0.0001" value="${dfo}" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px;box-sizing:border-box"/></label>
+        </div>
+        <label>Zoom niveau (11–15)
+          <input id="ze-zoom" type="number" min="11" max="15" value="${zone.zoom||13}" style="width:80px;padding:6px;border:1px solid #cbd5e1;border-radius:5px;margin-top:3px;font-size:13px"/>
+        </label>
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;font-size:12px;color:#475569">
+          <strong>Bounding box</strong> (voor CSV import & GBIF)<br>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+            <label>Min lat<input id="ze-bmin-lat" type="number" step="0.001" value="${zone.bbox?zone.bbox[0]:(dfl-0.07).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
+            <label>Min lon<input id="ze-bmin-lon" type="number" step="0.001" value="${zone.bbox?zone.bbox[1]:(dfo-0.1).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
+            <label>Max lat<input id="ze-bmax-lat" type="number" step="0.001" value="${zone.bbox?zone.bbox[2]:(dfl+0.07).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
+            <label>Max lon<input id="ze-bmax-lon" type="number" step="0.001" value="${zone.bbox?zone.bbox[3]:(dfo+0.1).toFixed(3)}" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-size:12px;box-sizing:border-box"/></label>
+          </div>
+          <div style="margin-top:6px;color:#94a3b8">Tip: gebruik <a href="https://boundingbox.klokantech.com" target="_blank" style="color:#0aa879">boundingbox.klokantech.com</a> om coördinaten op te zoeken</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button id="ze-cancel" style="flex:1;padding:8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:13px">Annuleren</button>
+        <button id="ze-save" style="flex:2;padding:8px;border-radius:6px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:13px;font-weight:600">Opslaan</button>
+      </div>
+      <div id="ze-error" style="font-size:12px;color:#dc2626;margin-top:6px;min-height:16px"></div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  // Auto-fill sleutel vanuit naam
+  if (isNew) {
+    modal.querySelector('#ze-label').addEventListener('input', e => {
+      const key = e.target.value.trim().replace(/\s+/g,'_').replace(/[^a-zA-Z0-9_]/g,'');
+      modal.querySelector('#ze-key').value = key;
+    });
+  }
+
+  modal.querySelector('#ze-cancel').onclick = () => modal.remove();
+  modal.querySelector('#ze-save').onclick = () => {
+    const label = modal.querySelector('#ze-label').value.trim();
+    const key   = modal.querySelector('#ze-key').value.trim();
+    const lat   = parseFloat(modal.querySelector('#ze-lat').value);
+    const lon   = parseFloat(modal.querySelector('#ze-lon').value);
+    const zoom  = parseInt(modal.querySelector('#ze-zoom').value) || 13;
+    const bMinLat = parseFloat(modal.querySelector('#ze-bmin-lat').value);
+    const bMinLon = parseFloat(modal.querySelector('#ze-bmin-lon').value);
+    const bMaxLat = parseFloat(modal.querySelector('#ze-bmax-lat').value);
+    const bMaxLon = parseFloat(modal.querySelector('#ze-bmax-lon').value);
+    const errEl = modal.querySelector('#ze-error');
+
+    if (!label) { errEl.textContent = 'Naam is verplicht'; return; }
+    if (!key || !/^[a-zA-Z0-9_]+$/.test(key)) { errEl.textContent = 'Sleutel mag alleen letters, cijfers en _ bevatten'; return; }
+    if (isNaN(lat) || isNaN(lon)) { errEl.textContent = 'Vul geldige coördinaten in'; return; }
+
+    const bbox = [bMinLat, bMinLon, bMaxLat, bMaxLon];
+    // WKT voor GBIF: POLYGON((minLon minLat, maxLon minLat, maxLon maxLat, minLon maxLat, minLon minLat))
+    const wkt = `POLYGON((${bMinLon} ${bMinLat},${bMaxLon} ${bMinLat},${bMaxLon} ${bMaxLat},${bMinLon} ${bMaxLat},${bMinLon} ${bMinLat}))`;
+
+    onSave({ key, label, lat, lon, zoom, bbox, wkt });
+    modal.remove();
+  };
+}
+
+// ZONE_WKT wordt dynamisch geladen via _loadZonesAdmin()
 
 function openGbifTab() {
   const lastSync = localStorage.getItem('gbif_last_sync') || '';
