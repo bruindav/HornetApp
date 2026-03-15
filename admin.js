@@ -1,4 +1,4 @@
-// admin.js — Fix 124
+// admin.js — Fix 126
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -235,6 +235,10 @@ function startListening() {
 
 // ======================= Tabel =======================
 function renderTable(users) {
+  // Alleen renderen als de gebruikers-tab actief is
+  const usersTabActive = document.querySelector('.adm-tab[data-tab="users"]')?.classList.contains('active');
+  if (!usersTabActive) return;
+
   if (!users.length) {
     setAdminBody('<p style="color:#64748b;padding:12px">Nog geen gebruikers.</p>');
     return;
