@@ -9,7 +9,7 @@
 // 
 // ----------------------------------------------------------------------------
 import { auth } from './firebase.js';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, orderBy, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
 const _db = getFirestore(app);
 
@@ -1010,45 +1010,191 @@ function _updateFilterBadge(){
 
 // ======================= Actie log =======================
 const _actionLog = [];
+let _actionLogPeriod = 'day'; // 'day' | 'week'
+let _actionLogScope  = 'own'; // 'own' | 'all' (alleen admin/manager)
+
+// ── Schrijf actie naar Firestore ──────────────────────────────────────────
+async function _persistAction(type, meta, markerId) {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const zone = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
+  const year = $('sel-year')?.value || DEFAULT_YEAR;
+  try {
+    await addDoc(collection(_db, 'activity', uid, 'log'), {
+      type,
+      markerId: markerId || null,
+      note:     meta?.note   || '',
+      by:       meta?.by     || _currentDisplayName || '',
+      zone,
+      year,
+      date:     new Date().toISOString().slice(0,10),
+      ts:       serverTimestamp(),
+      displayName: _currentDisplayName || '',
+    });
+  } catch(e) { console.warn('[activity] opslaan mislukt:', e.message); }
+}
+
 function _logAction(type, meta, marker){
   const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' };
   const icons  = { hoornaar:'\u{1F41D}', nest:'\u{1FAB9}', nest_geruimd:'\u2705', lokpot:'\u{1FA24}', val:'\u{1FA9D}', polygon:'\u2B21' };
   const label  = labels[type] || type;
   const icon   = icons[type]  || '\u{1F4CD}';
   const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
-  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||'', marker, type });
-  if(_actionLog.length > 50) _actionLog.pop();
+  const zone   = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
+  const markerId = marker?._meta?.id || null;
+  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||_currentDisplayName||'', marker, type, zone, markerId, ts: Date.now() });
+  if(_actionLog.length > 100) _actionLog.pop();
   _renderActionLog();
+  _persistAction(type, meta, markerId);
 }
+
+// ── Laad acties uit Firestore ─────────────────────────────────────────────
+async function _loadActivityLog() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const el = document.getElementById('action-log-list');
+  if (el) el.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:6px 0">Laden…</div>';
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - (_actionLogPeriod === 'week' ? 7 : 1));
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+
+  try {
+    let entries = [];
+
+    if (_actionLogScope === 'own' || !canEdit()) {
+      // Eigen acties
+      const snap = await getDocs(
+        query(collection(_db, 'activity', uid, 'log'),
+          where('date','>=', cutoffStr),
+          orderBy('date','desc'), orderBy('ts','desc'),
+          limit(100))
+      );
+      snap.forEach(d => entries.push({ ...d.data(), uid }));
+    } else {
+      // Admin/manager: alle gebruikers in eigen zones
+      const allUids = await _getAllUidsInZones();
+      for (const u of allUids) {
+        const snap = await getDocs(
+          query(collection(_db, 'activity', u, 'log'),
+            where('date','>=', cutoffStr),
+            orderBy('date','desc'), orderBy('ts','desc'),
+            limit(50))
+        );
+        snap.forEach(d => entries.push({ ...d.data(), uid: u }));
+      }
+      entries.sort((a,b) => (b.ts?.seconds||0) - (a.ts?.seconds||0));
+      entries = entries.slice(0, 150);
+    }
+
+    // Merge met in-memory log (huidige sessie)
+    const icons = { hoornaar:'🐝', nest:'🪹', nest_geruimd:'✅', lokpot:'🪤', val:'🪝', polygon:'⬡' };
+    // Zet Firestore entries om naar display-formaat
+    _actionLog.length = 0;
+    entries.forEach(e => {
+      const ts = e.ts?.seconds ? new Date(e.ts.seconds*1000) : new Date();
+      _actionLog.push({
+        icon:   icons[e.type] || '📍',
+        label:  { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' }[e.type] || e.type,
+        time:   ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),
+        date:   e.date,
+        note:   e.note||'',
+        by:     e.by||e.displayName||'',
+        zone:   e.zone||'',
+        type:   e.type,
+        markerId: e.markerId,
+        isOwn:  e.uid === uid,
+        marker: null, // niet klikbaar voor historische acties zonder live marker ref
+      });
+    });
+    _renderActionLog();
+  } catch(e) {
+    console.warn('[activity] laden mislukt:', e.message);
+    _renderActionLog();
+  }
+}
+
+async function _getAllUidsInZones() {
+  // Haal alle users op waarvan zones overlappen met _currentZones (of alle voor admin)
+  const snap = await getDocs(collection(_db, 'roles'));
+  const uids = [];
+  snap.forEach(d => {
+    const data = d.data();
+    if (!data.role || data.role === 'pending') return;
+    if (_currentRole === 'admin') { uids.push(d.id); return; }
+    // Manager: alleen users in eigen zones
+    const userZones = (data.zones||[]).map(normalizeZone);
+    if (userZones.some(z => _currentZones.includes(z))) uids.push(d.id);
+  });
+  return uids;
+}
+
 function _renderActionLog(){
   const el = document.getElementById('action-log-list');
   if(!el) return;
-  if(!_actionLog.length){ el.innerHTML='<div style="color:#94a3b8;font-size:12px;padding:6px 0">Nog geen acties deze sessie.</div>'; return; }
-  el.innerHTML = '';
-  _actionLog.forEach((a, idx) => {
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #e2e8f0;cursor:pointer;border-radius:4px';
-    div.innerHTML = '<span style="font-size:16px;flex-shrink:0">'+a.icon+'</span>'
-      + '<div style="flex:1;min-width:0">'
-      + '<div style="font-size:13px;font-weight:600;color:#1e293b">'+a.label+'</div>'
-      + (a.note ? '<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+a.note+'</div>' : '')
-      + (a.by ? '<div style="font-size:11px;color:#94a3b8">'+a.by+'</div>' : '')
-      + '</div>'
-      + '<span style="font-size:11px;color:#94a3b8;flex-shrink:0">'+a.time+'</span>';
-    div.addEventListener('mouseenter', ()=>div.style.background='#f1f5f9');
-    div.addEventListener('mouseleave', ()=>div.style.background='');
-    if(a.marker){
-      div.title = 'Klik om eigenschappen te bewerken';
-      div.addEventListener('click', ()=>{
-        window._setSidebar?.(false);
-        openPropModal({
-          type: a.type,
-          init: {...a.marker._meta, _latlng: a.marker.getLatLng()},
-          onSave:(vals)=>{ applyPropsToMarker(a.marker, vals); persistMarker(a.marker); _actionLog[idx].note=vals.note||''; _renderActionLog(); }
-        });
+
+  // Header met filters
+  const canSeeAll = canEdit(); // admin of manager
+  const headerHtml = `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <button data-p="day"  class="al-btn${_actionLogPeriod==='day'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #cbd5e1;cursor:pointer;background:${_actionLogPeriod==='day'?'#0aa879':'#fff'};color:${_actionLogPeriod==='day'?'#fff':'#64748b'}">Vandaag</button>
+      <button data-p="week" class="al-btn${_actionLogPeriod==='week'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #cbd5e1;cursor:pointer;background:${_actionLogPeriod==='week'?'#0aa879':'#fff'};color:${_actionLogPeriod==='week'?'#fff':'#64748b'}">Week</button>
+      ${canSeeAll ? `<button data-s="own"  class="al-btn${_actionLogScope==='own'?' al-active':''}"  style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #e2e8f0;cursor:pointer;background:${_actionLogScope==='own'?'#0f172a':'#fff'};color:${_actionLogScope==='own'?'#fff':'#94a3b8'}">Mijn</button>
+        <button data-s="all" class="al-btn${_actionLogScope==='all'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #e2e8f0;cursor:pointer;background:${_actionLogScope==='all'?'#0f172a':'#fff'};color:${_actionLogScope==='all'?'#fff':'#94a3b8'}">Iedereen</button>` : ''}
+    </div>`;
+
+  if(!_actionLog.length){
+    el.innerHTML = headerHtml + '<div style="color:#94a3b8;font-size:12px;padding:6px 0">Geen acties in deze periode.</div>';
+  } else {
+    let rows = '';
+    let lastDate = '';
+    _actionLog.forEach((a, idx) => {
+      // Datum-scheidingslijn
+      if (a.date && a.date !== lastDate) {
+        const dateLabel = a.date === new Date().toISOString().slice(0,10) ? 'Vandaag' : a.date;
+        rows += `<div style="font-size:10px;color:#94a3b8;padding:6px 0 2px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${dateLabel}</div>`;
+        lastDate = a.date;
+      }
+      const byLine = (_actionLogScope==='all' && a.by) ? `<div style="font-size:11px;color:#64748b">${a.by}${a.zone?' · '+a.zone:''}</div>` : (a.zone?`<div style="font-size:11px;color:#94a3b8">${a.zone}</div>`:'');
+      rows += `<div data-idx="${idx}" class="al-row" style="display:flex;gap:8px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid #f1f5f9;cursor:${a.marker?'pointer':'default'};border-radius:4px">
+        <span style="font-size:15px;flex-shrink:0">${a.icon}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:#1e293b">${a.label}</div>
+          ${a.note ? `<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.note}</div>` : ''}
+          ${byLine}
+        </div>
+        <span style="font-size:11px;color:#94a3b8;flex-shrink:0">${a.time}</span>
+      </div>`;
+    });
+    el.innerHTML = headerHtml + rows;
+  }
+
+  // Filter knoppen events
+  el.querySelectorAll('.al-btn').forEach(btn => {
+    btn.addEventListener('mouseenter', ()=>{ if(!btn.classList.contains('al-active')) btn.style.background='#f1f5f9'; });
+    btn.addEventListener('mouseleave', ()=>{ if(!btn.classList.contains('al-active')) btn.style.background= btn.dataset.p ? (btn.dataset.p===_actionLogPeriod?'#0aa879':'#fff') : (btn.dataset.s===_actionLogScope?'#0f172a':'#fff'); });
+    btn.addEventListener('click', () => {
+      if (btn.dataset.p) _actionLogPeriod = btn.dataset.p;
+      if (btn.dataset.s) _actionLogScope  = btn.dataset.s;
+      _loadActivityLog();
+    });
+  });
+
+  // Klikbare rijen (eigen acties met live marker)
+  el.querySelectorAll('.al-row').forEach(row => {
+    const idx = parseInt(row.dataset.idx);
+    const a = _actionLog[idx];
+    if (!a?.marker) return;
+    row.addEventListener('mouseenter', ()=>row.style.background='#f1f5f9');
+    row.addEventListener('mouseleave', ()=>row.style.background='');
+    row.addEventListener('click', ()=>{
+      window._setSidebar?.(false);
+      openPropModal({
+        type: a.type,
+        init: {...a.marker._meta, _latlng: a.marker.getLatLng()},
+        onSave:(vals)=>{ applyPropsToMarker(a.marker, vals); persistMarker(a.marker); a.note=vals.note||''; _renderActionLog(); }
       });
-    }
-    el.appendChild(div);
+    });
   });
 }
 
@@ -2218,6 +2364,8 @@ async function _initUserRole() {
     }
     // Overzicht rapport tonen (admin/manager)
     initReportSection();
+    // Actie-log laden vanuit Firestore
+    _loadActivityLog();
 
     // Zones laden en dropdown vullen, daarna scope activeren
     if (_currentZones.length) {
