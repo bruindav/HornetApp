@@ -1,4 +1,4 @@
-// app-core.js — Fix 143
+// app-core.js — Fix 144
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -374,6 +374,7 @@ function initUIBindings(){
   updateSWStatus();
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
+  document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -2221,6 +2222,173 @@ async function _requestAccountDeletion() {
   });
 }
 window._requestAccountDeletion = _requestAccountDeletion;
+
+// ======================= Changelog =======================
+const CHANGELOG = [
+  {
+    version: 'Fix 143', date: '2026-03-17',
+    category: 'Acties',
+    text: 'Adres automatisch toegevoegd aan acties — bijv. "Waarneming · Molenstraat 4, Zeist"'
+  },
+  {
+    version: 'Fix 141–142', date: '2026-03-17',
+    category: 'Acties',
+    text: 'Actielijst werkt nu ook na opnieuw inloggen — acties worden bewaard in de cloud'
+  },
+  {
+    version: 'Fix 140', date: '2026-03-17',
+    category: 'Privacy',
+    text: 'Privacygevoelige informatie (namen, e-mails) niet meer zichtbaar in browserconsole'
+  },
+  {
+    version: 'Fix 139', date: '2026-03-17',
+    category: 'Account',
+    text: 'Verzoek tot accountverwijdering via Beheer-scherm — nette popup zonder URL-balk'
+  },
+  {
+    version: 'Fix 137', date: '2026-03-17',
+    category: 'Account',
+    text: 'Privacybeleid-link en accountverwijdering verplaatst naar Beheer-scherm (naast kruisje)'
+  },
+  {
+    version: 'Fix 136', date: '2026-03-16',
+    category: 'Acties',
+    text: 'Actielijst toont standaard de afgelopen week · Beheerder ziet acties van heel zijn gebied · "Meer..." knop bij meer dan 10 acties'
+  },
+  {
+    version: 'Fix 134', date: '2026-03-16',
+    category: 'Kaart',
+    text: 'Klik op icoon toont eigenschappen (lezen). Lang indrukken om te wijzigen. Nieuw icoon opent altijd direct het invulscherm'
+  },
+  {
+    version: 'Fix 133', date: '2026-03-16',
+    category: 'Algemeen',
+    text: 'App hernoemd naar HoornaarZoeken'
+  },
+  {
+    version: 'Fix 131', date: '2026-03-16',
+    category: 'Uiterlijk',
+    text: 'Nieuw app-icoon: gestileerde Aziatische hoornaar met nest op groene achtergrond'
+  },
+  {
+    version: 'Fix 127', date: '2026-03-16',
+    category: 'Acties',
+    text: 'Acties worden opgeslagen in de cloud — na inloggen zie je direct je recente acties terug'
+  },
+  {
+    version: 'Fix 122', date: '2026-03-15',
+    category: 'Gebieden',
+    text: 'Kaartpicker bij toevoegen nieuw gebied — klik op de kaart voor het centrum. Bbox wordt automatisch berekend en getoond op een kaartje'
+  },
+  {
+    version: 'Fix 119–120', date: '2026-03-15',
+    category: 'Gebieden',
+    text: 'Admin kan nieuwe plaatsen toevoegen (bijv. Doorn, Soest). Zones worden direct beschikbaar in alle overzichten en voor gebruikerstoewijzing'
+  },
+  {
+    version: 'Fix 117', date: '2026-03-15',
+    category: 'GBIF',
+    text: 'GBIF-waarnemingen nu correct zichtbaar op kaart na inloggen · "Toon ruwe velden" knop in GBIF Sync om data te inspecteren'
+  },
+  {
+    version: 'Fix 116', date: '2026-03-15',
+    category: 'GBIF',
+    text: 'GBIF gebruikt nu de originele coördinaat van waarneming.nl (verbatim) in plaats van de afgeronde gridcoördinaat'
+  },
+  {
+    version: 'Fix 115', date: '2026-03-15',
+    category: 'Kaart',
+    text: 'Polygoon kopiëren naar ander jaar — rechtsklik op een polygoon → "Kopiëren naar jaar"'
+  },
+  {
+    version: 'Fix 113', date: '2026-03-15',
+    category: 'Overzicht',
+    text: 'Overzicht heeft nu een jaar-selector — bekijk tellingen uit 2025 of eerder'
+  },
+  {
+    version: 'Fix 111', date: '2026-03-15',
+    category: 'Overzicht',
+    text: 'GBIF-waarnemingen uitsluiten uit overzichtstellingen via "GBIF uitsluiten" checkbox'
+  },
+  {
+    version: 'Fix 110', date: '2026-03-14',
+    category: 'GBIF',
+    text: 'GBIF-waarnemingen komen nu onder het juiste jaar (2025 ipv 2026) · Knop om alle GBIF te verwijderen en opnieuw te importeren'
+  },
+  {
+    version: 'Fix 109', date: '2026-03-14',
+    category: 'Kaart',
+    text: 'Eigenschappen popup toont nu adres bij de locatie · GBIF-data volledig zichtbaar in popup'
+  },
+  {
+    version: 'Fix 107', date: '2026-03-14',
+    category: 'Filter',
+    text: 'Filters verplaatst naar trechter-knop op de kaart · Actie-log in zijbalk · Adres automatisch bij eigenschappen-popup'
+  },
+  {
+    version: 'Fix 105', date: '2026-03-14',
+    category: 'Kaart',
+    text: 'Zijbalk sluit automatisch na wisselen van gebied of jaar · "Pending" en "Stabiele interactie" opties verwijderd'
+  },
+  {
+    version: 'Fix 103', date: '2026-03-13',
+    category: 'Kaart',
+    text: 'Kaart wisselt direct bij kiezen van ander jaar of gebied — geen "Toepassen" meer nodig'
+  },
+  {
+    version: 'Fix 102', date: '2026-03-13',
+    category: 'Overzicht',
+    text: 'Overzicht verplaatst naar Beheer-scherm als eigen tab · Vrijwilligers en beheerders hebben nu ook toegang tot het overzicht'
+  },
+];
+
+function openChangelog() {
+  const existing = document.getElementById('changelog-modal');
+  if (existing) { existing.remove(); return; }
+
+  // Groepeer per categorie
+  const cats = {};
+  CHANGELOG.forEach(e => {
+    if (!cats[e.category]) cats[e.category] = [];
+    cats[e.category].push(e);
+  });
+
+  const catIcons = { Kaart:'🗺️', Filter:'🔽', Acties:'📋', Overzicht:'📊', GBIF:'🌍', Gebieden:'📍', Account:'👤', Privacy:'🔒', Uiterlijk:'🎨', Algemeen:'ℹ️' };
+
+  let html = '';
+  Object.entries(cats).forEach(([cat, entries]) => {
+    html += `<div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${catIcons[cat]||'•'} ${cat}</div>`;
+    entries.forEach(e => {
+      html += `<div style="padding:8px 10px;background:#f8fafc;border-radius:6px;margin-bottom:4px;border-left:3px solid #0aa879">
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:2px">${e.version}</div>
+        <div style="font-size:13px;color:#1e293b;line-height:1.5">${e.text}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  const modal = document.createElement('div');
+  modal.id = 'changelog-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45)';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 -4px 32px rgba(0,0,0,.2)">
+      <div style="padding:16px 20px 12px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0">
+        <div>
+          <div style="font-size:16px;font-weight:700;color:#0f172a">🆕 Verbeteringen</div>
+          <div style="font-size:12px;color:#94a3b8;margin-top:2px">Wat is er nieuw in HoornaarZoeken</div>
+        </div>
+        <button id="changelog-close" style="background:none;border:none;font-size:20px;cursor:pointer;color:#64748b;padding:4px">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:16px 20px;flex:1">${html}</div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if(e.target===modal) modal.remove(); });
+  document.getElementById('changelog-close').addEventListener('click', () => modal.remove());
+
+  // Sidebar sluiten op mobiel
+  window._setSidebar?.(false);
+}
 
 async function boot(){
   await _loadZonesFromFirestore();
