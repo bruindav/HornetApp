@@ -1554,15 +1554,6 @@ function deleteSightLine(line, fromMenu=false){
   linesGroup.removeLayer(line); allLines = allLines.filter(l=>l!==line);
   if(fromMenu && id){ deleteLineFromCloud(id); }
 }
-function createSectorLayer({id, pot,distance,color='#ffcc00',bearing,rInner,rOuter,angleLeft=45,angleRight=45,steps=36,flightId}){
-  const center=L.latLng(pot.lat,pot.lng); const start=bearing-angleLeft; const end=bearing+angleRight;
-  const outer=arcPoints(center,rOuter,start,end,steps);
-  const inner=arcPoints(center,rInner,end,start,steps);
-  const ring=[...outer,...inner];
-  const poly=L.polygon(ring,{color,weight:1,dashArray:'6 6',fillColor:color,fillOpacity:0.25});
-  poly._meta={ id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
-  return poly;
-}
 function attachSightLineInteractivity(line){
   const meta=line._meta||{}; if(meta.type!=='flight') return;
   const pot=L.latLng(meta.pot.lat,meta.pot.lng);
