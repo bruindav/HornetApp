@@ -1,4 +1,4 @@
-// app-core.js — Fix 142
+// app-core.js — Fix 143
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1026,11 +1026,32 @@ let _actionLogShowAll = false;
 const ACTION_PAGE_SIZE = 10;
 
 // ── Schrijf actie naar Firestore ──────────────────────────────────────────
-async function _persistAction(type, meta, markerId) {
+async function _persistAction(type, meta, markerId, latlng, memEntry) {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
   const zone = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
   const year = $('sel-year')?.value || DEFAULT_YEAR;
+
+  // Adres ophalen via reverse geocode
+  let address = '';
+  if (latlng?.lat != null && latlng?.lng != null) {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json&addressdetails=1`, {headers:{'Accept-Language':'nl'}});
+      const d = await r.json();
+      const a = d.address || {};
+      const road = a.road || a.pedestrian || a.path || '';
+      const nr   = a.house_number || '';
+      const city = a.city || a.town || a.village || a.hamlet || '';
+      address = [road + (nr ? ' ' + nr : ''), city].filter(Boolean).join(', ');
+    } catch { /* geocode optioneel */ }
+  }
+
+  // In-memory entry bijwerken met adres
+  if (memEntry && address) {
+    memEntry.address = address;
+    _renderActionLog();
+  }
+
   try {
     await addDoc(collection(_db, 'activity', uid, 'log'), {
       type,
@@ -1042,6 +1063,9 @@ async function _persistAction(type, meta, markerId) {
       date:     new Date().toISOString().slice(0,10),
       ts:       serverTimestamp(),
       displayName: _currentDisplayName || '',
+      address,
+      lat: latlng?.lat || null,
+      lng: latlng?.lng || null,
     });
     console.log('[activity] opgeslagen:', type);
   } catch(e) { console.warn('[activity] opslaan mislukt:', e.code, e.message); }
@@ -1055,10 +1079,12 @@ function _logAction(type, meta, marker){
   const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
   const zone   = normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
   const markerId = marker?._meta?.id || null;
-  _actionLog.unshift({ icon, label, time, note: meta?.note||'', by: meta?.by||_currentDisplayName||'', marker, type, zone, markerId, ts: Date.now() });
+  const latlng = marker?.getLatLng?.() || null;
+  const entry = { icon, label, time, note: meta?.note||'', by: meta?.by||_currentDisplayName||'', marker, type, zone, markerId, ts: Date.now(), address: '' };
+  _actionLog.unshift(entry);
   if(_actionLog.length > 100) _actionLog.pop();
   _renderActionLog();
-  _persistAction(type, meta, markerId);
+  _persistAction(type, meta, markerId, latlng, entry);
 }
 
 // ── Laad acties uit Firestore ─────────────────────────────────────────────
@@ -1120,7 +1146,7 @@ async function _loadActivityLog() {
         time: ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),
         date: e.date, note: e.note||'', by: e.by||e.displayName||'',
         zone: e.zone||'', type: e.type, markerId: e.markerId,
-        isOwn: e.uid===uid, marker: liveMarker||null,
+        isOwn: e.uid===uid, marker: liveMarker||null, address: e.address||'',
       });
     });
     _actionLogShowAll = false;
@@ -1196,6 +1222,7 @@ function _renderActionLog(){
         <span style="font-size:15px;flex-shrink:0">${a.icon}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:600;color:#1e293b">${a.label}</div>
+          ${a.address ? `<div style="font-size:11px;color:#0aa879;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📍 ${a.address}</div>` : ''}
           ${a.note ? `<div style="font-size:11px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.note}</div>` : ''}
           ${byLine}
         </div>
