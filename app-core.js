@@ -1,4 +1,4 @@
-// app-core.js — Fix 157
+// app-core.js — Fix 159
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2177,6 +2177,15 @@ function openUnifiedContextMenu(opts){
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }
+      else if(act==='poly_edit'){
+        const layer = opts.polygonLayer;
+        if(layer.pm?.enabled()) {
+          layer.pm.disable();
+        } else {
+          layer.pm.enable({ allowSelfIntersection: false });
+          layer.once('pm:edit', () => { persistPolygon(layer); });
+        }
+      }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } _removePolygonLayer(opts.polygonLayer); }
     },0);
