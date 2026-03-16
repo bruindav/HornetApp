@@ -1023,8 +1023,10 @@ function _updateFilterBadge(){
 
 // ======================= Actie log =======================
 const _actionLog = [];
-let _actionLogPeriod = 'day'; // 'day' | 'week'
-let _actionLogScope  = 'own'; // 'own' | 'all' (alleen admin/manager)
+let _actionLogPeriod = 'week'; // standaard week
+let _actionLogScope  = 'auto'; // 'own' | 'all' | 'auto'
+let _actionLogShowAll = false;
+const ACTION_PAGE_SIZE = 10;
 
 // ── Schrijf actie naar Firestore ──────────────────────────────────────────
 async function _persistAction(type, meta, markerId) {
@@ -1068,6 +1070,10 @@ async function _loadActivityLog() {
   const el = document.getElementById('action-log-list');
   if (el) el.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:6px 0">Laden…</div>';
 
+  const effectiveScope = (_actionLogScope === 'auto')
+    ? (canEdit() ? 'all' : 'own')
+    : _actionLogScope;
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - (_actionLogPeriod === 'week' ? 7 : 1));
   const cutoffStr = cutoff.toISOString().slice(0,10);
@@ -1075,51 +1081,42 @@ async function _loadActivityLog() {
   try {
     let entries = [];
 
-    if (_actionLogScope === 'own' || !canEdit()) {
-      // Eigen acties
-      const snap = await getDocs(
-        query(collection(_db, 'activity', uid, 'log'),
-          where('date','>=', cutoffStr),
-          orderBy('date','desc'), orderBy('ts','desc'),
-          limit(100))
-      );
-      snap.forEach(d => entries.push({ ...d.data(), uid }));
+    if (effectiveScope === 'own' || !canEdit()) {
+      let snap;
+      try {
+        snap = await getDocs(query(collection(_db, 'activity', uid, 'log'),
+          where('date','>=', cutoffStr), orderBy('date','desc'), orderBy('ts','desc'), limit(200)));
+      } catch { snap = await getDocs(collection(_db, 'activity', uid, 'log')); }
+      snap.forEach(d => { const data=d.data(); if(data.date>=cutoffStr) entries.push({...data,uid}); });
     } else {
-      // Admin/manager: alle gebruikers in eigen zones
       const allUids = await _getAllUidsInZones();
       for (const u of allUids) {
-        const snap = await getDocs(
-          query(collection(_db, 'activity', u, 'log'),
-            where('date','>=', cutoffStr),
-            orderBy('date','desc'), orderBy('ts','desc'),
-            limit(50))
-        );
-        snap.forEach(d => entries.push({ ...d.data(), uid: u }));
+        let snap;
+        try {
+          snap = await getDocs(query(collection(_db, 'activity', u, 'log'),
+            where('date','>=', cutoffStr), orderBy('date','desc'), orderBy('ts','desc'), limit(100)));
+        } catch { snap = await getDocs(collection(_db, 'activity', u, 'log')); }
+        snap.forEach(d => { const data=d.data(); if(data.date>=cutoffStr) entries.push({...data,uid:u}); });
       }
-      entries.sort((a,b) => (b.ts?.seconds||0) - (a.ts?.seconds||0));
-      entries = entries.slice(0, 150);
     }
 
-    // Merge met in-memory log (huidige sessie)
-    const icons = { hoornaar:'🐝', nest:'🪹', nest_geruimd:'✅', lokpot:'🪤', val:'🪝', polygon:'⬡' };
-    // Zet Firestore entries om naar display-formaat
+    entries.sort((a,b) => (b.ts?.seconds||0) - (a.ts?.seconds||0));
+
+    const icons  = { hoornaar:'🐝', nest:'🪹', nest_geruimd:'✅', lokpot:'🪤', val:'🪝', polygon:'⬡' };
+    const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' };
     _actionLog.length = 0;
     entries.forEach(e => {
       const ts = e.ts?.seconds ? new Date(e.ts.seconds*1000) : new Date();
+      const liveMarker = e.markerId ? allMarkers.find(m => m._meta?.id === e.markerId) : null;
       _actionLog.push({
-        icon:   icons[e.type] || '📍',
-        label:  { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' }[e.type] || e.type,
-        time:   ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),
-        date:   e.date,
-        note:   e.note||'',
-        by:     e.by||e.displayName||'',
-        zone:   e.zone||'',
-        type:   e.type,
-        markerId: e.markerId,
-        isOwn:  e.uid === uid,
-        marker: null, // niet klikbaar voor historische acties zonder live marker ref
+        icon: icons[e.type]||'📍', label: labels[e.type]||e.type,
+        time: ts.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}),
+        date: e.date, note: e.note||'', by: e.by||e.displayName||'',
+        zone: e.zone||'', type: e.type, markerId: e.markerId,
+        isOwn: e.uid===uid, marker: liveMarker||null,
       });
     });
+    _actionLogShowAll = false;
     _renderActionLog();
   } catch(e) {
     console.warn('[activity] laden mislukt:', e.message);
@@ -1146,29 +1143,43 @@ function _renderActionLog(){
   const el = document.getElementById('action-log-list');
   if(!el) return;
 
-  // Header met filters
-  const canSeeAll = canEdit(); // admin of manager
-  const headerHtml = `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
-      <button data-p="day"  class="al-btn${_actionLogPeriod==='day'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #cbd5e1;cursor:pointer;background:${_actionLogPeriod==='day'?'#0aa879':'#fff'};color:${_actionLogPeriod==='day'?'#fff':'#64748b'}">Vandaag</button>
-      <button data-p="week" class="al-btn${_actionLogPeriod==='week'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #cbd5e1;cursor:pointer;background:${_actionLogPeriod==='week'?'#0aa879':'#fff'};color:${_actionLogPeriod==='week'?'#fff':'#64748b'}">Week</button>
-      ${canSeeAll ? `<button data-s="own"  class="al-btn${_actionLogScope==='own'?' al-active':''}"  style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #e2e8f0;cursor:pointer;background:${_actionLogScope==='own'?'#0f172a':'#fff'};color:${_actionLogScope==='own'?'#fff':'#94a3b8'}">Mijn</button>
-        <button data-s="all" class="al-btn${_actionLogScope==='all'?' al-active':''}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid #e2e8f0;cursor:pointer;background:${_actionLogScope==='all'?'#0f172a':'#fff'};color:${_actionLogScope==='all'?'#fff':'#94a3b8'}">Iedereen</button>` : ''}
-    </div>`;
+  const canSeeAll = canEdit();
+  const effectiveScope = (_actionLogScope==='auto') ? (canEdit()?'all':'own') : _actionLogScope;
+
+  // Header
+  const mkBtn = (dp, ds, label, activeVal, activeCurrent) => {
+    const isAct = activeCurrent === activeVal;
+    const base = dp ? (isAct ? '#0aa879' : '#fff') : (isAct ? '#0f172a' : '#fff');
+    const col  = dp ? (isAct ? '#fff' : '#64748b') : (isAct ? '#fff' : '#94a3b8');
+    const bord = dp ? '#cbd5e1' : '#e2e8f0';
+    return `<button ${dp?`data-p="${dp}"`:`data-s="${ds}"`} class="al-btn${isAct?' al-active':''}"
+      style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid ${bord};cursor:pointer;background:${base};color:${col}">${label}</button>`;
+  };
+  const headerHtml = `<div style="display:flex;gap:5px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+    ${mkBtn('day',null,'Vandaag',_actionLogPeriod,'day')}
+    ${mkBtn('week',null,'Week',_actionLogPeriod,'week')}
+    ${canSeeAll ? mkBtn(null,'own','Mijn',effectiveScope,'own') + mkBtn(null,'all','Iedereen',effectiveScope,'all') : ''}
+  </div>`;
 
   if(!_actionLog.length){
     el.innerHTML = headerHtml + '<div style="color:#94a3b8;font-size:12px;padding:6px 0">Geen acties in deze periode.</div>';
   } else {
+    const visible = _actionLogShowAll ? _actionLog : _actionLog.slice(0, ACTION_PAGE_SIZE);
+    const hasMore = !_actionLogShowAll && _actionLog.length > ACTION_PAGE_SIZE;
     let rows = '';
     let lastDate = '';
-    _actionLog.forEach((a, idx) => {
-      // Datum-scheidingslijn
+    visible.forEach((a, idx) => {
       if (a.date && a.date !== lastDate) {
-        const dateLabel = a.date === new Date().toISOString().slice(0,10) ? 'Vandaag' : a.date;
+        const today = new Date().toISOString().slice(0,10);
+        const yesterday = new Date(Date.now()-86400000).toISOString().slice(0,10);
+        const dateLabel = a.date===today ? 'Vandaag' : a.date===yesterday ? 'Gisteren' : a.date;
         rows += `<div style="font-size:10px;color:#94a3b8;padding:6px 0 2px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${dateLabel}</div>`;
         lastDate = a.date;
       }
-      const byLine = (_actionLogScope==='all' && a.by) ? `<div style="font-size:11px;color:#64748b">${a.by}${a.zone?' · '+a.zone:''}</div>` : (a.zone?`<div style="font-size:11px;color:#94a3b8">${a.zone}</div>`:'');
+      const showBy = (effectiveScope==='all' || !a.isOwn) && a.by;
+      const byLine = showBy
+        ? `<div style="font-size:11px;color:#64748b">${a.by}${a.zone?' · '+a.zone:''}</div>`
+        : (a.zone ? `<div style="font-size:11px;color:#94a3b8">${a.zone}</div>` : '');
       rows += `<div data-idx="${idx}" class="al-row" style="display:flex;gap:8px;align-items:flex-start;padding:5px 4px;border-bottom:1px solid #f1f5f9;cursor:${a.marker?'pointer':'default'};border-radius:4px">
         <span style="font-size:15px;flex-shrink:0">${a.icon}</span>
         <div style="flex:1;min-width:0">
@@ -1179,21 +1190,31 @@ function _renderActionLog(){
         <span style="font-size:11px;color:#94a3b8;flex-shrink:0">${a.time}</span>
       </div>`;
     });
+    if (hasMore) {
+      rows += `<button id="al-more-btn" style="width:100%;margin-top:6px;padding:6px;border-radius:6px;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;cursor:pointer;font-size:12px">
+        Meer… (${_actionLog.length - ACTION_PAGE_SIZE} meer)</button>`;
+    }
     el.innerHTML = headerHtml + rows;
   }
 
-  // Filter knoppen events
+  // Filter knoppen
   el.querySelectorAll('.al-btn').forEach(btn => {
     btn.addEventListener('mouseenter', ()=>{ if(!btn.classList.contains('al-active')) btn.style.background='#f1f5f9'; });
-    btn.addEventListener('mouseleave', ()=>{ if(!btn.classList.contains('al-active')) btn.style.background= btn.dataset.p ? (btn.dataset.p===_actionLogPeriod?'#0aa879':'#fff') : (btn.dataset.s===_actionLogScope?'#0f172a':'#fff'); });
+    btn.addEventListener('mouseleave', ()=>{ if(!btn.classList.contains('al-active')) btn.style.background=''; });
     btn.addEventListener('click', () => {
       if (btn.dataset.p) _actionLogPeriod = btn.dataset.p;
-      if (btn.dataset.s) _actionLogScope  = btn.dataset.s;
+      if (btn.dataset.s) { _actionLogScope = btn.dataset.s; }
       _loadActivityLog();
     });
   });
 
-  // Klikbare rijen (eigen acties met live marker)
+  // Meer knop
+  el.querySelector('#al-more-btn')?.addEventListener('click', () => {
+    _actionLogShowAll = true;
+    _renderActionLog();
+  });
+
+  // Klikbare rijen
   el.querySelectorAll('.al-row').forEach(row => {
     const idx = parseInt(row.dataset.idx);
     const a = _actionLog[idx];
