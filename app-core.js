@@ -374,6 +374,9 @@ function initUIBindings(){
   updateSWStatus();
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
+
+  // Account verwijder-verzoek
+  document.getElementById('btn-request-delete')?.addEventListener('click', _requestAccountDeletion);
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -2042,6 +2045,20 @@ function updateHeaderRole(role, name) {
     sidebarName.textContent = displayName;
     if (sidebarBlock) sidebarBlock.style.display = '';
   }
+  // Toon status verwijderverzoek als al ingediend
+  const delBtn = document.getElementById('btn-request-delete');
+  if (delBtn) {
+    // Haal actuele rol-data op om deletionRequested te checken
+    const uid2 = auth.currentUser?.uid;
+    if (uid2) {
+      getDoc(doc(_db, 'roles', uid2)).then(snap => {
+        if (snap.data()?.deletionRequested) {
+          delBtn.textContent = '⏳ Verwijdering aangevraagd';
+          delBtn.disabled = true;
+        }
+      }).catch(()=>{});
+    }
+  }
   // Statusbalk mobiel
   const sbRole = document.getElementById('sb-role');
   if (sbRole) sbRole.textContent = ROL_LABEL[role] || role;
@@ -2086,6 +2103,35 @@ function activateScope(year, group, reload=false){
   updateHeaderScope(group, year);
 }
 // ======================= DOMContentLoaded: alles starten =======================
+// ======================= Account verwijder-verzoek =======================
+async function _requestAccountDeletion() {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+
+  const confirmed = confirm(
+    'Wil je een verzoek indienen om je account te verwijderen?\n\n' +
+    '• Je account wordt gemarkeerd voor verwijdering\n' +
+    '• Een beheerder verwerkt je verzoek zo snel mogelijk\n' +
+    '• Je kaartdata (iconen, polygonen) blijft bewaard voor de monitoring\n' +
+    '• Je ontvangt geen bevestigingsmail\n\n' +
+    'Doorgaan?'
+  );
+  if (!confirmed) return;
+
+  try {
+    await setDoc(doc(_db, 'roles', uid), {
+      deletionRequested: true,
+      deletionRequestedAt: new Date().toISOString(),
+    }, { merge: true });
+    alert('Je verzoek is ingediend. Een beheerder zal je account zo snel mogelijk verwijderen.');
+    // Knop verbergen zodat je niet dubbel indient
+    document.getElementById('btn-request-delete').textContent = '⏳ Verwijdering aangevraagd';
+    document.getElementById('btn-request-delete').disabled = true;
+  } catch(e) {
+    alert('Verzoek kon niet worden ingediend: ' + e.message);
+  }
+}
+
 async function boot(){
   await _loadZonesFromFirestore();
   initMap();

@@ -1,4 +1,4 @@
-// admin.js — Fix 126
+// admin.js — Fix 135
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -265,6 +265,11 @@ function renderTable(users) {
         </div>
         <div class="adm-muted">${u.email || u.uid}</div>
         ${isSelf ? '<div style="color:#0aa879;font-size:11px">(jouw account)</div>' : ''}
+        ${u.deletionRequested ? `<div style="color:#dc2626;font-size:11px;margin-top:3px">⚠️ Verwijdering aangevraagd
+          <button onclick="adminProcessDeletion('${u.uid}','${_esc(u.displayName||u.email)}')"
+            style="margin-left:6px;padding:2px 7px;font-size:11px;border-radius:4px;border:1px solid #fca5a5;background:#fff;color:#dc2626;cursor:pointer">
+            Verwerken
+          </button></div>` : ''}
       </td>`;
 
     // --- Rol-cel ---
@@ -1338,13 +1343,42 @@ window.adminDeleteUser = async (uid, name) => {
   if (uid === _adminUid) { alert('Je kunt jezelf niet verwijderen.'); return; }
   if (!confirm(`Gebruiker "${name}" definitief verwijderen?\nDit verwijdert hun account volledig.`)) return;
   try {
-    // 1. Verwijder uit Firebase Auth via Cloud Function
     const deleteAuthUser = httpsCallable(functions, 'deleteAuthUser');
     await deleteAuthUser({ uid });
-    // 2. Verwijder Firestore roles doc
     await deleteDoc(doc(db, 'roles', uid));
   } catch (e) {
     alert(`Verwijderen mislukt: ${e.message}`);
+  }
+};
+
+window.adminProcessDeletion = async (uid, name) => {
+  const choice = confirm(
+    `Verwijderverzoek van "${name}" verwerken.\n\n` +
+    `• Klik OK om het account te verwijderen\n` +
+    `• Klik Annuleren om het verzoek te annuleren (account blijft)\n\n` +
+    `Let op: kaartdata (iconen, polygonen) blijft bewaard.`
+  );
+  if (choice) {
+    // Account verwijderen — zelfde als adminDeleteUser maar zonder dubbele bevestiging
+    try {
+      try {
+        const deleteAuthUser = httpsCallable(functions, 'deleteAuthUser');
+        await deleteAuthUser({ uid });
+      } catch(e) {
+        // Auth verwijdering kan falen als Firebase Functions niet beschikbaar is — roles doc altijd verwijderen
+        console.warn('[admin] Auth verwijdering mislukt, roles doc wordt wel verwijderd:', e.message);
+      }
+      await deleteDoc(doc(db, 'roles', uid));
+      alert(`Account van "${name}" is verwijderd. Kaartdata blijft bewaard.`);
+    } catch(e) {
+      alert(`Verwijderen mislukt: ${e.message}`);
+    }
+  } else {
+    // Verzoek annuleren — deletionRequested vlag verwijderen
+    if (confirm(`Verwijderverzoek van "${name}" annuleren? Het account blijft actief.`)) {
+      await setDoc(doc(db, 'roles', uid), { deletionRequested: false, deletionRequestedAt: null }, { merge: true });
+      alert(`Verwijderverzoek geannuleerd. Account blijft actief.`);
+    }
   }
 };
 
