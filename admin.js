@@ -1,4 +1,4 @@
-// admin.js — Fix 137
+// admin.js — Fix 140
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -1305,7 +1305,7 @@ async function sendWelcomeEmail(email, displayName, role, zones) {
       user_role:   roleLabel,
       user_zones:  zonesText,
     });
-    console.log(`[admin] welkomstmail verstuurd naar ${email}`);
+    console.log('[admin] welkomstmail verstuurd');
   } catch (e) {
     console.error('[admin] welkomstmail mislukt:', e);
     alert('Let op: welkomstmail kon niet worden verstuurd.\n' + (e?.text || e?.message || e));

@@ -1,4 +1,4 @@
-// app-core.js — Fix 139
+// app-core.js — Fix 140
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -22,7 +22,7 @@ function canEdit()   { return _currentRole === 'admin' || _currentRole === 'mana
 function getZoneManagerName(zoneId) {
   const z = normalizeZone(zoneId || '') || normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
   const name = _zoneManagers[z] || null;
-  if(!name) console.log('[app] geen beheerder gevonden voor zone:', z, 'managers:', _zoneManagers);
+  if(!name) console.log('[app] geen beheerder gevonden voor zone:', z);
   return name;
 }
 function canWrite()  { return _currentRole === 'admin' || _currentRole === 'manager' || _currentRole === 'volunteer'; }  // iconen
@@ -338,10 +338,10 @@ function initUIBindings(){
   // Cache reset
   // Beheer knop — altijd binden (knop is hidden maar bestaat in DOM)
   const _btnAdmin = document.getElementById('btn-admin');
-  console.log('[app] btn-admin element gevonden:', _btnAdmin);
+  // [debug removed]
   if (_btnAdmin) {
     _btnAdmin.addEventListener('click', async () => {
-      console.log('[app] Beheer knop geklikt');
+      // [debug removed]
       try {
         const { openAdminOverlay } = await import('./admin.js');
         await openAdminOverlay(_currentRole);
@@ -351,7 +351,7 @@ function initUIBindings(){
       }
     });
   } else {
-    console.warn('[app] btn-admin NIET GEVONDEN in DOM bij initUIBindings');
+    // [debug removed]
   }
   // ── Help overlay ─────────────────────────────────────────────────────────
   const helpOverlay = document.getElementById('help-overlay');
@@ -2021,7 +2021,7 @@ async function _loadZonesFromFirestore() {
           if (z.key) newMeta[z.key] = { label: z.label||z.key, lat: z.lat||52.09, lon: z.lon||5.12, zoom: z.zoom||13 };
         });
         if (Object.keys(newMeta).length) ZONE_META = newMeta;
-        console.log('[zones] geladen uit Firestore:', Object.keys(ZONE_META));
+        console.log('[zones] geladen uit Firestore:', Object.keys(ZONE_META).length, 'zones');
       }
     }
   } catch(e) {
@@ -2241,7 +2241,7 @@ async function _loadZoneManagers() {
         });
       }
     });
-    console.log('[app] zone managers geladen:', _zoneManagers);
+    console.log('[app] zone managers geladen:', Object.keys(_zoneManagers).length, 'zones');
   } catch(e) {
     console.warn('[app] _loadZoneManagers fout:', e);
   }
@@ -2433,7 +2433,7 @@ async function _initUserRole() {
 
     if (!snap.exists()) {
       // Eerste login — pending aanmaken zodat admin hem kan accepteren
-      console.log('[app] nieuw account, pending aanmaken voor', email);
+      console.log('[app] nieuw account, pending aanmaken');
       await setDoc(ref, {
         role:        'pending',
         email:       email || '',
@@ -2447,14 +2447,14 @@ async function _initUserRole() {
         _showPendingScreen(email);
         return;
       }
-      console.log('[app] pending aangemaakt en geverifieerd voor', email);
+      console.log('[app] pending aangemaakt');
     }
 
     const data = snap.data();
 
     // ── PENDING: kaart blokkeren, pending scherm tonen ──────────────────────
     if (!data?.role || data.role === 'pending') {
-      console.log('[app] rol is pending — kaart blokkeren');
+      // [debug removed]
       _showPendingScreen(email);
       return; // stop hier — geen kaart laden
     }
@@ -2529,7 +2529,7 @@ function _fillZoneDropdown(zones) {
   const savedNorm = saved?.group ? normalizeZone(saved.group) : null;
   const activeZone = (savedNorm && zones.includes(savedNorm)) ? savedNorm : zones[0];
   newSel.value = activeZone;
-  console.log('[app] zone dropdown gevuld:', zones, '→ actief:', activeZone);
+  console.log('[app] zone dropdown gevuld:', zones.length, 'zones → actief:', activeZone);
   return activeZone;  // teruggeven zodat aanroeper scope kan activeren
 }
 
