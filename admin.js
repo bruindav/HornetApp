@@ -1,4 +1,4 @@
-// admin.js — Fix 145
+// admin.js — Fix 147
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -151,9 +151,12 @@ function createOverlay() {
     </div>`;
   document.body.appendChild(el);
   document.getElementById('admin-close').addEventListener('click', closeAdminOverlay);
-  document.getElementById('admin-request-delete')?.addEventListener('click', () => {
-    window._requestAccountDeletion?.();
-  });
+  // Verberg 'Account verwijderen' voor admins — admins verwijderen zichzelf niet
+  const delBtn = document.getElementById('admin-request-delete');
+  if (delBtn) {
+    if (_adminRole === 'admin') delBtn.style.display = 'none';
+    else delBtn.addEventListener('click', () => window._requestAccountDeletion?.());
+  }
   el.addEventListener('click', e => { if (e.target === el) closeAdminOverlay(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAdminOverlay(); });
   // Tab wisselen
