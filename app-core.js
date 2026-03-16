@@ -1,4 +1,4 @@
-// app-core.js — Fix 155
+// app-core.js — Fix 156
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -701,6 +701,7 @@ function openLineContextMenu(line, x, y){
   el.innerHTML=`<h4>Zichtlijn</h4>
   <button data-act="color">🎨 Kleur</button>
   <button data-act="note">📝 Opmerking</button>
+  <button data-act="fix_sector">🔧 Sector herstellen</button>
   <button data-act="delete">🗑️ Verwijderen</button>`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
@@ -708,6 +709,18 @@ function openLineContextMenu(line, x, y){
     if(act==='delete'){ deleteSightLine(line,true); }
     else if(act==='color'){ openColorModal(line._meta?.color||'#ffcc00', col=>{ setSightLineColor(line,col,true); }); }
     else if(act==='note'){ openLineNoteModal(line); }
+    else if(act==='fix_sector'){
+      // Verwijder en hermaak de sector voor deze lijn
+      if(line._sector){ const sid=line._sector._meta?.id; if(sid) deleteSectorFromCloud(sid); circlesGroup.removeLayer(line._sector); line._sector=null; }
+      const m=line._meta||{}; const ll=line.getLatLngs();
+      if(ll.length>=2 && m.pot){
+        const dist=Math.max(1,m.distance||50); const brg=((m.bearing||0)+360)%360;
+        const rInner=Math.max(1,dist-25), rOuter=dist+25;
+        const sector=createSectorLayer({id:genId('sect'),pot:m.pot,distance:dist,color:m.color||'#ffcc00',bearing:brg,rInner,rOuter,angleLeft:45,angleRight:45,steps:36,flightId:m.id}).addTo(circlesGroup);
+        registerSector(sector); line._sector=sector; sector._line=line;
+        persistSector(sector);
+      }
+    }
   });
   document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
   document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
@@ -1454,14 +1467,73 @@ function destinationPoint(start,distance,bearingDeg){
   return L.latLng(toDeg(phi2),((toDeg(lam2)+540)%360)-180);
 }
 function arcPoints(center,radius,startDeg,endDeg,steps=32){
-  const pts=[],total=endDeg-startDeg,step=total/steps;
-  for(let i=0;i<=steps;i++) pts.push(destinationPoint(center,radius,startDeg+step*i));
+  // Begrens arc tot max 360 graden om banaan-effect te voorkomen
+  const total = Math.max(-360, Math.min(360, endDeg - startDeg));
+  const step  = total / steps;
+  const pts   = [];
+  for(let i=0;i<=steps;i++) pts.push(destinationPoint(center, radius, startDeg+step*i));
   return pts;
 }
 function registerLine(line){ if(!allLines.includes(line)) allLines.push(line); }
 function registerSector(sector){ if(!allSectors.includes(sector)) allSectors.push(sector); }
 function makeHandleIcon(){ return L.divIcon({className:'line-handle',html:'<div></div>',iconSize:[12,12],iconAnchor:[6,6]}); }
-function setSightLineColor(line,color,save=false){
+
+function _isSectorValid(meta) {
+  if (!meta) return false;
+  const {bearing, rInner, rOuter, distance} = meta;
+  if (isNaN(bearing) || bearing == null) return false;
+  if (isNaN(rInner)  || rInner  < 0)    return false;
+  if (isNaN(rOuter)  || rOuter  <= 0)   return false;
+  if (isNaN(distance)|| distance <= 0)  return false;
+  if (rOuter > 50000) return false; // > 50km is sowieso fout
+  return true;
+}
+
+function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=45, angleRight=45, steps=36, flightId}){
+  // Saniteer waarden
+  bearing   = ((parseFloat(bearing)  || 0) + 360) % 360;
+  rInner    = Math.max(0, Math.min(parseFloat(rInner)  || 0, 49000));
+  rOuter    = Math.max(1, Math.min(parseFloat(rOuter)  || 50, 50000));
+  distance  = Math.max(1, parseFloat(distance) || 50);
+  angleLeft = Math.max(1, Math.min(parseFloat(angleLeft)  || 45, 175));
+  angleRight= Math.max(1, Math.min(parseFloat(angleRight) || 45, 175));
+  if (rInner >= rOuter) rInner = Math.max(0, rOuter - 25);
+
+  const center = L.latLng(pot.lat, pot.lng);
+  const start  = bearing - angleLeft;
+  const end    = bearing + angleRight;
+  const outer  = arcPoints(center, rOuter, start, end, steps);
+  const inner  = arcPoints(center, rInner, end,   start, steps);
+  const ring   = [...outer, ...inner];
+  const poly   = L.polygon(ring, {color, weight:1, dashArray:'6 6', fillColor:color, fillOpacity:0.25});
+  poly._meta   = { id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
+  return poly;
+}
+
+// ── Verwijder corrupte sectoren (zonder gekoppelde lijn of met ongeldige data) ──
+function _cleanupOrphanSectors() {
+  const toRemove = [];
+  circlesGroup.eachLayer(layer => {
+    if (!layer._meta || layer._meta.type !== 'sector') return;
+    // Sector zonder gekoppelde lijn
+    const linkedLine = allLines.find(l => l._meta?.id === layer._meta?.flightId);
+    if (!linkedLine) { toRemove.push(layer); return; }
+    // Sector met ongeldige data
+    if (!_isSectorValid(layer._meta)) { toRemove.push(layer); return; }
+  });
+  toRemove.forEach(s => {
+    const id = s._meta?.id;
+    if (id) deleteSectorFromCloud(id);
+    circlesGroup.removeLayer(s);
+    const idx = allSectors.indexOf(s);
+    if (idx > -1) allSectors.splice(idx, 1);
+    console.log('[sector] corrupte sector verwijderd:', id);
+  });
+  if (toRemove.length > 0) {
+    console.log(`[sector] ${toRemove.length} corrupte sector(en) opgeruimd`);
+  }
+  return toRemove.length;
+}
   line.setStyle({color});
   line._meta=line._meta||{}; line._meta.color=color;
   if(line._sector){
@@ -2311,14 +2383,39 @@ function deleteLineFromCloudLocal(id){
   if(l) deleteSightLine(l,false);
 }
 function upsertSectorFromCloud(doc){
+  // Valideer sector data — sla corrupte sectoren over
+  if (!doc.pot?.lat || !doc.pot?.lng) return;
+  if (!doc.rOuter || doc.rOuter <= 0 || doc.rOuter > 5000) return;
+  if (doc.rInner == null || doc.rInner < 0) return;
+  if (doc.bearing == null) return;
+
   const line = allLines.find(l=>l._meta?.id===doc.flightId);
   if(line && line._sector){ circlesGroup.removeLayer(line._sector); }
   const sector = createSectorLayer({
     id: doc.id, pot: doc.pot, distance: doc.distance, color: doc.color, bearing: doc.bearing,
-    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft, angleRight: doc.angleRight, steps: doc.steps, flightId: doc.flightId
+    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft||45, angleRight: doc.angleRight||45, steps: doc.steps||36, flightId: doc.flightId
   }).addTo(circlesGroup);
   registerSector(sector);
   if(line){ line._sector = sector; sector._line = line; }
+  else {
+    // Wees sector zonder lijn — voeg verwijder contextmenu toe
+    sector.on('contextmenu', (e) => {
+      e.originalEvent?.preventDefault();
+      const el = document.createElement('div'); el.className='ctx-menu';
+      el.innerHTML=`<h4>Sector</h4><button data-act="del">🗑️ Verwijderen</button>`;
+      el.addEventListener('click', ev => {
+        if(ev.target.closest('[data-act="del"]')){
+          circlesGroup.removeLayer(sector);
+          allSectors = allSectors.filter(s=>s!==sector);
+          deleteSectorFromCloud(doc.id);
+          closeContextMenu();
+        }
+      });
+      document.body.appendChild(el); contextMenuEl=el;
+      positionMenu(el, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
+      document.addEventListener('click', closeContextMenuOnce, true);
+    });
+  }
   applyFilters();
 }
 function deleteSectorFromCloudLocal(id){
@@ -2888,6 +2985,8 @@ async function _initUserRole() {
     initReportSection();
     // Actie-log laden vanuit Firestore
     _loadActivityLog();
+    // Opruimen corrupte sectoren na korte delay zodat alle data geladen is
+    setTimeout(() => _cleanupOrphanSectors(), 3000);
 
     // Zones laden en dropdown vullen, daarna scope activeren
     if (_currentZones.length) {
