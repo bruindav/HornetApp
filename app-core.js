@@ -846,6 +846,16 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   ['pm-sender-ja','pm-sender-nee','pm-succes-ja','pm-succes-nee'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=ro; });
   if(pmSave2) pmSave2.style.display = ro ? 'none' : '';
   if(pmCancel2) pmCancel2.textContent = ro ? 'Sluiten' : 'Annuleren';
+  // Hint tonen bij read-only eigen markers (niet bij GBIF/import)
+  const isImportMarker = init.source === 'GBIF' || init.source === 'waarneming.nl';
+  let hintEl = document.getElementById('pm-edit-hint');
+  if (!hintEl) {
+    hintEl = document.createElement('div');
+    hintEl.id = 'pm-edit-hint';
+    hintEl.style.cssText = 'font-size:11px;color:#94a3b8;margin-top:8px;text-align:center';
+    pmCancel2?.parentElement?.appendChild(hintEl);
+  }
+  hintEl.textContent = (ro && !isImportMarker && canWrite()) ? '✏️ Lang indrukken op het icoon om te wijzigen' : '';
   // Modal tonen
   modalEl2.classList.remove('hidden');
   // Adres ophalen via reverse geocode
@@ -1251,11 +1261,12 @@ function attachMarkerPopup(marker){
   marker.on('click', (e)=>{
     L.DomEvent.stopPropagation(e);
     const isImport = m.source === 'GBIF' || m.source === 'waarneming.nl';
+    // Klik toont eigenschappen altijd — bewerkbaar alleen via contextmenu "Eigenschappen"
     openPropModal({
       type: m.type,
       init: {...m, _latlng: marker.getLatLng()},
-      readOnly: isImport,
-      onSave: isImport ? null : (vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }
+      readOnly: true,  // klik = altijd lezen; wijzigen via lang indrukken → Eigenschappen
+      onSave: null
     });
   });
 }
@@ -1707,7 +1718,19 @@ function openUnifiedContextMenu(opts){
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
     closeContextMenu();
     setTimeout(()=>{
-      if(act==='mk'){ const m=createMarkerWithPropsAt(opts.latlng, b.dataset.type, {date:nowISODate()}); persistMarker(m); _logAction(b.dataset.type, {}); return; }
+      if(act==='mk'){
+        // Altijd props modal openen bij nieuw icoon — ook binnen polygoon
+        openPropModal({
+          type: b.dataset.type,
+          init: { _latlng: opts.latlng },
+          onSave:(vals)=>{
+            const m = createMarkerWithPropsAt(opts.latlng, b.dataset.type, vals);
+            persistMarker(m);
+            _logAction(b.dataset.type, vals, m);
+          }
+        });
+        return;
+      }
       if(!opts.polygonLayer) return;
       if(act==='poly_label'){ const lbl=prompt('Polygoon label:', opts.polygonLayer._props?.label||''); if(lbl===null) return; opts.polygonLayer._props.label=lbl; refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }
       else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }
