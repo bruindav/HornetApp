@@ -1,4 +1,4 @@
-// app-core.js — Fix 141
+// app-core.js — Fix 142
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1043,7 +1043,8 @@ async function _persistAction(type, meta, markerId) {
       ts:       serverTimestamp(),
       displayName: _currentDisplayName || '',
     });
-  } catch(e) { console.warn('[activity] opslaan mislukt:', e.message); }
+    console.log('[activity] opgeslagen:', type);
+  } catch(e) { console.warn('[activity] opslaan mislukt:', e.code, e.message); }
 }
 
 function _logAction(type, meta, marker){
