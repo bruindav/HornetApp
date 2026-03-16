@@ -130,6 +130,20 @@
 
       /* Schaalregel iets opgetild boven de toggle knop */
       .leaflet-control-scale { margin-bottom: 8px !important; }
+
+      /* Voorkom dat browser "afbeelding opslaan" popup toont bij lang indrukken op markers */
+      .leaflet-marker-icon img,
+      .leaflet-marker-icon,
+      .leaflet-div-icon img,
+      .leaflet-div-icon {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        pointer-events: auto;
+      }
+      .leaflet-marker-pane img {
+        -webkit-touch-callout: none !important;
+      }
       .tab-btn.active { color: #0aa879; border-bottom-color: #0aa879; }
     </style>
   </head>
