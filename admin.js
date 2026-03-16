@@ -1,4 +1,4 @@
-// admin.js — Fix 135
+// admin.js — Fix 137
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -127,6 +127,10 @@ function createOverlay() {
     <div id="admin-panel">
       <div id="admin-header">
         <strong>⚙️ Beheer</strong>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;margin-right:8px">
+          <a href="./privacy.html" target="_blank" style="font-size:12px;color:#0aa879;text-decoration:none;white-space:nowrap">🔒 Privacy</a>
+          <button id="admin-request-delete" style="font-size:12px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0;white-space:nowrap">Account verwijderen</button>
+        </div>
         <button id="admin-close" title="Sluiten">✕</button>
       </div>
       <div class="adm-tabs" id="adm-tabs-bar">
@@ -143,6 +147,9 @@ function createOverlay() {
     </div>`;
   document.body.appendChild(el);
   document.getElementById('admin-close').addEventListener('click', closeAdminOverlay);
+  document.getElementById('admin-request-delete')?.addEventListener('click', () => {
+    window._requestAccountDeletion?.();
+  });
   el.addEventListener('click', e => { if (e.target === el) closeAdminOverlay(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAdminOverlay(); });
   // Tab wisselen

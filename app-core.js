@@ -374,9 +374,6 @@ function initUIBindings(){
   updateSWStatus();
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
-
-  // Account verwijder-verzoek
-  document.getElementById('btn-request-delete')?.addEventListener('click', _requestAccountDeletion);
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -2066,19 +2063,15 @@ function updateHeaderRole(role, name) {
     sidebarName.textContent = displayName;
     if (sidebarBlock) sidebarBlock.style.display = '';
   }
-  // Toon status verwijderverzoek als al ingediend
-  const delBtn = document.getElementById('btn-request-delete');
-  if (delBtn) {
-    // Haal actuele rol-data op om deletionRequested te checken
-    const uid2 = auth.currentUser?.uid;
-    if (uid2) {
-      getDoc(doc(_db, 'roles', uid2)).then(snap => {
-        if (snap.data()?.deletionRequested) {
-          delBtn.textContent = '⏳ Verwijdering aangevraagd';
-          delBtn.disabled = true;
-        }
-      }).catch(()=>{});
-    }
+  // Toon status verwijderverzoek in beheer header knop als al ingediend
+  const uid2 = auth.currentUser?.uid;
+  if (uid2) {
+    getDoc(doc(_db, 'roles', uid2)).then(snap => {
+      if (snap.data()?.deletionRequested) {
+        const adminDelBtn = document.getElementById('admin-request-delete');
+        if (adminDelBtn) { adminDelBtn.textContent = '⏳ Verwijdering aangevraagd'; adminDelBtn.disabled = true; }
+      }
+    }).catch(()=>{});
   }
   // Statusbalk mobiel
   const sbRole = document.getElementById('sb-role');
@@ -2145,13 +2138,13 @@ async function _requestAccountDeletion() {
       deletionRequestedAt: new Date().toISOString(),
     }, { merge: true });
     alert('Je verzoek is ingediend. Een beheerder zal je account zo snel mogelijk verwijderen.');
-    // Knop verbergen zodat je niet dubbel indient
-    document.getElementById('btn-request-delete').textContent = '⏳ Verwijdering aangevraagd';
-    document.getElementById('btn-request-delete').disabled = true;
+    const adminDelBtn = document.getElementById('admin-request-delete');
+    if (adminDelBtn) { adminDelBtn.textContent = '⏳ Verwijdering aangevraagd'; adminDelBtn.disabled = true; }
   } catch(e) {
     alert('Verzoek kon niet worden ingediend: ' + e.message);
   }
 }
+window._requestAccountDeletion = _requestAccountDeletion;
 
 async function boot(){
   await _loadZonesFromFirestore();
