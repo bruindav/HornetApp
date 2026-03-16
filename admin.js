@@ -1,4 +1,4 @@
-// admin.js — Fix 140
+// admin.js — Fix 145
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -39,6 +39,10 @@ let ZONE_WKT = {
   'Driebergen': 'POLYGON((5.24 52.02,5.35 52.02,5.35 52.09,5.24 52.09,5.24 52.02))',
   'Utrecht':    'POLYGON((5.03 52.04,5.18 52.04,5.18 52.15,5.03 52.15,5.03 52.04))',
 };
+
+async function _getFlightSpm() {
+  try { const s=await getDoc(doc(db,"config","settings")); return s.exists()&&s.data().secondsPerMeter ? parseFloat(s.data().secondsPerMeter) : 0.6; } catch { return 0.6; }
+}
 
 async function _loadZonesAdmin() {
   try {
@@ -660,9 +664,50 @@ async function _renderGebiedenTab(body) {
       <p style="font-size:11px;color:#94a3b8;margin-top:12px">
         Gebieden worden direct beschikbaar na opslaan. Gebruikers moeten de app herladen.
       </p>
+
+      <!-- Vliegtijd instelling -->
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
+        <h3 style="margin:0 0 8px;font-size:14px;color:#1e293b">⏱️ Vliegtijd instelling</h3>
+        <p style="font-size:12px;color:#64748b;margin:0 0 10px">
+          Bepaalt hoe de stopwatch de afstand berekent.<br>
+          Standaard: 4 minuten (240s) = 400m → 0.6 seconden per meter.
+        </p>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <label style="font-size:13px">
+            Seconden per meter
+            <input id="flight-spm" type="number" min="0.1" max="5" step="0.05" value="${(await _getFlightSpm()).toFixed(2)}"
+              style="display:block;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;width:110px"/>
+          </label>
+          <div style="font-size:12px;color:#64748b" id="flight-spm-info"></div>
+          <button id="flight-spm-save" style="padding:8px 16px;border-radius:6px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Opslaan</button>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:6px">
+          Voorbeelden: 0.6 s/m = 4 min→400m · 0.5 s/m = 5 min→600m · 1.0 s/m = 4 min→240m
+        </div>
+      </div>
     </div>`;
 
   document.getElementById('zone-add-btn')?.addEventListener('click', () => window._editZone(-1));
+
+  // Vliegtijd save
+  const spmInput = body.querySelector('#flight-spm');
+  const spmInfo  = body.querySelector('#flight-spm-info');
+  function updateSpmInfo() {
+    const v = parseFloat(spmInput?.value);
+    if (!v) return;
+    spmInfo.textContent = `→ 4 min = ${Math.round(240/v)} m · 3 min = ${Math.round(180/v)} m · 5 min = ${Math.round(300/v)} m`;
+  }
+  spmInput?.addEventListener('input', updateSpmInfo);
+  updateSpmInfo();
+  body.querySelector('#flight-spm-save')?.addEventListener('click', async () => {
+    const v = parseFloat(spmInput?.value);
+    if (!v || v <= 0) { alert('Vul een geldige waarde in'); return; }
+    try {
+      await setDoc(doc(db, 'config', 'settings'), { secondsPerMeter: v }, { merge: true });
+      spmInfo.textContent = '✅ Opgeslagen — gebruikers zien dit na herladen';
+      spmInfo.style.color = '#0aa879';
+    } catch(e) { alert('Opslaan mislukt: ' + e.message); }
+  });
 
   // Edit/delete handlers
   window._zoneData = allZones;
