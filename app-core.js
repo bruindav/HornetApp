@@ -1,4 +1,4 @@
-// app-core.js — Fix 145
+// app-core.js — Fix 146
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1595,6 +1595,12 @@ function _openSightLineModal(potLatLng, onConfirm) {
         <input id="sl-note" type="text" placeholder="bijv. richting spoor, hoge boom..."
           style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;box-sizing:border-box"/>
       </div>
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
+        <label style="font-size:13px;font-weight:600;color:#475569">Kleur</label>
+        <input id="sl-color" type="color" value="#ff6600"
+          style="width:44px;height:36px;border:1px solid #cbd5e1;border-radius:7px;cursor:pointer;padding:2px"/>
+        <span style="font-size:11px;color:#94a3b8">Kleur voor lijn en sector</span>
+      </div>
       <div style="display:flex;gap:8px">
         <button id="sl-cancel"  style="flex:1;padding:10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:14px;color:#475569">Annuleren</button>
         <button id="sl-confirm" style="flex:2;padding:10px;border-radius:8px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Klik richting op kaart →</button>
@@ -1646,10 +1652,11 @@ function _openSightLineModal(potLatLng, onConfirm) {
   modal.querySelector('#sl-cancel').addEventListener('click', ()=>{ clearInterval(swInterval); modal.remove(); });
   modal.querySelector('#sl-confirm').addEventListener('click', ()=>{
     clearInterval(swInterval);
-    const dist = Math.max(10, parseInt(distInput.value)||defaultDist);
-    const note = modal.querySelector('#sl-note').value.trim();
+    const dist  = Math.max(10, parseInt(distInput.value)||defaultDist);
+    const note  = modal.querySelector('#sl-note').value.trim();
+    const color = modal.querySelector('#sl-color').value || null;
     modal.remove();
-    onConfirm(dist, note, null);
+    onConfirm(dist, note, color);
   });
 }
 
@@ -2332,11 +2339,6 @@ window._requestAccountDeletion = _requestAccountDeletion;
 
 // ======================= Changelog =======================
 const CHANGELOG = [
-   {
-    version: 'Fix 144', date: '2026-03-17',
-    category: 'Acties',
-    text: 'Zichtlijn met stopwatch en automatisch afstand berekening; instelbaar door admin'
-  },
   {
     version: 'Fix 143', date: '2026-03-17',
     category: 'Acties',
