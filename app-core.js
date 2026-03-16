@@ -1534,6 +1534,8 @@ function _cleanupOrphanSectors() {
   }
   return toRemove.length;
 }
+
+function setSightLineColor(line,color,save=false){
   line.setStyle({color});
   line._meta=line._meta||{}; line._meta.color=color;
   if(line._sector){
