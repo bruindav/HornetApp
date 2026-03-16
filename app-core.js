@@ -1,4 +1,4 @@
-// app-core.js — Fix 156
+// app-core.js — Fix 157
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -462,17 +462,21 @@ const IMG = {
 
 function makeDivIcon(imgHtml, _bg, _border, size){
   // Geen achtergrondvlakje — alleen het icoon met drop-shadow voor zichtbaarheid
+  // draggable=false en oncontextmenu voorkomt "afbeelding opslaan" popup op mobiel
+  const noCtx = ' draggable="false" oncontextmenu="return false" style="display:inline-block;vertical-align:middle;-webkit-touch-callout:none;user-select:none"';
+  // Voeg attrs toe aan img tags in imgHtml
+  const safeHtml = imgHtml.replace(/<img /g, '<img draggable="false" oncontextmenu="return false" ');
   size = size || 'full';
   if(size === 'full'){
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;gap:3px">'+imgHtml+'</div>',
+      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;gap:3px;-webkit-touch-callout:none;user-select:none">'+safeHtml+'</div>',
       iconSize:[40,40], iconAnchor:[20,20]
     });
   } else {
     return L.divIcon({
       className:'custom-div-icon',
-      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center">'+imgHtml+'</div>',
+      html:'<div style="background:none;border:none;padding:0;display:flex;align-items:center;justify-content:center;-webkit-touch-callout:none;user-select:none">'+safeHtml+'</div>',
       iconSize:[26,26], iconAnchor:[13,13]
     });
   }
