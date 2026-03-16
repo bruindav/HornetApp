@@ -2332,6 +2332,11 @@ window._requestAccountDeletion = _requestAccountDeletion;
 
 // ======================= Changelog =======================
 const CHANGELOG = [
+   {
+    version: 'Fix 144', date: '2026-03-17',
+    category: 'Acties',
+    text: 'Zichtlijn met stopwatch en automatisch afstand berekening; instelbaar door admin'
+  },
   {
     version: 'Fix 143', date: '2026-03-17',
     category: 'Acties',
