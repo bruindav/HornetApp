@@ -1,4 +1,4 @@
-// app-core.js — Fix 153
+// app-core.js — Fix 155
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1746,36 +1746,72 @@ function _openSightLineModal(potLatLng, onConfirm) {
     else calcInfo.textContent='';
   });
 
-  // ── Kompas (DeviceOrientationEvent) ───────────────────────────────────
+  // ── Kompas (DeviceOrientationEvent) met middeling ──────────────────────
   let compassHandler = null;
   let compassActive  = false;
+  let compassReadings = [];
+  let compassTimer    = null;
+  const COMPASS_SECS  = 3;
+
+  function circularMean(angles) {
+    let sinSum = 0, cosSum = 0;
+    for (const a of angles) {
+      sinSum += Math.sin(a * Math.PI / 180);
+      cosSum += Math.cos(a * Math.PI / 180);
+    }
+    const mean = Math.atan2(sinSum / angles.length, cosSum / angles.length) * 180 / Math.PI;
+    return ((mean % 360) + 360) % 360;
+  }
 
   function startCompass(){
     if(compassActive) { stopCompass(); return; }
     const doStart = () => {
-      compassActive = true;
-      btnCompass.textContent = '🧭 Stop kompas';
+      compassActive = true; compassReadings = [];
+      btnCompass.textContent = `🧭 Meten… ${COMPASS_SECS}s`;
       btnCompass.style.background = '#fef3c7';
       btnCompass.style.borderColor = '#f59e0b';
+      bearingLbl.textContent = '🧭 Houd telefoon horizontaal, bovenkant naar nest…';
+      bearingLbl.style.color = '#f59e0b';
+
+      let remaining = COMPASS_SECS;
+      compassTimer = setInterval(() => {
+        remaining--;
+        if (remaining > 0) {
+          btnCompass.textContent = `🧭 Meten… ${remaining}s`;
+        } else {
+          clearInterval(compassTimer); compassTimer = null;
+          if (compassReadings.length > 0) {
+            const avg = circularMean(compassReadings);
+            const h   = Math.round(avg);
+            bearingInp.value = h;
+            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen)`;
+            bearingLbl.style.color = '#0aa879';
+          } else {
+            bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen';
+            bearingLbl.style.color = '#f59e0b';
+          }
+          stopCompass();
+        }
+      }, 1000);
+
       compassHandler = (e) => {
-        // iOS: webkitCompassHeading (true north, al gecorrigeerd)
-        // Android: alpha is heading t.o.v. magnetisch noord (360-alpha)
         let heading = null;
         if (e.webkitCompassHeading != null) {
           heading = e.webkitCompassHeading;
+        } else if (e.absolute && e.alpha != null) {
+          heading = (360 - e.alpha + 360) % 360;
         } else if (e.alpha != null) {
           heading = (360 - e.alpha + 360) % 360;
         }
         if (heading == null) return;
-        const h = Math.round(heading);
-        bearingInp.value = h;
-        bearingLbl.textContent = '🧭 ' + bearingToLabel(h);
+        compassReadings.push(heading);
+        const preview = Math.round(circularMean(compassReadings));
+        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${compassReadings.length} metingen…)`;
       };
       window.addEventListener('deviceorientationabsolute', compassHandler, true);
-      window.addEventListener('deviceorientation', compassHandler, true);
+      window.addEventListener('deviceorientation',         compassHandler, true);
     };
 
-    // iOS 13+ vereist toestemming
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
       DeviceOrientationEvent.requestPermission().then(state => {
         if (state === 'granted') doStart();
@@ -1790,9 +1826,10 @@ function _openSightLineModal(potLatLng, onConfirm) {
   }
 
   function stopCompass(){
-    if(compassHandler){
+    if (compassTimer) { clearInterval(compassTimer); compassTimer = null; }
+    if (compassHandler) {
       window.removeEventListener('deviceorientationabsolute', compassHandler, true);
-      window.removeEventListener('deviceorientation', compassHandler, true);
+      window.removeEventListener('deviceorientation',         compassHandler, true);
       compassHandler = null;
     }
     compassActive = false;
