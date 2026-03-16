@@ -1,4 +1,4 @@
-// admin.js — Fix 147
+// admin.js — Fix 158
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -66,6 +66,7 @@ const ACCEPTED_ROLES = ['volunteer', 'manager', 'admin'];
 
 let _unsubUsers = null;
 let _adminUid   = null;
+let _adminRole  = '';
 
 // ======================= Overlay =======================
 function createOverlay() {
@@ -184,7 +185,8 @@ function setAdminBody(html) {
 export async function openAdminOverlay(callerRole) {
   const uid = auth.currentUser?.uid;
   if (!uid) { alert('Niet ingelogd.'); return; }
-  _adminUid = uid;
+  _adminUid  = uid;
+  _adminRole = callerRole || '';
 
   await _loadZonesAdmin(); // zones altijd vers laden bij openen beheer
   createOverlay();
