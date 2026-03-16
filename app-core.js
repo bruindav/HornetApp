@@ -1,4 +1,4 @@
-// app-core.js — Fix 152
+// app-core.js — Fix 153
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1524,8 +1524,34 @@ function attachSightLineInteractivity(line){
 }
 function startSightLine(lokpotMarker){
   const potLatLng = lokpotMarker.getLatLng();
-  _openSightLineModal(potLatLng, (dist, note, color) => {
+  _openSightLineModal(potLatLng, (dist, note, color, compassBearing) => {
     const defaultColor = color || '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+
+    // Als kompasrichting opgegeven: direct lijn tekenen zonder kaart klik
+    if (compassBearing != null && !isNaN(compassBearing)) {
+      const brg = ((compassBearing % 360) + 360) % 360;
+      const endLatLng = destinationPoint(potLatLng, dist, brg);
+      const id = genId('flight');
+      const line = L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:3}).addTo(linesGroup);
+      line._meta = { id, type:'flight',
+        pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
+        potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg, note:note||''
+      };
+      registerLine(line);
+      line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
+        .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
+      const rInner=Math.max(1,dist-25), rOuter=dist+25;
+      const sector = createSectorLayer({
+        id:genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
+        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+      }).addTo(circlesGroup);
+      registerSector(sector); line._sector=sector; sector._line=line;
+      attachSightLineInteractivity(line);
+      persistLine(line); persistSector(sector);
+      return;
+    }
+
+    // Geen kompas: laat gebruiker op kaart klikken voor richting
     const tempGuide = L.polyline([potLatLng,potLatLng],{color:defaultColor,weight:2,dashArray:'4 4'}).addTo(map);
     const onMove = (e) => { tempGuide.setLatLngs([potLatLng,e.latlng]); };
     const onClick = (e) => {
@@ -1576,41 +1602,67 @@ function _openSightLineModal(potLatLng, onConfirm) {
 
   const modal = document.createElement('div');
   modal.id = 'sightline-modal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9100;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:12px';
   modal.innerHTML = `
-    <div style="background:#fff;border-radius:14px;padding:22px 24px;width:340px;max-width:94vw;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+    <div style="background:#fff;border-radius:14px;padding:20px 22px;width:340px;max-width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.25)">
       <h3 style="margin:0 0 4px;font-size:16px;color:#0f172a">📐 Zichtlijn toevoegen</h3>
-      <p style="font-size:12px;color:#64748b;margin:0 0 14px">Na bevestigen: klik op de kaart voor de richting van het nest</p>
-      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:10px">⏱️ Vliegtijd meten (heen + terug)</div>
-        <div id="sw-display" style="font-size:40px;font-weight:700;color:#0f172a;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:3px;margin-bottom:12px">0:00</div>
-        <div style="display:flex;gap:8px;justify-content:center">
-          <button id="sw-start" style="padding:9px 20px;border-radius:7px;border:none;background:#0aa879;color:#fff;font-size:14px;font-weight:600;cursor:pointer">▶ Start</button>
-          <button id="sw-stop"  style="padding:9px 20px;border-radius:7px;border:none;background:#64748b;color:#fff;font-size:14px;cursor:pointer" disabled>⏸ Stop</button>
-          <button id="sw-reset" style="padding:9px 14px;border-radius:7px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">↺</button>
+      <p style="font-size:12px;color:#64748b;margin:0 0 12px">Na bevestigen: klik op de kaart voor de richting van het nest</p>
+
+      <!-- Stopwatch blok -->
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:#475569;margin-bottom:8px">⏱️ Vliegtijd (heen + terug)</div>
+        <div id="sw-display" style="font-size:38px;font-weight:700;color:#0f172a;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:3px;margin-bottom:4px;cursor:pointer;user-select:none" title="Klik om handmatig in te voeren">0:00</div>
+        <div id="sw-manual-row" style="display:none;justify-content:center;gap:6px;margin-bottom:8px">
+          <input id="sw-min" type="number" min="0" max="59" placeholder="min" style="width:60px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:15px;text-align:center"/>
+          <span style="font-size:18px;color:#64748b;line-height:36px">:</span>
+          <input id="sw-sec" type="number" min="0" max="59" placeholder="sec" style="width:60px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;font-size:15px;text-align:center"/>
+          <button id="sw-manual-ok" style="padding:6px 12px;border-radius:6px;border:none;background:#0aa879;color:#fff;font-size:13px;cursor:pointer">OK</button>
         </div>
-        <div id="sw-hint" style="font-size:11px;color:#94a3b8;text-align:center;margin-top:8px">Druk op ← Gebruik tijd om de afstand te berekenen</div>
+        <div style="display:flex;gap:8px;justify-content:center;margin-bottom:6px">
+          <button id="sw-start" style="padding:8px 18px;border-radius:7px;border:none;background:#0aa879;color:#fff;font-size:14px;font-weight:600;cursor:pointer">▶ Start</button>
+          <button id="sw-stop"  style="padding:8px 18px;border-radius:7px;border:none;background:#64748b;color:#fff;font-size:14px;cursor:pointer" disabled>⏸ Stop</button>
+          <button id="sw-reset" style="padding:8px 12px;border-radius:7px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">↺</button>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;text-align:center">Klik op de tijd om handmatig in te voeren</div>
       </div>
+
+      <!-- Afstand + richting rij -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Afstand (m)</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="sl-distance" type="number" min="10" max="5000" value="${defaultDist}"
+              style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
+          </div>
+          <button id="sw-apply" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #0aa879;background:#f0fdf4;color:#0aa879;font-size:11px;cursor:pointer">← Gebruik tijd</button>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Richting (°)</label>
+          <input id="sl-bearing" type="number" min="0" max="359" placeholder="0–359"
+            style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
+          <button id="sl-compass" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #64748b;background:#f8fafc;color:#475569;font-size:11px;cursor:pointer">🧭 Gebruik kompas</button>
+        </div>
+      </div>
+      <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
+
+      <!-- Richting label -->
+      <div id="sl-bearing-label" style="font-size:12px;color:#0aa879;text-align:center;margin-bottom:10px;min-height:16px"></div>
+
+      <!-- Opmerking -->
       <div style="margin-bottom:12px">
-        <label style="font-size:13px;font-weight:600;color:#475569;display:block;margin-bottom:6px">Afstand tot nest (meter)</label>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input id="sl-distance" type="number" min="10" max="5000" value="${defaultDist}"
-            style="flex:1;padding:9px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600"/>
-          <button id="sw-apply" style="padding:9px 12px;border-radius:7px;border:1px solid #0aa879;background:#f0fdf4;color:#0aa879;font-size:12px;cursor:pointer;white-space:nowrap">← Gebruik tijd</button>
-        </div>
-        <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:4px"></div>
-      </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:13px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Opmerking</label>
+        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">Opmerking</label>
         <input id="sl-note" type="text" placeholder="bijv. richting spoor, hoge boom..."
           style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;box-sizing:border-box"/>
       </div>
-      <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
-        <label style="font-size:13px;font-weight:600;color:#475569">Kleur</label>
+
+      <!-- Kleur -->
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <label style="font-size:12px;font-weight:600;color:#475569">Kleur</label>
         <input id="sl-color" type="color" value="#ff6600"
-          style="width:44px;height:36px;border:1px solid #cbd5e1;border-radius:7px;cursor:pointer;padding:2px"/>
+          style="width:40px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;padding:2px"/>
         <span style="font-size:11px;color:#94a3b8">Kleur voor lijn en sector</span>
       </div>
+
       <div style="display:flex;gap:8px">
         <button id="sl-cancel"  style="flex:1;padding:10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:14px;color:#475569">Annuleren</button>
         <button id="sl-confirm" style="flex:2;padding:10px;border-radius:8px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Klik richting op kaart →</button>
@@ -1618,57 +1670,154 @@ function _openSightLineModal(potLatLng, onConfirm) {
     </div>`;
   document.body.appendChild(modal);
 
+  // ── Stopwatch ──────────────────────────────────────────────────────────
   let swInterval=null, swSeconds=0, swRunning=false;
-  const display  = modal.querySelector('#sw-display');
-  const btnStart = modal.querySelector('#sw-start');
-  const btnStop  = modal.querySelector('#sw-stop');
-  const btnReset = modal.querySelector('#sw-reset');
-  const btnApply = modal.querySelector('#sw-apply');
-  const distInput = modal.querySelector('#sl-distance');
-  const calcInfo  = modal.querySelector('#sl-calc-info');
+  const display    = modal.querySelector('#sw-display');
+  const manualRow  = modal.querySelector('#sw-manual-row');
+  const btnStart   = modal.querySelector('#sw-start');
+  const btnStop    = modal.querySelector('#sw-stop');
+  const btnReset   = modal.querySelector('#sw-reset');
+  const btnApply   = modal.querySelector('#sw-apply');
+  const distInput  = modal.querySelector('#sl-distance');
+  const calcInfo   = modal.querySelector('#sl-calc-info');
+  const bearingInp = modal.querySelector('#sl-bearing');
+  const bearingLbl = modal.querySelector('#sl-bearing-label');
+  const btnCompass = modal.querySelector('#sl-compass');
 
   function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
   function updateInfo(secs){
     if(!secs){ calcInfo.textContent=''; return; }
-    const d = Math.round(secs / secPerM);
-    calcInfo.textContent = `${fmtTime(secs)} vliegtijd = ±${d} m (instelling: ${secPerM}s/m)`;
+    const d=Math.round(secs/secPerM);
+    calcInfo.textContent=`${fmtTime(secs)} = ±${d} m  (${secPerM}s/m)`;
   }
+  function bearingToLabel(deg){
+    if(deg===''||deg===null||isNaN(deg)) return '';
+    const d=((deg%360)+360)%360;
+    const dirs=['N','NNO','NO','ONO','O','OZO','ZO','ZZO','Z','ZZW','ZW','WZW','W','WNW','NW','NNW'];
+    return `${Math.round(d)}° — ${dirs[Math.round(d/22.5)%16]}`;
+  }
+  bearingInp.addEventListener('input',()=>{
+    bearingLbl.textContent = bearingToLabel(bearingInp.value);
+  });
 
-  btnStart.addEventListener('click', ()=>{
+  // Klik op display → handmatige invoer tonen
+  display.addEventListener('click',()=>{
+    if(swRunning) return;
+    const isOpen = manualRow.style.display==='flex';
+    manualRow.style.display = isOpen ? 'none' : 'flex';
+    if(!isOpen){
+      modal.querySelector('#sw-min').value = Math.floor(swSeconds/60)||'';
+      modal.querySelector('#sw-sec').value = swSeconds%60||'';
+      modal.querySelector('#sw-min').focus();
+    }
+  });
+  modal.querySelector('#sw-manual-ok').addEventListener('click',()=>{
+    const m=parseInt(modal.querySelector('#sw-min').value)||0;
+    const s=parseInt(modal.querySelector('#sw-sec').value)||0;
+    swSeconds=m*60+s;
+    display.textContent=fmtTime(swSeconds);
+    manualRow.style.display='none';
+    updateInfo(swSeconds);
+  });
+
+  btnStart.addEventListener('click',()=>{
     if(swRunning) return; swRunning=true;
     btnStart.disabled=true; btnStop.disabled=false;
     swInterval=setInterval(()=>{ swSeconds++; display.textContent=fmtTime(swSeconds); updateInfo(swSeconds); },1000);
   });
-  btnStop.addEventListener('click', ()=>{
+  btnStop.addEventListener('click',()=>{
     if(!swRunning) return; swRunning=false; clearInterval(swInterval);
     btnStart.disabled=false; btnStop.disabled=true; btnStart.textContent='▶ Hervat';
   });
-  btnReset.addEventListener('click', ()=>{
+  btnReset.addEventListener('click',()=>{
     swRunning=false; clearInterval(swInterval); swSeconds=0;
-    display.textContent='0:00'; btnStart.disabled=false; btnStop.disabled=true;
-    btnStart.textContent='▶ Start'; calcInfo.textContent='';
+    display.textContent='0:00'; manualRow.style.display='none';
+    btnStart.disabled=false; btnStop.disabled=true; btnStart.textContent='▶ Start';
+    calcInfo.textContent='';
   });
-  btnApply.addEventListener('click', ()=>{
+  btnApply.addEventListener('click',()=>{
     if(!swSeconds) return;
-    distInput.value = Math.round(swSeconds / secPerM);
+    distInput.value=Math.round(swSeconds/secPerM);
     updateInfo(swSeconds);
   });
-  distInput.addEventListener('input', ()=>{
+  distInput.addEventListener('input',()=>{
     const d=parseInt(distInput.value);
     if(d>0) calcInfo.textContent=`${d} m → ±${Math.round(d*secPerM)}s vliegtijd`;
     else calcInfo.textContent='';
   });
 
-  modal.querySelector('#sl-cancel').addEventListener('click', ()=>{ clearInterval(swInterval); modal.remove(); });
-  modal.querySelector('#sl-confirm').addEventListener('click', ()=>{
-    clearInterval(swInterval);
-    const dist  = Math.max(10, parseInt(distInput.value)||defaultDist);
-    const note  = modal.querySelector('#sl-note').value.trim();
-    const color = modal.querySelector('#sl-color').value || null;
+  // ── Kompas (DeviceOrientationEvent) ───────────────────────────────────
+  let compassHandler = null;
+  let compassActive  = false;
+
+  function startCompass(){
+    if(compassActive) { stopCompass(); return; }
+    const doStart = () => {
+      compassActive = true;
+      btnCompass.textContent = '🧭 Stop kompas';
+      btnCompass.style.background = '#fef3c7';
+      btnCompass.style.borderColor = '#f59e0b';
+      compassHandler = (e) => {
+        // iOS: webkitCompassHeading (true north, al gecorrigeerd)
+        // Android: alpha is heading t.o.v. magnetisch noord (360-alpha)
+        let heading = null;
+        if (e.webkitCompassHeading != null) {
+          heading = e.webkitCompassHeading;
+        } else if (e.alpha != null) {
+          heading = (360 - e.alpha + 360) % 360;
+        }
+        if (heading == null) return;
+        const h = Math.round(heading);
+        bearingInp.value = h;
+        bearingLbl.textContent = '🧭 ' + bearingToLabel(h);
+      };
+      window.addEventListener('deviceorientationabsolute', compassHandler, true);
+      window.addEventListener('deviceorientation', compassHandler, true);
+    };
+
+    // iOS 13+ vereist toestemming
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission().then(state => {
+        if (state === 'granted') doStart();
+        else { bearingLbl.textContent = '⚠️ Geen toestemming voor kompas'; bearingLbl.style.color='#f59e0b'; }
+      }).catch(() => { bearingLbl.textContent = '⚠️ Kompas niet beschikbaar'; });
+    } else if (typeof DeviceOrientationEvent !== 'undefined') {
+      doStart();
+    } else {
+      bearingLbl.textContent = '⚠️ Geen kompas op dit apparaat';
+      bearingLbl.style.color = '#f59e0b';
+    }
+  }
+
+  function stopCompass(){
+    if(compassHandler){
+      window.removeEventListener('deviceorientationabsolute', compassHandler, true);
+      window.removeEventListener('deviceorientation', compassHandler, true);
+      compassHandler = null;
+    }
+    compassActive = false;
+    btnCompass.textContent = '🧭 Gebruik kompas';
+    btnCompass.style.background = '#f8fafc';
+    btnCompass.style.borderColor = '#64748b';
+  }
+
+  btnCompass.addEventListener('click', startCompass);
+
+  // ── Sluiten ───────────────────────────────────────────────────────────
+  modal.querySelector('#sl-cancel').addEventListener('click',()=>{
+    clearInterval(swInterval); stopCompass(); modal.remove();
+  });
+  modal.querySelector('#sl-confirm').addEventListener('click',()=>{
+    clearInterval(swInterval); stopCompass();
+    const dist    = Math.max(10, parseInt(distInput.value)||defaultDist);
+    const note    = modal.querySelector('#sl-note').value.trim();
+    const color   = modal.querySelector('#sl-color').value || null;
+    const bearing = bearingInp.value !== '' ? parseFloat(bearingInp.value) : null;
     modal.remove();
-    onConfirm(dist, note, color);
+    onConfirm(dist, note, color, bearing);
   });
 }
+
 
 function persistLine(line){
   const m=line._meta||{}, ll=line.getLatLngs();
