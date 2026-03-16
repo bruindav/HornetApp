@@ -1,4 +1,4 @@
-// app-core.js — Fix 140
+// app-core.js — Fix 141
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -912,7 +912,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
       if(vt) vals.valtype = vt;
       if(!isNaN(kn)) vals.koninginnen = kn;
     }
-    onSave && onSave(vals); _logAction(type, vals); cleanup();
+    onSave && onSave(vals); cleanup();
   };
 }
 
@@ -1083,7 +1083,12 @@ async function _loadActivityLog() {
       try {
         snap = await getDocs(query(collection(_db, 'activity', uid, 'log'),
           where('date','>=', cutoffStr), orderBy('date','desc'), orderBy('ts','desc'), limit(200)));
-      } catch { snap = await getDocs(collection(_db, 'activity', uid, 'log')); }
+      } catch(qErr) {
+        // Index nog niet aangemaakt — probeer simpelere query
+        if (qErr.code === 'failed-precondition' || qErr.message?.includes('index')) {
+          snap = await getDocs(collection(_db, 'activity', uid, 'log'));
+        } else { throw qErr; } // permissions of andere fout — gooi door
+      }
       snap.forEach(d => { const data=d.data(); if(data.date>=cutoffStr) entries.push({...data,uid}); });
     } else {
       const allUids = await _getAllUidsInZones();
@@ -1092,7 +1097,11 @@ async function _loadActivityLog() {
         try {
           snap = await getDocs(query(collection(_db, 'activity', u, 'log'),
             where('date','>=', cutoffStr), orderBy('date','desc'), orderBy('ts','desc'), limit(100)));
-        } catch { snap = await getDocs(collection(_db, 'activity', u, 'log')); }
+        } catch(qErr) {
+          if (qErr.code === 'failed-precondition' || qErr.message?.includes('index')) {
+            try { snap = await getDocs(collection(_db, 'activity', u, 'log')); } catch { continue; }
+          } else { continue; }
+        }
         snap.forEach(d => { const data=d.data(); if(data.date>=cutoffStr) entries.push({...data,uid:u}); });
       }
     }
@@ -1116,8 +1125,13 @@ async function _loadActivityLog() {
     _actionLogShowAll = false;
     _renderActionLog();
   } catch(e) {
-    console.warn('[activity] laden mislukt:', e.message);
-    _renderActionLog();
+    console.warn('[activity] laden mislukt:', e.code || e.message);
+    if (e.code === 'permission-denied') {
+      const el2 = document.getElementById('action-log-list');
+      if (el2) el2.innerHTML = '<div style="color:#f59e0b;font-size:11px;padding:6px 0">⚠️ Firestore rules niet bijgewerkt — upload firestore.rules</div>';
+    } else {
+      _renderActionLog();
+    }
   }
 }
 
