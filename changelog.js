@@ -13,6 +13,11 @@
 
 const CHANGELOG = [
   {
+    version: 'Fix 153', date: '2026-03-17',
+    category: 'Acties',
+    text: 'Kompas telefoon gebruiken bij toevoegen zichtlijn. '
+  },
+  {
     version: 'Fix 148', date: '2026-03-17',
     category: 'Algemeen',
     text: 'Changelog verplaatst naar eigen bestand (changelog.js) voor eenvoudig beheer'
