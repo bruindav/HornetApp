@@ -1,4 +1,4 @@
-// app-core.js — Fix 116
+// app-core.js — Fix 139
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2122,27 +2122,61 @@ async function _requestAccountDeletion() {
   const uid = auth.currentUser?.uid;
   if (!uid) return;
 
-  const confirmed = confirm(
-    'Wil je een verzoek indienen om je account te verwijderen?\n\n' +
-    '• Je account wordt gemarkeerd voor verwijdering\n' +
-    '• Een beheerder verwerkt je verzoek zo snel mogelijk\n' +
-    '• Je kaartdata (iconen, polygonen) blijft bewaard voor de monitoring\n' +
-    '• Je ontvangt geen bevestigingsmail\n\n' +
-    'Doorgaan?'
-  );
-  if (!confirmed) return;
+  // Eigen gestylede modal — geen browser confirm/alert
+  return new Promise(resolve => {
+    const existing = document.getElementById('delete-account-modal');
+    if (existing) existing.remove();
 
-  try {
-    await setDoc(doc(_db, 'roles', uid), {
-      deletionRequested: true,
-      deletionRequestedAt: new Date().toISOString(),
-    }, { merge: true });
-    alert('Je verzoek is ingediend. Een beheerder zal je account zo snel mogelijk verwijderen.');
-    const adminDelBtn = document.getElementById('admin-request-delete');
-    if (adminDelBtn) { adminDelBtn.textContent = '⏳ Verwijdering aangevraagd'; adminDelBtn.disabled = true; }
-  } catch(e) {
-    alert('Verzoek kon niet worden ingediend: ' + e.message);
-  }
+    const modal = document.createElement('div');
+    modal.id = 'delete-account-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5)';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:12px;padding:24px;width:320px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+        <div style="font-size:28px;text-align:center;margin-bottom:12px">🗑️</div>
+        <h3 style="margin:0 0 8px;font-size:16px;color:#0f172a;text-align:center">Account verwijderen?</h3>
+        <p style="font-size:13px;color:#475569;margin:0 0 16px;line-height:1.6">
+          Je account wordt gemarkeerd voor verwijdering. Een beheerder verwerkt je verzoek zo snel mogelijk.<br><br>
+          Je kaartdata blijft bewaard voor de monitoring.
+        </p>
+        <div style="display:flex;gap:8px">
+          <button id="del-cancel" style="flex:1;padding:10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;cursor:pointer;font-size:14px;color:#475569">Annuleren</button>
+          <button id="del-confirm" style="flex:1;padding:10px;border-radius:8px;border:none;background:#dc2626;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Verwijderen</button>
+        </div>
+        <div id="del-status" style="font-size:12px;color:#64748b;margin-top:10px;min-height:16px;text-align:center"></div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    modal.querySelector('#del-cancel').onclick = () => { modal.remove(); resolve(false); };
+
+    modal.querySelector('#del-confirm').onclick = async () => {
+      const btn = modal.querySelector('#del-confirm');
+      const status = modal.querySelector('#del-status');
+      btn.disabled = true; btn.textContent = '⏳ Bezig…';
+      try {
+        await setDoc(doc(_db, 'roles', uid), {
+          deletionRequested: true,
+          deletionRequestedAt: new Date().toISOString(),
+        }, { merge: true });
+        // Toon bevestiging in modal
+        modal.querySelector('div > div').innerHTML = `
+          <div style="font-size:28px;text-align:center;margin-bottom:12px">✅</div>
+          <h3 style="margin:0 0 8px;font-size:16px;color:#0f172a;text-align:center">Verzoek ingediend</h3>
+          <p style="font-size:13px;color:#475569;margin:0 0 20px;text-align:center;line-height:1.6">
+            Een beheerder verwerkt je verzoek zo snel mogelijk.
+          </p>
+          <button id="del-close" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Sluiten</button>`;
+        modal.querySelector('#del-close').onclick = () => { modal.remove(); };
+        const adminDelBtn = document.getElementById('admin-request-delete');
+        if (adminDelBtn) { adminDelBtn.textContent = '⏳ Verwijdering aangevraagd'; adminDelBtn.disabled = true; }
+        resolve(true);
+      } catch(e) {
+        btn.disabled = false; btn.textContent = 'Verwijderen';
+        status.textContent = 'Mislukt: ' + e.message;
+        status.style.color = '#dc2626';
+        resolve(false);
+      }
+    };
+  });
 }
 window._requestAccountDeletion = _requestAccountDeletion;
 
