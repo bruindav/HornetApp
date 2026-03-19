@@ -1,4 +1,4 @@
-// app-core.js — Fix 163
+// app-core.js — Fix 164
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2179,38 +2179,12 @@ function openUnifiedContextMenu(opts){
       else if(act==='poly_color'){ openColorModal(opts.polygonLayer._props?.color||'#0aa879', col=>{ opts.polygonLayer._props.color=col; opts.polygonLayer.setStyle({ color: col, fillColor: col }); refreshPolygonLabel(opts.polygonLayer); persistPolygon(opts.polygonLayer); }); }
       else if(act==='poly_edit'){
         const layer = opts.polygonLayer;
-        const isEditing = layer._pmEditing === true;
-        if(isEditing) {
-          layer._pmEditing = false;
+        if(layer.pm?.enabled()) {
           layer.pm.disable();
-          layer.off('pm:markerdragend').off('pm:vertexadded')
-               .off('pm:vertexremoved').off('pm:edit').off('pm:change');
           persistPolygon(layer);
         } else {
-          layer._pmEditing = true;
-          const saveFn = () => { persistPolygon(layer); };
-          layer.off('pm:markerdragend').off('pm:vertexadded')
-               .off('pm:vertexremoved').off('pm:edit').off('pm:change');
-          layer.on('pm:markerdragend', saveFn);
-          layer.on('pm:vertexadded',   saveFn);
-          layer.on('pm:vertexremoved', saveFn);
-          layer.on('pm:edit',          saveFn);
-          layer.on('pm:change',        saveFn);
-          // Gebruik requestAnimationFrame zodat huidige click-cyclus volledig klaar is
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            layer.pm.enable({ allowSelfIntersection: false, preventMarkerRemoval: false });
-          }));
-          // Bijhouden als Geoman zelf de editing uitzet (bv. via toolbar)
-          const onGlobalToggle = (e) => {
-            if(!e.enabled && layer._pmEditing) {
-              layer._pmEditing = false;
-              persistPolygon(layer);
-              map.off('pm:globaleditmodetoggled', onGlobalToggle);
-            }
-          };
-          map.on('pm:globaleditmodetoggled', onGlobalToggle);
+          layer.pm.enable();
         }
-        return;
       }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
       else if(act==='poly_delete'){ const id=opts.polygonLayer._props?.id; if(id){ deletePolygonFromCloud(id); } _removePolygonLayer(opts.polygonLayer); }
