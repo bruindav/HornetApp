@@ -1,4 +1,4 @@
-// app-core.js — Fix 160
+// app-core.js — Fix 161
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2182,9 +2182,16 @@ function openUnifiedContextMenu(opts){
         if(layer.pm?.enabled()) {
           layer.pm.disable();
           layer.off('pm:edit');
+          layer.off('pm:markerdragend');
+          layer.off('pm:vertexadded');
+          layer.off('pm:vertexremoved');
         } else {
           layer.pm.enable({ allowSelfIntersection: false });
-          layer.on('pm:edit', () => { persistPolygon(layer); });
+          const saveFn = () => { persistPolygon(layer); };
+          layer.on('pm:edit',          saveFn);
+          layer.on('pm:markerdragend', saveFn);
+          layer.on('pm:vertexadded',   saveFn);
+          layer.on('pm:vertexremoved', saveFn);
         }
       }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
