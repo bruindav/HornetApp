@@ -1,4 +1,4 @@
-// app-core.js — Fix 164
+// app-core.js — Fix 166
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2687,6 +2687,39 @@ function openChangelog() {
   window._setSidebar?.(false);
 }
 
+function _showDemoWelcome() {
+  const existing = document.getElementById('demo-welcome-modal');
+  if (existing) return; // al getoond
+
+  const modal = document.createElement('div');
+  modal.id = 'demo-welcome-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9800;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px 26px;width:360px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3);text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">🐝</div>
+      <h2 style="margin:0 0 8px;font-size:20px;color:#0f172a">Welkom bij HoornaarZoeken!</h2>
+      <div style="display:inline-block;background:#fef3c7;color:#92400e;font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;margin-bottom:16px">Demo account</div>
+      <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 14px;text-align:left">
+        Je bent ingelogd met het <strong>demo account</strong>, ingesteld op de gemeenten
+        <strong>Wageningen</strong> en <strong>Rhenen</strong>.
+      </p>
+      <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 14px;text-align:left">
+        Je mag alles uitproberen — iconen plaatsen, zichtlijnen tekenen, het overzicht bekijken en filters instellen.
+      </p>
+      <p style="font-size:14px;color:#475569;line-height:1.7;margin:0 0 20px;text-align:left">
+        💡 <strong>Tip:</strong> lees eerst de <strong>Help</strong> — klik op het
+        <span style="background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:13px">?</span>
+        knopje rechtsboven in de app.
+      </p>
+      <button id="demo-welcome-ok" style="width:100%;padding:13px;border-radius:10px;border:none;background:#0aa879;color:#fff;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px">
+        Veel plezier met HoornaarZoeken! 🚀
+      </button>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('demo-welcome-ok').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
+}
+
 async function boot(){
   await _loadZonesFromFirestore();
   await _loadFlightSettings();
@@ -2993,6 +3026,12 @@ async function _initUserRole() {
     _loadActivityLog();
     // Opruimen corrupte sectoren na korte delay zodat alle data geladen is
     setTimeout(() => _cleanupOrphanSectors(), 3000);
+
+    // Demo account welkomstpopup
+    const DEMO_EMAIL = 'demo@hoornaarzoeken.nl';
+    if ((auth.currentUser?.email || '').toLowerCase() === DEMO_EMAIL) {
+      _showDemoWelcome();
+    }
 
     // Zones laden en dropdown vullen, daarna scope activeren
     if (_currentZones.length) {
