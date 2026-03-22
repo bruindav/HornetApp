@@ -1,4 +1,4 @@
-// app-core.js — Fix 166
+// app-core.js — Fix 167
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2134,7 +2134,7 @@ function openUnifiedContextMenu(opts){
   let html='';
   if(opts.polygonLayer){
     const _mgr = getZoneManagerName(opts.polygonLayer._props?.zoneId);
-    const _mgrTxt = _mgr ? ` <span style="font-size:11px;color:#64748b;font-weight:normal">(beheerder: ${_mgr})</span>` : '';
+    const _mgrTxt = _mgr ? ` <span style="font-size:11px;color:#64748b;font-weight:normal">(coördinator: ${_mgr})</span>` : '';
     if(canEdit()){
       html += `<h4>Polygoon${_mgrTxt}</h4>
     <button data-act="poly_label">✏️ Label wijzigen</button>
@@ -2492,7 +2492,7 @@ function zoomToZone(zone) {
 }
 const ROL_LABEL = {
   admin:     '🔑 Admin',
-  manager:   '🛠 Beheerder',
+  manager:   '🗂️ Coördinator',
   volunteer: '👷 Vrijwilliger',
   pending:   '⏳ In afwachting',
 };
@@ -2591,7 +2591,7 @@ async function _requestAccountDeletion() {
         <div style="font-size:28px;text-align:center;margin-bottom:12px">🗑️</div>
         <h3 style="margin:0 0 8px;font-size:16px;color:#0f172a;text-align:center">Account verwijderen?</h3>
         <p style="font-size:13px;color:#475569;margin:0 0 16px;line-height:1.6">
-          Je account wordt gemarkeerd voor verwijdering. Een beheerder verwerkt je verzoek zo snel mogelijk.<br><br>
+          Je account wordt gemarkeerd voor verwijdering. Een coördinator verwerkt je verzoek zo snel mogelijk.<br><br>
           Je kaartdata blijft bewaard voor de monitoring.
         </p>
         <div style="display:flex;gap:8px">
@@ -2618,7 +2618,7 @@ async function _requestAccountDeletion() {
           <div style="font-size:28px;text-align:center;margin-bottom:12px"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAWCAYAAAAmaHdCAAAE5UlEQVR42l1UWWxUZRT+/v+/987cdkr31k6H1ZalQ+m000gFTBEkBqNFgyNr1Ig2Eh/whaAGvdaIRB80oj4UTcAgEdvIWkQMESpohS7IYl2ILQiF0pZC25m7zF2ODzBGOU/n5Mt3Tr6zMdxlpIEfQy1PxfO7C4g1N7upuPWlmiomOW9YDk4u+qRjc1MsJtg3aytnFahije3SnkEDp+q2dup3J66vj8qrVanKJ7xltkeTHQc7juZ27H3sWlQcKOp02d7nKlaNzxRfCIlhxPAsj+F3IuqxiekyZ64gNwtMzM7LUAr7R+0TlkPrT94wuxqau5OpIgwAXo2V5Ef9aoWqYJItMEFhTMhGcshRfdU2YyvH4kZdNrFBlqGWSoKXSUQ5nDGXSax/xHT2sfNlZYHgNVPk3OwZ+a+E9z54ca1sGyu5bURMm9rGksmmt9/Z99kdmG9bVzGutJ8eTjq4yPSqmRcEg9SbxhdMP362t/H1pbNNv2+H3ydKTcuB5biQOQByYep2l6rry1/ecuTCpWmVwWJf8hABQmzIz5+XpipzcxL2g5OXROyh3MDONEkqGtMt27Yd5jgu8zx4lu06Al5oVFGeeKEk1DNneGS7SFfKTcf9jgHASKS8cRyj+ptZCrZHi5AIqN44SeHEOZKWBcuywAEYgJftEX+6vQ95I0mMkLcl63T3OkYAZ4DXs+i+9slXRyuH8lTsqr1XJBQFiuPCZYAgQsJ1IcV1PNveZ98zZotLGUrLpBNnllAsJsSbAHI2Lq88V5a3wW9acknvTV48OMbOZstIcAYfEWxFhmJZWHXqCoIDOmufkcu/rA7Ja8qn76zYvlvnDCBb2KrfRdqhSBCd4QJWfMPAM2euI0sIGGk+CMPEivY+FA/oaCvJ5Aem5sNne1N6FD2bAcQAgIjYuxuX9kiymGQIeItP9/Ho+QFcG5+JPdEg6jqvInRlFJ3Tc7FvZqGrEvGxUb1r88dHqjUNnGtarcQYI+LisCQ4WDzp7Z+ej66ZhSga0lH//V8IDSXwSzgfB8KFUFyQJAmmqmrz7ZWp5RIw3wNaQZy/b3tUL3PGPUmio9PyWWn/GDLGLMTTZBwaH4BuWl5BepqIJ8zLGEp8SATGWKvLGxoaPE3T+GsNX/3p2d5uNSfAZdP0nmy7iIy4hcGAjEDcwerOfuRyQZbnMH04/nbD561mc3OMAyABAK3HWkHdMXEik30L5i5cffp6UejvW3QqV+FbpmahSJExrfeWXWp5vCMgPtq09eimjvqovOiVI86/B5jalV5M9AerMloU0MJfgwH6tFiFokhM8sneij+GefnlOOC6R9pcvmxOd/dwisdTzuHCWemF0ayDiiQtHFCltv3VITsULGA56enJTEXiu2bkn9TJ24UM/0OVCms5PqE8mwFeEyA4A7yfQjXqA0HaoypiQdyy9xf++Pg8ePx5z0qaVtJU9LjVYblyXfqZ31YkjGSTP025vzoPLR1ToplPAS62Taz1G5XlB2lulPRIeLeGWonotsyN6x6Z8db6xY/GYjEFACgWEzFA6JGyr2luFZlVM1s7otFMGJHyk1RTSUZFuLkRUZkARgDXNI3/7/cS2B2MaaiVjIpwM9VEyIiEz8GIhH9OVISPNSIqsztNThE1TeOaViulBpAaAgGsEVHZiIRbExXhH/4BTRw+aPkvjewAAAAASUVORK5CYII=" width="16" height="16" style="display:inline-block;vertical-align:middle"></div>
           <h3 style="margin:0 0 8px;font-size:16px;color:#0f172a;text-align:center">Verzoek ingediend</h3>
           <p style="font-size:13px;color:#475569;margin:0 0 20px;text-align:center;line-height:1.6">
-            Een beheerder verwerkt je verzoek zo snel mogelijk.
+            Een coördinator verwerkt je verzoek zo snel mogelijk.
           </p>
           <button id="del-close" style="width:100%;padding:10px;border-radius:8px;border:none;background:#0aa879;color:#fff;cursor:pointer;font-size:14px;font-weight:600">Sluiten</button>`;
         modal.querySelector('#del-close').onclick = () => { modal.remove(); };

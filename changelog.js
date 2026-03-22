@@ -13,9 +13,64 @@
 
 const CHANGELOG = [
   {
-    version: 'Fix 153', date: '2026-03-17',
-    category: 'Acties',
-    text: 'Kompas telefoon gebruiken bij toevoegen zichtlijn. '
+    version: 'Fix 166', date: '2026-03-22',
+    category: 'Algemeen',
+    text: 'Demo account (demo@hoornaarzoeken.nl) toont welkomstpopup bij inloggen met uitleg over Wageningen en Rhenen als testgebieden'
+  },
+  {
+    version: 'Fix 165', date: '2026-03-22',
+    category: 'Algemeen',
+    text: 'Versienummer zichtbaar onderin de sidebar — handig om te controleren of de nieuwste versie geladen is'
+  },
+  {
+    version: 'Fix 164', date: '2026-03-22',
+    category: 'Kaart',
+    text: 'Polygoon bewerken (Vorm bewerken aan/uit) werkt weer correct — punten verplaatsen en opslaan'
+  },
+  {
+    version: 'Fix 163–162', date: '2026-03-22',
+    category: 'Kaart',
+    text: 'Lang indrukken op kaartmarkers geeft nu altijd het contextmenu — browser "afbeelding opslaan" popup op mobiel is geblokkeerd'
+  },
+  {
+    version: 'Fix 159', date: '2026-03-22',
+    category: 'Beheer',
+    text: 'Beheer-scherm opent weer correct — fout bij laden van beheerscherm opgelost'
+  },
+  {
+    version: 'Fix 158', date: '2026-03-22',
+    category: 'Gebieden',
+    text: 'Corrupte sectoren (banaan-vorm) worden automatisch opgeruimd bij inloggen. Nieuw contextmenu-optie "🔧 Sector herstellen" op zichtlijnen'
+  },
+  {
+    version: 'Fix 155', date: '2026-03-20',
+    category: 'Kaart',
+    text: 'Kompas meet nu 3 seconden lang en toont gemiddelde richting — nauwkeuriger dan directe meting. Live weergave tijdens meten'
+  },
+  {
+    version: 'Fix 154', date: '2026-03-20',
+    category: 'Algemeen',
+    text: 'Help-teksten volledig bijgewerkt met nieuwe iconen, uitleg over zichtlijnen, actielijst, account verwijderen en kompas'
+  },
+  {
+    version: 'Fix 153', date: '2026-03-20',
+    category: 'Kaart',
+    text: 'Zichtlijn: stopwatch tijd ook handmatig invoerbaar (klik op de tijd). Kompas-knop meet 3 seconden en vult richting automatisch in — bij bekende richting geen kaart-klik meer nodig'
+  },
+  {
+    version: 'Fix 152', date: '2026-03-19',
+    category: 'Uiterlijk',
+    text: 'Nest-icoon vernieuwd — zelfde nestvorm als "nest geruimd" maar zonder kadertje en zonder rood kruis'
+  },
+  {
+    version: 'Fix 150–151', date: '2026-03-19',
+    category: 'Uiterlijk',
+    text: 'Val-icoon verbeterd: rechtopstaande cilinder met rood roosterkapje en roze trippit vloeistof. Bijgewerkt op kaart, filter, actielijst én overzicht'
+  },
+  {
+    version: 'Fix 149', date: '2026-03-18',
+    category: 'Algemeen',
+    text: 'Changelog staat nu in een apart bestand (changelog.js) — nieuwe fixes bovenaan toevoegen is veel eenvoudiger'
   },
   {
     version: 'Fix 148', date: '2026-03-17',
