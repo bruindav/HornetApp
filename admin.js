@@ -1,4 +1,4 @@
-// admin.js — Fix 158
+// admin.js — Fix 167
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -206,11 +206,17 @@ export async function openAdminOverlay(callerRole) {
     }
   }
 
-  const isAdmin = myRole === 'admin';
+  const isAdmin   = myRole === 'admin';
+  const isManager = myRole === 'manager';
 
   // Admin-only tabs tonen/verbergen
   document.querySelectorAll('.adm-tab-admin').forEach(tab => {
-    tab.style.display = isAdmin ? '' : 'none';
+    // Gebieden tab ook zichtbaar voor coördinator
+    if (tab.dataset.tab === 'gebieden') {
+      tab.style.display = (isAdmin || isManager) ? '' : 'none';
+    } else {
+      tab.style.display = isAdmin ? '' : 'none';
+    }
   });
 
   if (isAdmin) {
@@ -223,12 +229,13 @@ export async function openAdminOverlay(callerRole) {
     startListening();
     openOverzichtTab();
   } else if (myRole === 'manager' || myRole === 'volunteer') {
-    // Manager/Vrijwilliger: alleen Overzicht tab, direct openen
+    // Manager/Vrijwilliger: Overzicht + Gebieden (voor manager) tabs, direct openen
     document.querySelectorAll('.adm-tab').forEach(b => b.classList.remove('active'));
     const overzichtTab = document.querySelector('.adm-tab[data-tab="overzicht"]');
     if (overzichtTab) overzichtTab.classList.add('active');
     const footer = document.getElementById('admin-footer');
-    if (footer) footer.style.display = 'none'; // verborgen bij overzicht
+    if (footer) footer.style.display = 'none';
+    if (myRole === 'manager') startListening(); // nodig voor Gebieden tab
     openOverzichtTab();
   } else {
     setAdminBody(`<p style="color:red;padding:12px">Geen toegang. Jouw rol is: "${myRole}"</p>`);
@@ -307,7 +314,7 @@ function renderTable(users) {
         <td>
           <select class="adm-sel" onchange="adminSetRole('${u.uid}', this.value)">
             <option value="volunteer" ${u.role==='volunteer'?'selected':''}>👤 Vrijwilliger</option>
-            <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Beheerder</option>
+            <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Coördinator</option>
             <option value="admin"     ${u.role==='admin'    ?'selected':''}>⭐ Admin</option>
           </select>
           <div style="margin-top:6px">${deleteBtn}</div>
@@ -343,7 +350,7 @@ function renderTable(users) {
 window.adminOpenAcceptDialog = async (uid, email, currentName) => {
   document.getElementById('adm-accept-dialog')?.remove();
 
-  // Laad huidige beheerders per zone voor hint
+  // Laad huidige coördinatoren per zone voor hint
   let managerMap = {};
   try {
     const allRoles = await getDocs(collection(db, 'roles'));
@@ -382,7 +389,7 @@ window.adminOpenAcceptDialog = async (uid, email, currentName) => {
         <span style="font-size:13px;color:#475569">Rol</span>
         <select id="adm-acc-role" style="display:block;width:100%;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px">
           <option value="volunteer">👤 Vrijwilliger</option>
-          <option value="manager">🗂️ Beheerder</option>
+          <option value="manager">🗂️ Coördinator</option>
           <option value="admin">⭐ Admin</option>
         </select>
       </label>
@@ -618,10 +625,11 @@ function openGebiedenTab() {
 
 async function _renderGebiedenTab(body) {
   body.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:13px">Gebieden laden…</div>';
-  // Zones altijd vers laden
   await _loadZonesAdmin();
 
-  // Huidige zones uit Firestore (volledig object met alle velden)
+  const isAdmin = _adminRole === 'admin';
+
+  // Huidige zones uit Firestore
   let allZones = [];
   try {
     const snap = await getDoc(doc(db, 'config', 'zones'));
@@ -630,7 +638,6 @@ async function _renderGebiedenTab(body) {
     }
   } catch(e) {}
 
-  // Als nog leeg, initialiseer met defaults
   if (!allZones.length) {
     allZones = [
       { key:'Zeist',      label:'Zeist',      lat:52.0893, lon:5.2425, zoom:13, bbox:[52.05,5.17,52.14,5.33] },
@@ -640,23 +647,60 @@ async function _renderGebiedenTab(body) {
     ];
   }
 
-  const rows = allZones.map((z,i) => `
-    <tr style="border-bottom:1px solid #f1f5f9">
+  // Voor coördinator: eigen zones ophalen
+  let myZones = [];
+  if (!isAdmin) {
+    try {
+      const mySnap = await getDoc(doc(db, 'roles', _adminUid));
+      myZones = (mySnap.data()?.zones || []).map(z => z.toLowerCase());
+    } catch(e) {}
+  }
+
+  // Welke zones zijn al aan een andere coördinator toegewezen?
+  let assignedZones = new Set();
+  if (!isAdmin) {
+    try {
+      const allRoles = await getDocs(collection(db, 'roles'));
+      allRoles.forEach(d => {
+        if (d.id !== _adminUid && d.data().role === 'manager') {
+          (d.data().zones || []).forEach(z => assignedZones.add(z.toLowerCase()));
+        }
+      });
+    } catch(e) {}
+  }
+
+  // Coördinator ziet alleen eigen gebieden
+  const visibleZones = isAdmin ? allZones : allZones.filter(z => myZones.includes(z.key.toLowerCase()));
+
+  // Bestaande zone-keys (voor check bij aanmaken nieuw gebied)
+  const existingKeys = new Set(allZones.map(z => z.key.toLowerCase()));
+
+  const rows = visibleZones.map((z,i) => {
+    const realIdx = allZones.indexOf(z);
+    return `<tr style="border-bottom:1px solid #f1f5f9">
       <td style="padding:6px 8px;font-weight:600;color:#1e293b">${z.label}</td>
       <td style="padding:6px 8px;color:#64748b;font-size:12px">${z.key}</td>
       <td style="padding:6px 8px;color:#64748b;font-size:12px">${z.lat?.toFixed(4)}, ${z.lon?.toFixed(4)}</td>
       <td style="padding:6px 8px">
-        <button onclick="window._editZone(${i})" style="padding:3px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff">✏️</button>
-        <button onclick="window._deleteZone('${z.key}')" style="padding:3px 8px;font-size:12px;border:1px solid #fca5a5;border-radius:4px;cursor:pointer;background:#fff;color:#dc2626">🗑️</button>
+        <button onclick="window._editZone(${realIdx})" style="padding:3px 8px;font-size:12px;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;background:#fff">✏️</button>
+        ${isAdmin ? `<button onclick="window._deleteZone('${z.key}')" style="padding:3px 8px;font-size:12px;border:1px solid #fca5a5;border-radius:4px;cursor:pointer;background:#fff;color:#dc2626">🗑️</button>` : ''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+
+  // Coördinator: toon "+ Nieuw gebied" alleen als er nog onbezette zones zijn
+  // (zones die bestaan in Firestore maar niet aan hen of een andere coordinator zijn toegewezen)
+  const canAddNew = isAdmin || true; // coördinator mag altijd nieuwe aanmaken (check bij opslaan)
 
   body.innerHTML = `
     <div style="padding:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="margin:0;font-size:14px;color:#1e293b">📍 Gebieden beheren</h3>
+        <h3 style="margin:0;font-size:14px;color:#1e293b">📍 ${isAdmin ? 'Gebieden beheren' : 'Mijn gebieden'}</h3>
         <button id="zone-add-btn" style="padding:6px 14px;border-radius:6px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">+ Nieuw gebied</button>
       </div>
+      ${!isAdmin ? `<p style="font-size:12px;color:#64748b;margin:0 0 12px;background:#f0fdf4;padding:8px 10px;border-radius:6px;border-left:3px solid #0aa879">
+        Je ziet alleen jouw toegewezen gebieden. Je kunt nieuwe gebieden aanmaken mits deze nog niet aan een andere coördinator zijn toegewezen.
+      </p>` : ''}
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead><tr style="background:#f8fafc;color:#64748b;font-size:11px">
           <th style="text-align:left;padding:6px 8px">Naam</th>
@@ -664,7 +708,7 @@ async function _renderGebiedenTab(body) {
           <th style="text-align:left;padding:6px 8px">Centrum</th>
           <th style="padding:6px 8px"></th>
         </tr></thead>
-        <tbody>${rows}</tbody>
+        <tbody>${rows || '<tr><td colspan="4" style="padding:12px;color:#94a3b8;font-size:12px">Geen gebieden toegewezen</td></tr>'}</tbody>
       </table>
       <p style="font-size:11px;color:#94a3b8;margin-top:12px">
         Gebieden worden direct beschikbaar na opslaan. Gebruikers moeten de app herladen.
@@ -734,7 +778,35 @@ async function _renderGebiedenTab(body) {
         if (allZones.some(z => z.key === updated.key)) {
           alert(`Sleutel "${updated.key}" bestaat al.`); return;
         }
+        // Coördinator check: is dit gebied al aan een andere coördinator toegewezen?
+        if (!isAdmin) {
+          try {
+            const allRoles = await getDocs(collection(db, 'roles'));
+            const taken = [];
+            allRoles.forEach(d => {
+              if (d.id !== _adminUid && d.data().role === 'manager') {
+                if ((d.data().zones || []).map(z=>z.toLowerCase()).includes(updated.key.toLowerCase())) {
+                  taken.push(d.data().displayName || d.data().email || d.id);
+                }
+              }
+            });
+            if (taken.length > 0) {
+              alert(`Dit gebied is al toegewezen aan coördinator: ${taken.join(', ')}.\nNeem contact op met de admin.`);
+              return;
+            }
+          } catch(e) {}
+        }
         newList = [...allZones, updated];
+        // Coördinator: wijs dit nieuwe gebied ook direct aan zichzelf toe
+        if (!isAdmin) {
+          try {
+            const mySnap = await getDoc(doc(db, 'roles', _adminUid));
+            const myZonesNow = mySnap.data()?.zones || [];
+            if (!myZonesNow.includes(updated.key)) {
+              await setDoc(doc(db, 'roles', _adminUid), { zones: [...myZonesNow, updated.key] }, { merge: true });
+            }
+          } catch(e) {}
+        }
       } else {
         newList = allZones.map((z,i) => i === idx ? updated : z);
       }
@@ -1341,7 +1413,7 @@ async function sendWelcomeEmail(email, displayName, role, zones) {
     window.emailjs.init(EMAILJS_PUBLIC_KEY);
   }
 
-  const roleLabels = { volunteer: 'Vrijwilliger', manager: 'Beheerder', admin: 'Admin' };
+  const roleLabels = { volunteer: 'Vrijwilliger', manager: 'Coördinator', admin: 'Admin' };
   const roleLabel  = roleLabels[role] || role;
   const name       = displayName || email;
   const zonesText  = zones.length
@@ -1466,7 +1538,7 @@ window.adminAddZone = async (uid) => {
           `⚠️ Gebied "${zone.replace('Hoornaar_','')}" is al toegewezen aan: ${namen}.
 
 ` +
-          `Bij doorgaan wordt dit gebied bij hen verwijderd en alleen aan deze beheerder toegewezen.
+          `Bij doorgaan wordt dit gebied bij hen verwijderd en alleen aan deze coördinator toegewezen.
 
 Doorgaan?`
         );

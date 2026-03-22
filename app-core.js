@@ -1,4 +1,4 @@
-// app-core.js — Fix 167
+// app-core.js — Fix 168
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
