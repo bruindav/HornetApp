@@ -40,8 +40,17 @@ let ZONE_WKT = {
   'Utrecht':    'POLYGON((5.03 52.04,5.18 52.04,5.18 52.15,5.03 52.15,5.03 52.04))',
 };
 
-async function _getFlightSpm() {
-  try { const s=await getDoc(doc(db,"config","settings")); return s.exists()&&s.data().secondsPerMeter ? parseFloat(s.data().secondsPerMeter) : 0.6; } catch { return 0.6; }
+async function _getFlightSpm(zone) {
+  try {
+    // Probeer zone-specifieke instelling
+    if (zone) {
+      const s = await getDoc(doc(db, 'config', `settings_${zone}`));
+      if (s.exists() && s.data().secondsPerMeter != null) return parseFloat(s.data().secondsPerMeter);
+    }
+    // Fallback: globale instelling
+    const s = await getDoc(doc(db, 'config', 'settings'));
+    return s.exists() && s.data().secondsPerMeter ? parseFloat(s.data().secondsPerMeter) : 0.6;
+  } catch { return 0.6; }
 }
 
 async function _loadZonesAdmin() {
@@ -714,17 +723,23 @@ async function _renderGebiedenTab(body) {
         Gebieden worden direct beschikbaar na opslaan. Gebruikers moeten de app herladen.
       </p>
 
-      <!-- Vliegtijd instelling -->
+      <!-- Vliegtijd instelling per gebied -->
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0">
         <h3 style="margin:0 0 8px;font-size:14px;color:#1e293b">⏱️ Vliegtijd instelling</h3>
         <p style="font-size:12px;color:#64748b;margin:0 0 10px">
-          Bepaalt hoe de stopwatch de afstand berekent.<br>
+          Bepaalt hoe de stopwatch de afstand berekent, per gebied.<br>
           Standaard: 4 minuten (240s) = 400m → 0.6 seconden per meter.
         </p>
         <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
           <label style="font-size:13px">
+            Gebied
+            <select id="flight-zone" style="display:block;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px">
+              ${visibleZones.map(z => `<option value="${z.key}">${z.label}</option>`).join('')}
+            </select>
+          </label>
+          <label style="font-size:13px">
             Seconden per meter
-            <input id="flight-spm" type="number" min="0.1" max="5" step="0.05" value="${(await _getFlightSpm()).toFixed(2)}"
+            <input id="flight-spm" type="number" min="0.1" max="5" step="0.05" value="0.60"
               style="display:block;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;width:110px"/>
           </label>
           <div style="font-size:12px;color:#64748b" id="flight-spm-info"></div>
@@ -738,22 +753,35 @@ async function _renderGebiedenTab(body) {
 
   document.getElementById('zone-add-btn')?.addEventListener('click', () => window._editZone(-1));
 
-  // Vliegtijd save
-  const spmInput = body.querySelector('#flight-spm');
-  const spmInfo  = body.querySelector('#flight-spm-info');
+  // Vliegtijd: laad waarde bij zone-wissel
+  const spmInput    = body.querySelector('#flight-spm');
+  const spmInfo     = body.querySelector('#flight-spm-info');
+  const zoneSelect  = body.querySelector('#flight-zone');
+
+  async function loadSpmForZone(zoneKey) {
+    const v = await _getFlightSpm(zoneKey);
+    if (spmInput) spmInput.value = v.toFixed(2);
+    updateSpmInfo();
+  }
   function updateSpmInfo() {
     const v = parseFloat(spmInput?.value);
     if (!v) return;
     spmInfo.textContent = `→ 4 min = ${Math.round(240/v)} m · 3 min = ${Math.round(180/v)} m · 5 min = ${Math.round(300/v)} m`;
   }
+  zoneSelect?.addEventListener('change', () => loadSpmForZone(zoneSelect.value));
   spmInput?.addEventListener('input', updateSpmInfo);
-  updateSpmInfo();
+  // Laad waarde voor eerste zone
+  if (zoneSelect?.value) loadSpmForZone(zoneSelect.value);
+
   body.querySelector('#flight-spm-save')?.addEventListener('click', async () => {
     const v = parseFloat(spmInput?.value);
+    const zoneKey = zoneSelect?.value;
     if (!v || v <= 0) { alert('Vul een geldige waarde in'); return; }
+    if (!zoneKey) { alert('Selecteer een gebied'); return; }
     try {
-      await setDoc(doc(db, 'config', 'settings'), { secondsPerMeter: v }, { merge: true });
-      spmInfo.textContent = '✅ Opgeslagen — gebruikers zien dit na herladen';
+      await setDoc(doc(db, 'config', `settings_${zoneKey}`), { secondsPerMeter: v }, { merge: true });
+      const zoneName = visibleZones.find(z=>z.key===zoneKey)?.label || zoneKey;
+      spmInfo.textContent = `✅ Opgeslagen voor ${zoneName}`;
       spmInfo.style.color = '#0aa879';
     } catch(e) { alert('Opslaan mislukt: ' + e.message); }
   });

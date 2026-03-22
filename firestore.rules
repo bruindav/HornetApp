@@ -1,4 +1,4 @@
-// firestore.rules — Fix 169
+// firestore.rules — Fix 170
 // Wijziging t.o.v. Fix 54:
 // - config/zones: leesbaar voor iedereen ingelogd, schrijfbaar alleen voor admin
 
@@ -76,9 +76,11 @@ service cloud.firestore {
 
     match /config/{docId} {
       // Zones config: leesbaar voor iedereen ingelogd
-      // Schrijven: admin altijd, manager alleen voor zones-document
+      // Schrijven: admin altijd, manager alleen voor zones-document en eigen settings
       allow read: if isSignedIn();
-      allow write: if isAdmin() || (isManager() && docId == 'zones');
+      allow write: if isAdmin()
+        || (isManager() && docId == 'zones')
+        || (isManager() && docId.matches('settings_.*'));
     }
 
     match /activity/{uid} {

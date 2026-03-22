@@ -1,4 +1,4 @@
-// app-core.js — Fix 168
+// app-core.js — Fix 170
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1652,8 +1652,17 @@ function startSightLine(lokpotMarker){
 // ── Vliegtijd instelling laden ────────────────────────────────────────────
 let _flightSecondsPerMeter = 0.6; // standaard: 4 min (240s) = 400m → 0.6 s/m
 
-async function _loadFlightSettings() {
+async function _loadFlightSettings(zone) {
   try {
+    // Probeer eerst zone-specifieke instelling
+    if (zone) {
+      const zoneSnap = await getDoc(doc(_db, 'config', `settings_${zone}`));
+      if (zoneSnap.exists() && zoneSnap.data().secondsPerMeter != null) {
+        _flightSecondsPerMeter = parseFloat(zoneSnap.data().secondsPerMeter) || 0.6;
+        return;
+      }
+    }
+    // Fallback: globale instelling
     const snap = await getDoc(doc(_db, 'config', 'settings'));
     if (snap.exists() && snap.data().secondsPerMeter != null) {
       _flightSecondsPerMeter = parseFloat(snap.data().secondsPerMeter) || 0.6;
@@ -2749,6 +2758,7 @@ async function boot(){
     const y = getSelYear()?.value || DEFAULT_YEAR;
     const g = getSelGroup()?.value || DEFAULT_GROUP;
     activateScope(y, g, /*reload=*/true);
+    _loadFlightSettings(normalizeZone(g)); // herlaad vliegtijd voor nieuwe zone
     window._setSidebar?.(false);
   }
   // jaar: change event op het select element
@@ -3037,6 +3047,7 @@ async function _initUserRole() {
     if (_currentZones.length) {
       const activeZone = _fillZoneDropdown(_currentZones);
       const year = $('sel-year')?.value || DEFAULT_YEAR;
+      _loadFlightSettings(activeZone); // laad vliegtijd voor actief gebied
       activateScope(year, activeZone, /*reload=*/true);
     }
 
