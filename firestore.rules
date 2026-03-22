@@ -1,4 +1,4 @@
-// firestore.rules — Fix 138
+// firestore.rules — Fix 169
 // Wijziging t.o.v. Fix 54:
 // - config/zones: leesbaar voor iedereen ingelogd, schrijfbaar alleen voor admin
 
@@ -11,6 +11,11 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isManager() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/roles/$(request.auth.uid)).data.role == 'manager';
     }
 
     function userZones() {
@@ -62,16 +67,18 @@ service cloud.firestore {
 
     match /roles/{uid} {
       // Iedereen die ingelogd is mag role/zones/displayName lezen (nodig voor beheerder-weergave)
-      // Volledige lees-toegang alleen voor eigen doc of admin
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.auth.uid == uid;
-      allow update, delete: if isAdmin();
+      // Manager mag eigen zones-veld updaten (voor gebied-toewijzing aan zichzelf)
+      allow update: if isAdmin() || (isManager() && request.auth.uid == uid);
+      allow delete: if isAdmin();
     }
 
     match /config/{docId} {
-      // Zones config: leesbaar voor iedereen ingelogd, schrijfbaar alleen voor admin
+      // Zones config: leesbaar voor iedereen ingelogd
+      // Schrijven: admin altijd, manager alleen voor zones-document
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow write: if isAdmin() || (isManager() && docId == 'zones');
     }
 
     match /activity/{uid} {
