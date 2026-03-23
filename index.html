@@ -133,16 +133,23 @@
 
       /* Voorkom dat browser "afbeelding opslaan" popup toont bij lang indrukken op markers */
       .leaflet-marker-icon img,
-      .leaflet-marker-icon,
       .leaflet-div-icon img,
-      .leaflet-div-icon {
+      .custom-div-icon img {
         -webkit-touch-callout: none !important;
         -webkit-user-select: none !important;
         user-select: none !important;
-        pointer-events: auto;
+        pointer-events: none !important;  /* overlay div vangt events op */
+        draggable: false;
+      }
+      .leaflet-marker-icon,
+      .leaflet-div-icon,
+      .custom-div-icon {
+        -webkit-touch-callout: none !important;
+        touch-action: none;
       }
       .leaflet-marker-pane img {
         -webkit-touch-callout: none !important;
+        pointer-events: none !important;
       }
       .tab-btn.active { color: #0aa879; border-bottom-color: #0aa879; }
     </style>
@@ -274,7 +281,7 @@
             <button id="btn-changelog" style="width:100%;padding:8px 12px;border-radius:7px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px">
               <span>🆕</span><span>Verbeteringen aan de app</span>
             </button>
-            <div style="text-align:center;padding:6px 0 2px;font-size:10px;color:#94a3b8">v170</div>
+            <div style="text-align:center;padding:6px 0 2px;font-size:10px;color:#94a3b8">v171</div>
           </div>
 
         </aside>
