@@ -1,4 +1,4 @@
-// app-core.js — Fix 201
+// app-core.js — Fix 202
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1753,6 +1753,19 @@ async function _loadFlightSettings(zone) {
   } catch {}
 }
 
+// ── Kompas-kalibratie laden ───────────────────────────────────────────────
+// Fix 202: globale correctie ingesteld door beheer (Beheer → Kompas), geldt voor alle gebruikers.
+let _compassOffset = 0;
+
+async function _loadCompassOffset() {
+  try {
+    const snap = await getDoc(doc(_db, 'config', 'settings'));
+    if (snap.exists() && snap.data().compassOffset != null) {
+      _compassOffset = parseFloat(snap.data().compassOffset) || 0;
+    }
+  } catch {}
+}
+
 // ── Gestylde modal: stopwatch + afstand ──────────────────────────────────
 function _openSightLineModal(potLatLng, onConfirm) {
   const existing = document.getElementById('sightline-modal');
@@ -1802,15 +1815,9 @@ function _openSightLineModal(potLatLng, onConfirm) {
           <input id="sl-bearing" type="number" min="0" max="359" placeholder="0–359"
             style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
           <button id="sl-compass" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #64748b;background:#f8fafc;color:#475569;font-size:11px;cursor:pointer">🧭 Gebruik kompas</button>
-          <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
-            <span style="font-size:10px;color:#94a3b8;white-space:nowrap">Correctie</span>
-            <input id="sl-compass-offset" type="number" step="1" value="0"
-              style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;text-align:center"/>
-            <span style="font-size:10px;color:#94a3b8">°</span>
-          </div>
         </div>
       </div>
-      <div style="font-size:10px;color:#94a3b8;margin-top:-8px;margin-bottom:8px">Wijkt de lijn steeds in dezelfde richting af? Stel hier een vaste correctie in (bv. +8 als de lijn te veel naar links loopt, -8 als die te veel naar rechts loopt) — wordt onthouden op dit toestel.</div>
+
       <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
 
       <!-- Richting label -->
@@ -1851,13 +1858,6 @@ function _openSightLineModal(potLatLng, onConfirm) {
   const bearingInp = modal.querySelector('#sl-bearing');
   const bearingLbl = modal.querySelector('#sl-bearing-label');
   const btnCompass = modal.querySelector('#sl-compass');
-  const offsetInp  = modal.querySelector('#sl-compass-offset');
-  const COMPASS_OFFSET_KEY = 'hornetapp_compass_offset';
-  offsetInp.value = parseFloat(localStorage.getItem(COMPASS_OFFSET_KEY)) || 0;
-  offsetInp.addEventListener('change', () => {
-    const v = parseFloat(offsetInp.value) || 0;
-    localStorage.setItem(COMPASS_OFFSET_KEY, v);
-  });
 
   function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
   function updateInfo(secs){
@@ -1967,7 +1967,7 @@ function _openSightLineModal(potLatLng, onConfirm) {
           clearInterval(compassTimer); compassTimer = null;
           if (compassReadings.length > 0) {
             const avg = circularMean(compassReadings);
-            const offset = parseFloat(offsetInp.value) || 0;
+            const offset = _compassOffset || 0;
             const h   = Math.round((avg + offset + 360) % 360);
             bearingInp.value = h;
             bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen${offset ? `, correctie ${offset>0?'+':''}${offset}°` : ''})`;
@@ -2874,6 +2874,7 @@ function _showDemoWelcome() {
 async function boot(){
   await _loadZonesFromFirestore();
   await _loadFlightSettings();
+  await _loadCompassOffset();
   initMap();
   initUIBindings();
   initWakeLock();
