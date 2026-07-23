@@ -1,4 +1,4 @@
-// app-core.js — Fix 172
+// app-core.js — Fix 200
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -178,7 +178,13 @@ function initMap(){
     drawCircle:false, drawCircleMarker:false, drawText:false,
     editMode:false, dragMode:false, cutPolygon:false, removalMode:false, rotateMode:false
   });
-  map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
+  map.pm.setGlobalOptions({
+    finishOn: 'dblclick', allowSelfIntersection: false,
+    snappable: true,
+    snapDistance: 30,     // was standaard 20px — groter vangbereik, makkelijker exact aan laten sluiten
+    snapSegment: true,    // snap ook naar lijnstukken van andere polygonen, niet alleen hoekpunten
+    snapMiddle: true       // snap ook naar het midden van bestaande lijnstukken
+  });
 
   // Sateliet-knop als custom Geoman control in de toolbar (topleft)
   map.pm.Toolbar.createCustomControl({
@@ -287,6 +293,54 @@ function initMap(){
   });
   map.on('mouseup touchend', () => { clearTimeout(_lpTimer); });
 }
+// ======================= Wake Lock (scherm niet laten vergrendelen) =======================
+// Fix 200: optionele Wake Lock zodat het scherm niet op slot gaat tijdens gebruik van de app.
+let _wakeLock = null;
+const WAKE_LOCK_PREF_KEY = 'hornetapp_wakelock_enabled';
+
+function isWakeLockPreferred() {
+  const v = localStorage.getItem(WAKE_LOCK_PREF_KEY);
+  return v === null ? true : v === '1'; // standaard AAN
+}
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  if (!isWakeLockPreferred()) return;
+  if (document.visibilityState !== 'visible') return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+  } catch (err) {
+    // Kan falen bij bv. lage batterij of geen toestemming — stil negeren
+    _wakeLock = null;
+  }
+}
+function releaseWakeLock() {
+  if (_wakeLock) { try { _wakeLock.release(); } catch {} _wakeLock = null; }
+}
+function initWakeLock() {
+  if (!('wakeLock' in navigator)) {
+    const toggle = document.getElementById('wakelock-toggle');
+    const row = document.getElementById('wakelock-row');
+    if (row) row.title = 'Niet ondersteund op dit apparaat/deze browser';
+    if (toggle) toggle.disabled = true;
+    return;
+  }
+  const toggle = document.getElementById('wakelock-toggle');
+  if (toggle) {
+    toggle.checked = isWakeLockPreferred();
+    toggle.addEventListener('change', () => {
+      localStorage.setItem(WAKE_LOCK_PREF_KEY, toggle.checked ? '1' : '0');
+      if (toggle.checked) requestWakeLock(); else releaseWakeLock();
+    });
+  }
+  requestWakeLock();
+  // Scherm gaat na tab-wissel/vergrendeling automatisch los; opnieuw aanvragen bij terugkeer.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+}
+
 // ======================= UI‑bindingen =======================
 function updateHeaderHeightVar(){
   try{
@@ -1849,11 +1903,14 @@ function _openSightLineModal(potLatLng, onConfirm) {
   });
 
   // ── Kompas (DeviceOrientationEvent) met middeling ──────────────────────
-  let compassHandler = null;
-  let compassActive  = false;
-  let compassReadings = [];
-  let compassTimer    = null;
-  const COMPASS_SECS  = 3;
+  // Fix 200: gebruik nog maar 1 bron per meting (i.p.v. absolute+relatief door elkaar),
+  // en compenseer voor schermrotatie (portret/liggend) zodat de richting klopt.
+  let compassHandler   = null;
+  let compassActive    = false;
+  let compassReadings  = [];
+  let compassTimer     = null;
+  let compassSourceUsed = null; // 'ios' | 'absolute' | 'relative'
+  const COMPASS_SECS   = 3;
 
   function circularMean(angles) {
     let sinSum = 0, cosSum = 0;
@@ -1865,14 +1922,21 @@ function _openSightLineModal(potLatLng, onConfirm) {
     return ((mean % 360) + 360) % 360;
   }
 
+  // Huidige schermrotatie t.o.v. de "natuurlijke" stand van het toestel.
+  function getScreenAngle() {
+    if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+    if (typeof window.orientation === 'number') return window.orientation; // oudere iOS
+    return 0;
+  }
+
   function startCompass(){
     if(compassActive) { stopCompass(); return; }
     const doStart = () => {
-      compassActive = true; compassReadings = [];
+      compassActive = true; compassReadings = []; compassSourceUsed = null;
       btnCompass.textContent = `🧭 Meten… ${COMPASS_SECS}s`;
       btnCompass.style.background = '#fef3c7';
       btnCompass.style.borderColor = '#f59e0b';
-      bearingLbl.textContent = '🧭 Houd telefoon horizontaal, bovenkant naar nest…';
+      bearingLbl.textContent = '🧭 Houd de telefoon plat (horizontaal), bovenkant/camera wijst naar het nest…';
       bearingLbl.style.color = '#f59e0b';
 
       let remaining = COMPASS_SECS;
@@ -1889,29 +1953,50 @@ function _openSightLineModal(potLatLng, onConfirm) {
             bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen)`;
             bearingLbl.style.color = '#0aa879';
           } else {
-            bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen';
+            bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen — kalibreer kompas (8-vorm bewegen) en probeer opnieuw';
             bearingLbl.style.color = '#f59e0b';
           }
           stopCompass();
         }
       }, 1000);
 
-      compassHandler = (e) => {
-        let heading = null;
-        if (e.webkitCompassHeading != null) {
-          heading = e.webkitCompassHeading;
-        } else if (e.absolute && e.alpha != null) {
-          heading = (360 - e.alpha + 360) % 360;
-        } else if (e.alpha != null) {
-          heading = (360 - e.alpha + 360) % 360;
-        }
-        if (heading == null) return;
-        compassReadings.push(heading);
-        const preview = Math.round(circularMean(compassReadings));
-        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${compassReadings.length} metingen…)`;
+      // Losse handlers per bron: we kiezen de EERSTE bron die data geeft en
+      // negeren daarna de andere, zodat metingen niet door elkaar lopen.
+      const screenAngle = getScreenAngle();
+
+      const onIOS = (e) => {
+        if (e.webkitCompassHeading == null) return;
+        if (compassSourceUsed && compassSourceUsed !== 'ios') return;
+        compassSourceUsed = 'ios';
+        // webkitCompassHeading is al t.o.v. echt noord en houdt al rekening met schermrotatie.
+        pushReading(e.webkitCompassHeading);
       };
-      window.addEventListener('deviceorientationabsolute', compassHandler, true);
-      window.addEventListener('deviceorientation',         compassHandler, true);
+      const onAbsolute = (e) => {
+        if (!e.absolute || e.alpha == null) return;
+        if (compassSourceUsed && compassSourceUsed !== 'absolute') return;
+        compassSourceUsed = 'absolute';
+        let heading = (360 - e.alpha + screenAngle + 360) % 360;
+        pushReading(heading);
+      };
+      const onRelative = (e) => {
+        if (e.alpha == null) return;
+        // Alleen gebruiken als er geen absolute/iOS-bron actief is (fallback, minder betrouwbaar).
+        if (compassSourceUsed && compassSourceUsed !== 'relative') return;
+        compassSourceUsed = 'relative';
+        let heading = (360 - e.alpha + screenAngle + 360) % 360;
+        pushReading(heading);
+      };
+      function pushReading(heading){
+        compassReadings.push(((heading % 360) + 360) % 360);
+        const preview = Math.round(circularMean(compassReadings));
+        const warn = compassSourceUsed === 'relative' ? ' ⚠️ minder nauwkeurig' : '';
+        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${compassReadings.length} metingen…)${warn}`;
+      }
+
+      compassHandler = { onIOS, onAbsolute, onRelative };
+      window.addEventListener('deviceorientation', onIOS, true);
+      window.addEventListener('deviceorientationabsolute', onAbsolute, true);
+      window.addEventListener('deviceorientation', onRelative, true);
     };
 
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -1930,8 +2015,9 @@ function _openSightLineModal(potLatLng, onConfirm) {
   function stopCompass(){
     if (compassTimer) { clearInterval(compassTimer); compassTimer = null; }
     if (compassHandler) {
-      window.removeEventListener('deviceorientationabsolute', compassHandler, true);
-      window.removeEventListener('deviceorientation',         compassHandler, true);
+      window.removeEventListener('deviceorientation', compassHandler.onIOS, true);
+      window.removeEventListener('deviceorientationabsolute', compassHandler.onAbsolute, true);
+      window.removeEventListener('deviceorientation', compassHandler.onRelative, true);
       compassHandler = null;
     }
     compassActive = false;
@@ -2759,6 +2845,7 @@ async function boot(){
   await _loadFlightSettings();
   initMap();
   initUIBindings();
+  initWakeLock();
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
   // Jaar dropdown vullen: 2020 t/m huidig jaar (nieuwste bovenaan)
