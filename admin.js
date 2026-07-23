@@ -1,4 +1,4 @@
-// admin.js — Fix 202
+// admin.js — Fix 203
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -153,7 +153,6 @@ function createOverlay() {
         <button class="adm-tab adm-tab-admin" data-tab="gebieden">📍 Gebieden</button>
         <button class="adm-tab adm-tab-admin" data-tab="sync">📄 CSV Import</button>
         <button class="adm-tab adm-tab-admin" data-tab="gbif">🌍 GBIF Sync</button>
-        <button class="adm-tab adm-tab-admin" data-tab="kompas">🧭 Kompas</button>
       </div>
       <div id="admin-body"><p style="color:#64748b;padding:12px">Laden…</p></div>
       <p id="admin-footer">
@@ -181,7 +180,6 @@ function createOverlay() {
       if (btn.dataset.tab === 'users') startListening();
       else if (btn.dataset.tab === 'sync') openSyncTab();
       else if (btn.dataset.tab === 'gbif') openGbifTab();
-      else if (btn.dataset.tab === 'kompas') openKompasTab();
       else if (btn.dataset.tab === 'gebieden') openGebiedenTab();
       else if (btn.dataset.tab === 'overzicht') openOverzichtTab();
     });
@@ -1133,62 +1131,6 @@ function openGbifTab() {
   document.getElementById('gbif-sync-btn')?.addEventListener('click', runGbifSync);
   document.getElementById('gbif-clean-btn')?.addEventListener('click', runGbifCleanup);
   document.getElementById('gbif-debug-btn')?.addEventListener('click', runGbifDebug);
-}
-
-// Fix 202: Kompas-kalibratie — globale instelling voor alle gebruikers (i.p.v. per toestel)
-async function _getCompassOffset() {
-  try {
-    const s = await getDoc(doc(db, 'config', 'settings'));
-    return s.exists() && s.data().compassOffset != null ? parseFloat(s.data().compassOffset) : 0;
-  } catch { return 0; }
-}
-
-async function openKompasTab() {
-  setAdminBody('<p style="color:#64748b;padding:12px">Laden…</p>');
-  const current = await _getCompassOffset();
-
-  setAdminBody(
-    '<div style="padding:16px;max-width:560px">' +
-    '<h3 style="margin:0 0 4px;font-size:15px">🧭 Kompas-kalibratie</h3>' +
-    '<p style="color:#64748b;font-size:13px;margin:0 0 14px;line-height:1.6">' +
-    'Telefoon-kompassen hebben vaak een structurele afwijking. Deze correctie wordt toegepast op ' +
-    '<strong>de kompasmeting van alle gebruikers</strong> bij het tekenen van een zichtlijn.' +
-    '</p>' +
-    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;margin-bottom:16px;font-size:12px;color:#1e40af">' +
-    'ℹ️ Loopt een zichtlijn structureel te ver naar <strong>links</strong>? Verhoog de correctie (positief getal). ' +
-    'Loopt hij te ver naar <strong>rechts</strong>? Verlaag de correctie (negatief getal). ' +
-    'Test dit met een bekend punt (bv. een gebouw op vaste afstand) voordat je opslaat.' +
-    '</div>' +
-    '<div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">' +
-    '<label style="font-size:13px">Correctie (graden)' +
-    '<input id="kompas-offset" type="number" step="1" min="-180" max="180" value="' + current + '" ' +
-    'style="display:block;margin-top:4px;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;width:110px"/>' +
-    '</label>' +
-    '<button id="kompas-offset-save" style="padding:8px 16px;border-radius:6px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Opslaan</button>' +
-    '<button id="kompas-offset-reset" style="padding:8px 16px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Terug naar 0°</button>' +
-    '</div>' +
-    '<div id="kompas-offset-info" style="font-size:12px;margin-top:10px;min-height:16px"></div>' +
-    '<p style="font-size:11px;color:#94a3b8;margin-top:16px">Actief sinds vorige opslag: ' + (current !== 0 ? current + '°' : 'geen correctie ingesteld (0°)') + '</p>' +
-    '</div>'
-  );
-
-  document.getElementById('kompas-offset-reset')?.addEventListener('click', () => {
-    const inp = document.getElementById('kompas-offset');
-    if (inp) inp.value = 0;
-  });
-
-  document.getElementById('kompas-offset-save')?.addEventListener('click', async () => {
-    const inp  = document.getElementById('kompas-offset');
-    const info = document.getElementById('kompas-offset-info');
-    const v = parseFloat(inp?.value);
-    if (isNaN(v)) { if (info) { info.textContent = 'Vul een geldig getal in.'; info.style.color = '#dc2626'; } return; }
-    try {
-      await setDoc(doc(db, 'config', 'settings'), { compassOffset: v }, { merge: true });
-      if (info) { info.textContent = `✅ Opgeslagen — geldt direct voor alle gebruikers (${v > 0 ? '+' : ''}${v}°)`; info.style.color = '#0aa879'; }
-    } catch (e) {
-      if (info) { info.textContent = 'Opslaan mislukt: ' + e.message; info.style.color = '#dc2626'; }
-    }
-  });
 }
 
 function logGbif(msg, color) {
