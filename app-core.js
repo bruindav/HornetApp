@@ -1,4 +1,4 @@
-// app-core.js — Fix 203
+// app-core.js — Fix 204
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1765,6 +1765,158 @@ function _setCompassOffsetLocal(v) {
   localStorage.setItem(COMPASS_OFFSET_KEY, String(v));
 }
 
+// Huidige schermrotatie t.o.v. de "natuurlijke" stand van het toestel (module-breed herbruikbaar).
+function _getScreenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  if (typeof window.orientation === 'number') return window.orientation; // oudere iOS
+  return 0;
+}
+
+// Doorlopende richtingmeting (géén 3s-gemiddelde): kiest 1 bron en levert live updates,
+// voor gebruik in de waaier-kalibratie hieronder. Retourneert een stopfunctie.
+function _startLiveHeading(onHeading) {
+  let source = null;
+  const screenAngle = _getScreenAngle();
+  const onIOS = (e) => {
+    if (e.webkitCompassHeading == null) return;
+    if (source && source !== 'ios') return;
+    source = 'ios';
+    onHeading(((e.webkitCompassHeading % 360) + 360) % 360);
+  };
+  const onAbsolute = (e) => {
+    if (!e.absolute || e.alpha == null) return;
+    if (source && source !== 'absolute') return;
+    source = 'absolute';
+    onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
+  };
+  const onRelative = (e) => {
+    if (e.alpha == null) return;
+    if (source && source !== 'relative') return;
+    source = 'relative';
+    onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
+  };
+  window.addEventListener('deviceorientation', onIOS, true);
+  window.addEventListener('deviceorientationabsolute', onAbsolute, true);
+  window.addEventListener('deviceorientation', onRelative, true);
+  return function stop() {
+    window.removeEventListener('deviceorientation', onIOS, true);
+    window.removeEventListener('deviceorientationabsolute', onAbsolute, true);
+    window.removeEventListener('deviceorientation', onRelative, true);
+  };
+}
+
+// Fix 204: draaibare waaier-kalibratie — blauwe waaier toont live waar het toestel nu naar wijst,
+// gele pijl sleep je zelf naar de bekende juiste richting; het verschil wordt de opgeslagen correctie.
+function openCompassCalibModal(onApplied) {
+  const existing = document.getElementById('compass-calib-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'compass-calib-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:18px 20px;width:320px;max-width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 6px;font-size:15px;color:#0f172a">🧭 Kompas kalibreren</h3>
+      <p style="font-size:11.5px;color:#64748b;margin:0 0 12px;line-height:1.5">
+        Houd je telefoon plat en richt de bovenkant op een punt waarvan je de richting zeker weet (bv. je garage).
+        Sleep de <strong style="color:#b45309">gele pijl</strong> tot die naar datzelfde punt wijst als je telefoon nu ligt.
+      </p>
+      <svg id="calib-dial" width="230" height="230" viewBox="0 0 230 230" style="touch-action:none;user-select:none;cursor:grab">
+        <circle cx="115" cy="115" r="105" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+        <circle cx="115" cy="115" r="70" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="115" y="24" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">N</text>
+        <text x="206" y="120" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">O</text>
+        <text x="115" y="212" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">Z</text>
+        <text x="24" y="120" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">W</text>
+        <g id="calib-live-wedge"><path d="M 115 115 L 98 38 A 19 19 0 0 1 132 38 Z" fill="#3b82f6" opacity="0.45"/></g>
+        <g id="calib-target-arrow">
+          <line x1="115" y1="115" x2="115" y2="32" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
+          <polygon points="115,17 105,38 125,38" fill="#d97706"/>
+        </g>
+        <circle cx="115" cy="115" r="7" fill="#0f172a"/>
+      </svg>
+      <div style="display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:11px;color:#475569">
+        <div><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;opacity:.6;border-radius:2px;vertical-align:middle"></span> kompas nu</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px;vertical-align:middle"></span> jouw richting</div>
+      </div>
+      <div id="calib-diff" style="font-size:16px;font-weight:700;margin-top:10px;color:#0f172a">Correctie: 0°</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button id="calib-cancel" style="flex:1;padding:9px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Annuleren</button>
+        <button id="calib-apply" style="flex:1;padding:9px;border-radius:8px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Gebruik correctie</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const svg         = modal.querySelector('#calib-dial');
+  const liveWedgeEl = modal.querySelector('#calib-live-wedge');
+  const targetEl    = modal.querySelector('#calib-target-arrow');
+  const diffEl      = modal.querySelector('#calib-diff');
+
+  let liveHeading   = 0;
+  let targetHeading = 0; // start bovenaan (noord); gebruiker sleept naar de juiste richting
+
+  function updateDiff() {
+    const diff = Math.round(((targetHeading - liveHeading + 540) % 360) - 180);
+    diffEl.textContent = `Correctie: ${diff > 0 ? '+' : ''}${diff}°`;
+    return diff;
+  }
+  function renderLive()   { liveWedgeEl.setAttribute('transform', `rotate(${liveHeading} 115 115)`); updateDiff(); }
+  function renderTarget() { targetEl.setAttribute('transform', `rotate(${targetHeading} 115 115)`); updateDiff(); }
+  renderLive(); renderTarget();
+
+  let stopLive = null;
+  function beginLive() { stopLive = _startLiveHeading((h) => { liveHeading = h; renderLive(); }); }
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(state => { if (state === 'granted') beginLive(); }).catch(() => {});
+  } else if (typeof DeviceOrientationEvent !== 'undefined') {
+    beginLive();
+  }
+
+  // Sleep-interactie: gele pijl volgt vinger/muis rondom het middelpunt.
+  function angleFromEvent(ev) {
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const p = ev.touches ? ev.touches[0] : ev;
+    const x = p.clientX - cx, y = p.clientY - cy;
+    const deg = Math.atan2(x, -y) * 180 / Math.PI; // 0° = boven (noord), rechtsom oplopend
+    return ((deg % 360) + 360) % 360;
+  }
+  let dragging = false;
+  function onDragStart(ev) { dragging = true; svg.style.cursor = 'grabbing'; onDragMove(ev); ev.preventDefault(); }
+  function onDragMove(ev) {
+    if (!dragging) return;
+    targetHeading = Math.round(angleFromEvent(ev));
+    renderTarget();
+    ev.preventDefault();
+  }
+  function onDragEnd() { dragging = false; svg.style.cursor = 'grab'; }
+  svg.addEventListener('mousedown', onDragStart);
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('mouseup', onDragEnd);
+  svg.addEventListener('touchstart', onDragStart, { passive: false });
+  window.addEventListener('touchmove', onDragMove, { passive: false });
+  window.addEventListener('touchend', onDragEnd);
+
+  function cleanup() {
+    if (stopLive) stopLive();
+    svg.removeEventListener('mousedown', onDragStart);
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+    svg.removeEventListener('touchstart', onDragStart);
+    window.removeEventListener('touchmove', onDragMove);
+    window.removeEventListener('touchend', onDragEnd);
+    modal.remove();
+  }
+  modal.querySelector('#calib-cancel').addEventListener('click', cleanup);
+  modal.querySelector('#calib-apply').addEventListener('click', () => {
+    const diff = updateDiff();
+    _setCompassOffsetLocal(diff);
+    cleanup();
+    onApplied?.();
+  });
+  modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
+}
+
 // ── Gestylde modal: stopwatch + afstand ──────────────────────────────────
 function _openSightLineModal(potLatLng, onConfirm) {
   const existing = document.getElementById('sightline-modal');
@@ -1823,10 +1975,11 @@ function _openSightLineModal(potLatLng, onConfirm) {
               <button type="button" id="sl-comp-p1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">+1</button>
               <button type="button" id="sl-comp-p5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">+5</button>
             </div>
+            <button type="button" id="sl-comp-calib" style="margin-top:5px;width:100%;padding:6px;border-radius:6px;border:1px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;cursor:pointer">🎯 Nauwkeurig kalibreren (waaier)</button>
           </div>
         </div>
       </div>
-      <div style="font-size:10px;color:#94a3b8;margin-top:-6px;margin-bottom:8px">Loopt de lijn steeds naar dezelfde kant af? Tik op −/+ om bij te stellen, dit toestel onthoudt de laatste waarde.</div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:-6px;margin-bottom:8px">Loopt de lijn steeds naar dezelfde kant af? Tik op −/+ om bij te stellen, of gebruik "Nauwkeurig kalibreren" — dit toestel onthoudt de laatste waarde.</div>
 
       <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
 
@@ -1885,6 +2038,7 @@ function _openSightLineModal(potLatLng, onConfirm) {
   modal.querySelector('#sl-comp-m1')?.addEventListener('click', () => bumpCompOffset(-1));
   modal.querySelector('#sl-comp-p1')?.addEventListener('click', () => bumpCompOffset(1));
   modal.querySelector('#sl-comp-p5')?.addEventListener('click', () => bumpCompOffset(5));
+  modal.querySelector('#sl-comp-calib')?.addEventListener('click', () => openCompassCalibModal(renderCompVal));
 
   function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
   function updateInfo(secs){
