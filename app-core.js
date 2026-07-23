@@ -1,4 +1,4 @@
-// app-core.js — Fix 200
+// app-core.js — Fix 201
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -74,7 +74,12 @@ const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
-  map = L.map('map', { zoomControl: true, rotate: true, rotateControl: false }).setView([52.1, 5.3], 8);
+  map = L.map('map', {
+    zoomControl: true, rotate: true, rotateControl: false,
+    zoomSnap: 0.25,          // was standaard 1 — nu ook tussenliggende zoomniveaus mogelijk (fijner, en exacter passend voor screenshots)
+    zoomDelta: 0.5,          // stapgrootte van de +/- knoppen
+    wheelPxPerZoomLevel: 120 // scrollwiel/trackpad reageert geleidelijker i.p.v. in sprongen
+  }).setView([52.1, 5.3], 8);
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -1797,8 +1802,15 @@ function _openSightLineModal(potLatLng, onConfirm) {
           <input id="sl-bearing" type="number" min="0" max="359" placeholder="0–359"
             style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
           <button id="sl-compass" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #64748b;background:#f8fafc;color:#475569;font-size:11px;cursor:pointer">🧭 Gebruik kompas</button>
+          <div style="display:flex;align-items:center;gap:4px;margin-top:4px">
+            <span style="font-size:10px;color:#94a3b8;white-space:nowrap">Correctie</span>
+            <input id="sl-compass-offset" type="number" step="1" value="0"
+              style="width:100%;padding:4px 6px;border:1px solid #e2e8f0;border-radius:5px;font-size:12px;text-align:center"/>
+            <span style="font-size:10px;color:#94a3b8">°</span>
+          </div>
         </div>
       </div>
+      <div style="font-size:10px;color:#94a3b8;margin-top:-8px;margin-bottom:8px">Wijkt de lijn steeds in dezelfde richting af? Stel hier een vaste correctie in (bv. +8 als de lijn te veel naar links loopt, -8 als die te veel naar rechts loopt) — wordt onthouden op dit toestel.</div>
       <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
 
       <!-- Richting label -->
@@ -1839,6 +1851,13 @@ function _openSightLineModal(potLatLng, onConfirm) {
   const bearingInp = modal.querySelector('#sl-bearing');
   const bearingLbl = modal.querySelector('#sl-bearing-label');
   const btnCompass = modal.querySelector('#sl-compass');
+  const offsetInp  = modal.querySelector('#sl-compass-offset');
+  const COMPASS_OFFSET_KEY = 'hornetapp_compass_offset';
+  offsetInp.value = parseFloat(localStorage.getItem(COMPASS_OFFSET_KEY)) || 0;
+  offsetInp.addEventListener('change', () => {
+    const v = parseFloat(offsetInp.value) || 0;
+    localStorage.setItem(COMPASS_OFFSET_KEY, v);
+  });
 
   function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
   function updateInfo(secs){
@@ -1948,9 +1967,10 @@ function _openSightLineModal(potLatLng, onConfirm) {
           clearInterval(compassTimer); compassTimer = null;
           if (compassReadings.length > 0) {
             const avg = circularMean(compassReadings);
-            const h   = Math.round(avg);
+            const offset = parseFloat(offsetInp.value) || 0;
+            const h   = Math.round((avg + offset + 360) % 360);
             bearingInp.value = h;
-            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen)`;
+            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen${offset ? `, correctie ${offset>0?'+':''}${offset}°` : ''})`;
             bearingLbl.style.color = '#0aa879';
           } else {
             bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen — kalibreer kompas (8-vorm bewegen) en probeer opnieuw';
@@ -2300,9 +2320,20 @@ function openUnifiedContextMenu(opts){
         const layer = opts.polygonLayer;
         if(layer.pm?.enabled()) {
           layer.pm.disable();
+          if(layer._pmEndEditHandler){ layer.off('dblclick', layer._pmEndEditHandler); layer._pmEndEditHandler=null; }
           persistPolygon(layer);
         } else {
           layer.pm.enable();
+          // Fix 201: dubbelklik binnen de polygoon beëindigt het bewerken (i.p.v. alleen via het menu)
+          const endEdit = (ev) => {
+            L.DomEvent.stopPropagation(ev);
+            layer.pm.disable();
+            layer.off('dblclick', endEdit);
+            layer._pmEndEditHandler = null;
+            persistPolygon(layer);
+          };
+          layer._pmEndEditHandler = endEdit;
+          layer.on('dblclick', endEdit);
         }
       }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
