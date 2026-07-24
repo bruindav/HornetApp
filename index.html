@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 212 -->
+<!-- index.html — Fix 217 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -378,7 +378,7 @@
               Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
             </label>
             <div id="pm-photo-row" style="font-size:13px">
-              <div style="margin-bottom:4px">Foto</div>
+              <div style="margin-bottom:4px">Foto <span style="font-weight:normal;color:#94a3b8;font-size:11px">(zichtbaar voor alle vrijwilligers — liever geen mensen/kentekens in beeld)</span></div>
               <div id="pm-photo-preview" style="display:none;margin-bottom:6px">
                 <img id="pm-photo-img" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid #e2e8f0;display:block"/>
               </div>
@@ -476,6 +476,34 @@
             </div>
 
             <div class="help-section">
+              <div class="help-section-title">🧩 Eenvoudige modus</div>
+              <div class="help-row">
+                <div class="help-icon">🧩</div>
+                <div><strong>Wat is het?</strong> — Een vereenvoudigde stap-voor-stap manier om meldingen te doen, met grote knoppen en zonder de kaart zelf te hoeven bedienen. Handig als je de gewone app lastig vindt.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🔀</div>
+                <div><strong>Aan/uit</strong> — Een beheerder kan dit voor je instellen als standaard. Zelf wisselen kan altijd: tik rechtsboven in de eenvoudige modus op <em>Expert modus</em>, of onderin de zijbalk op <em>🧩 Eenvoudige modus</em>. Sta je nog in expert modus terwijl eenvoudige modus je standaard is, dan zie je linksonder een grote groene knop om terug te gaan.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📍</div>
+                <div><strong>Locatie</strong> — Kies <em>Gebruik mijn huidige locatie</em> als je er zelf bij staat, of wijs de plek zelf aan op een kaartje (de kaart verschuiven, de pin in het midden staat vast).</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🎯</div>
+                <div><strong>Vliegrichting vastleggen</strong> — Aparte optie voor als je een gemerkte hoornaar bij een lokpot ziet wegvliegen: kies het potje op een kaartje (bestaande vliegrichtingen zie je er meteen bij, inclusief het zoekgebied), kies de kleur van de markering, geef de richting op (kompas of zelf aanwijzen), en meet de vliegtijd met de stopwatch of typ die handmatig in. De afstand wordt automatisch berekend; je krijgt de kans om die te controleren en zo nodig bij te stellen. Dit levert een volwaardige zichtlijn op, identiek aan wat je via de expert-modus zou maken.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🗺️</div>
+                <div><strong>Bekijk de kaart hier in de buurt</strong> — Op het startscherm van de wizard: een alleen-lezen kaart, gecentreerd op je locatie, die laat zien wat er al gemeld/geplaatst is (waarnemingen, vallen, lokpotten, nesten, vliegrichtingen). Tik op een icoon voor details.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">📸</div>
+                <div><strong>Foto toevoegen</strong> — Bij elke melding kan je optioneel een foto maken of kiezen. Deze is zichtbaar voor alle vrijwilligers in de app.</div>
+              </div>
+            </div>
+
+            <div class="help-section">
               <div class="help-section-title">🗺️ De kaart</div>
               <div class="help-row">
                 <div class="help-icon">☰</div>
@@ -513,6 +541,10 @@
                 <div><strong>Eigenschappen wijzigen</strong> — Houd het icoon ingedrukt → kies <em>Eigenschappen</em> om te bewerken.</div>
               </div>
               <div class="help-row">
+                <div class="help-icon">📸</div>
+                <div><strong>Foto toevoegen</strong> — In het eigenschappen-formulier kan je optioneel een foto kiezen of maken, ook achteraf bij het bewerken. Foto's zijn zichtbaar voor alle vrijwilligers.</div>
+              </div>
+              <div class="help-row">
                 <div class="help-icon">✋</div>
                 <div><strong>Verplaatsen / Verwijderen</strong> — Houd ingedrukt → kies <em>Verplaatsen</em> of <em>Verwijderen</em>.</div>
               </div>
@@ -532,6 +564,7 @@
                 <div>⚙️ <strong>Kalibratie-instellingen</strong> — klap open onder de kompasknop. Wijkt het kompas van jouw toestel steeds in dezelfde richting af? Stel een correctie in met de −/+ knoppen, of gebruik <em>🎯 Nauwkeurig kalibreren (waaier)</em>: richt je telefoon op een punt waarvan je de richting zeker weet, sleep de gele pijl naar diezelfde richting, en de correctie wordt automatisch berekend. Met <em>Correctie toepassen</em> zet je de correctie tijdelijk uit om de ruwe meting te zien. Let op: dit is een instelling per toestel, en helpt alleen tegen een structurele afwijking — sta bij het meten liever niet vlak bij een auto, hek of tafel met metaal, want dat verstoort het kompas zelf.</div>
                 <div>🧭 <strong>N/Z op de kaart</strong> — rechtsboven op de kaart staat een vast kompasje: boven is altijd noord. Handig om een kompasmeting tegen te controleren.</div>
                 <div>🎨 <strong>Kleur</strong> — kies een kleur voor de lijn en sector. Achteraf aanpassen kan ook via lang indrukken op de lijn.</div>
+                <div>📸 <strong>Foto</strong> — optioneel een foto toevoegen bij de zichtlijn, zichtbaar voor alle vrijwilligers.</div>
               </div>
             </div>
 
@@ -655,6 +688,10 @@
                 <div class="help-icon">⏱️</div>
                 <div><strong>Vliegtijd instelling</strong> — Via <em>Beheer → Gebieden → Vliegtijd instelling</em>. Standaard: 0.6 s/m (4 min = 400 m).</div>
               </div>
+              <div class="help-row">
+                <div class="help-icon">📸</div>
+                <div><strong>Foto</strong> — optioneel toe te voegen in dezelfde popup, zichtbaar voor alle vrijwilligers.</div>
+              </div>
             </div>
 
             <div class="help-section">
@@ -706,6 +743,10 @@
               <div class="help-row">
                 <div class="help-icon">⚠️</div>
                 <div><strong>Verwijderverzoeken</strong> — Als een gebruiker zijn account wil laten verwijderen verschijnt <em>⚠️ Verwijdering aangevraagd</em>. Klik <em>Verwerken</em> om te verwerken of annuleren. Kaartdata blijft altijd bewaard.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🧩</div>
+                <div><strong>Eenvoudige modus</strong> — Vinkje bij elke gebruiker om de eenvoudige modus (wizard) als standaard in te stellen, handig voor vrijwilligers die de gewone app lastig vinden. De gebruiker kan altijd zelf wisselen naar expert modus en weer terug — dit vinkje bepaalt alleen wat ze zien bij het inloggen.</div>
               </div>
             </div>
 

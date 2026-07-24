@@ -1,4 +1,4 @@
-// app-core.js — Fix 214
+// app-core.js — Fix 217
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1600,6 +1600,7 @@ function createMarkerWithPropsAt(latlng, type, vals){
 function deleteMarkerAndAssociations(marker){
   const meta=marker._meta||{};
   if(meta.type==='lokpot' && meta.potId){ removePotAssociations(meta.potId); }
+  if(meta.photoPath){ deleteActionPhoto(meta.photoPath); } // Fix 215: foto opruimen uit Storage
   markersGroup.removeLayer(marker); allMarkers = allMarkers.filter(m=>m!==marker);
 }
 function persistMarker(marker){
@@ -1713,6 +1714,7 @@ function setSightLineColor(line,color,save=false){
 }
 function deleteSightLine(line, fromMenu=false){
   const id = line._meta?.id;
+  if(line._meta?.photoPath){ deleteActionPhoto(line._meta.photoPath); } // Fix 215: foto opruimen uit Storage
   if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
   if(line._sector){ const sid=line._sector._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(line._sector); line._sector=null; }
   if(line._distLabel){ try{ map.removeLayer(line._distLabel); }catch{} line._distLabel=null; }
@@ -1755,7 +1757,7 @@ function attachSightLineInteractivity(line){
 }
 function startSightLine(lokpotMarker){
   const potLatLng = lokpotMarker.getLatLng();
-  _openSightLineModal(potLatLng, (dist, note, color, compassBearing) => {
+  _openSightLineModal(potLatLng, (dist, note, color, compassBearing, photo) => {
     const defaultColor = color || '#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
 
     // Als kompasrichting opgegeven: direct lijn tekenen zonder kaart klik
@@ -1768,6 +1770,7 @@ function startSightLine(lokpotMarker){
         pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
         potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg, note:note||''
       };
+      if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
@@ -1795,6 +1798,7 @@ function startSightLine(lokpotMarker){
         pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
         potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg, note:note||''
       };
+      if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
@@ -2093,11 +2097,23 @@ function _openSightLineModal(potLatLng, onConfirm) {
       </div>
 
       <!-- Kleur -->
-      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px">
+      <div style="margin-bottom:12px;display:flex;align-items:center;gap:10px">
         <label style="font-size:12px;font-weight:600;color:#475569">Kleur</label>
         <input id="sl-color" type="color" value="#ff6600"
           style="width:40px;height:32px;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;padding:2px"/>
         <span style="font-size:11px;color:#94a3b8">Kleur voor lijn en sector</span>
+      </div>
+
+      <!-- Foto (Fix 215) -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px">
+          Foto <span style="font-weight:normal;color:#94a3b8;font-size:11px">(optioneel, zichtbaar voor alle vrijwilligers)</span>
+        </label>
+        <div id="sl-photo-preview" style="display:none;margin-bottom:6px">
+          <img id="sl-photo-img" style="max-width:100%;max-height:150px;border-radius:8px;border:1px solid #e2e8f0;display:block"/>
+        </div>
+        <input id="sl-photo-input" type="file" accept="image/*" style="font-size:12px"/>
+        <div id="sl-photo-status" style="font-size:11px;color:#94a3b8;margin-top:3px"></div>
       </div>
 
       <div style="display:flex;gap:8px">
@@ -2106,6 +2122,19 @@ function _openSightLineModal(potLatLng, onConfirm) {
       </div>
     </div>`;
   document.body.appendChild(modal);
+
+  // ── Foto (Fix 215) ────────────────────────────────────────────────────
+  let _slPhotoFile = null;
+  const slPhotoInput   = modal.querySelector('#sl-photo-input');
+  const slPhotoPreview = modal.querySelector('#sl-photo-preview');
+  const slPhotoImg     = modal.querySelector('#sl-photo-img');
+  slPhotoInput?.addEventListener('change', () => {
+    const f = slPhotoInput.files?.[0];
+    if (!f) return;
+    _slPhotoFile = f;
+    if (slPhotoImg) slPhotoImg.src = URL.createObjectURL(f);
+    if (slPhotoPreview) slPhotoPreview.style.display = 'block';
+  });
 
   // ── Stopwatch ──────────────────────────────────────────────────────────
   let swInterval=null, swSeconds=0, swRunning=false;
@@ -2347,14 +2376,27 @@ function _openSightLineModal(potLatLng, onConfirm) {
   modal.querySelector('#sl-cancel').addEventListener('click',()=>{
     clearInterval(swInterval); stopCompass(); modal.remove();
   });
-  modal.querySelector('#sl-confirm').addEventListener('click',()=>{
+  const slConfirmBtn = modal.querySelector('#sl-confirm');
+  const slPhotoStatus = modal.querySelector('#sl-photo-status');
+  slConfirmBtn.addEventListener('click', async ()=>{
     clearInterval(swInterval); stopCompass();
     const dist    = Math.max(10, parseInt(distInput.value)||defaultDist);
     const note    = modal.querySelector('#sl-note').value.trim();
     const color   = modal.querySelector('#sl-color').value || null;
     const bearing = bearingInp.value !== '' ? parseFloat(bearingInp.value) : null;
+    let photo = null;
+    if (_slPhotoFile) {
+      slConfirmBtn.disabled = true;
+      if (slPhotoStatus) { slPhotoStatus.textContent = '📤 Foto uploaden…'; slPhotoStatus.style.color = '#94a3b8'; }
+      try { photo = await _saveActionPhoto(_slPhotoFile, genId('photo')); }
+      catch (e) {
+        slConfirmBtn.disabled = false;
+        if (slPhotoStatus) { slPhotoStatus.textContent = '⚠️ Foto uploaden mislukt: ' + e.message; slPhotoStatus.style.color = '#dc2626'; }
+        return;
+      }
+    }
     modal.remove();
-    onConfirm(dist, note, color, bearing);
+    onConfirm(dist, note, color, bearing, photo);
   });
 }
 
@@ -3215,9 +3257,9 @@ function _swEffectiveSimple() {
 
 const SW_TYPES = {
   hoornaar: { label: 'Waarneming — ik zag een hoornaar', icon: '🐝' },
-  gemerkt:  { label: 'Hoornaar gemerkt bij een lokpot',  icon: '🎯' },
-  val:      { label: 'Val geplaatst',                     icon: '🪤' },
   lokpot:   { label: 'Lokpot geplaatst',                  icon: '🍯' },
+  gemerkt:  { label: 'Vliegrichting vastleggen',          icon: '🎯' },
+  val:      { label: 'Val geplaatst',                     icon: '🪤' },
   nest:     { label: 'Nest gevonden',                     icon: '🪺' },
 };
 const SW_MARK_COLORS = [
@@ -3313,13 +3355,17 @@ function _swBack() {
 }
 function _swBody() { return document.getElementById('sw-body'); }
 
-function _swBigButton(label, icon, onClick, extraStyle='') {
+function _swBigButton(label, icon, onClick, extraStyle='', compact=false) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.style.cssText = 'width:100%;padding:20px 16px;border-radius:14px;border:2px solid #cbd5e1;background:#fff;'
-    + 'color:#0f172a;font-size:19px;font-weight:700;display:flex;align-items:center;gap:14px;cursor:pointer;'
+  const pad = compact ? '13px 14px' : '20px 16px';
+  const fontSize = compact ? '16px' : '19px';
+  const iconSize = compact ? '22px' : '30px';
+  const gap = compact ? '11px' : '14px';
+  btn.style.cssText = `width:100%;padding:${pad};border-radius:14px;border:2px solid #cbd5e1;background:#fff;`
+    + `color:#0f172a;font-size:${fontSize};font-weight:700;display:flex;align-items:center;gap:${gap};cursor:pointer;`
     + 'text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.08);' + extraStyle;
-  btn.innerHTML = `<span style="font-size:30px;line-height:1;flex:0 0 auto">${icon}</span><span>${label}</span>`;
+  btn.innerHTML = `<span style="font-size:${iconSize};line-height:1;flex:0 0 auto">${icon}</span><span>${label}</span>`;
   btn.addEventListener('click', onClick);
   return btn;
 }
@@ -3380,16 +3426,19 @@ function _swRender() {
 function _swRenderType(body) {
   body.appendChild(_swTitle('Wat wil je melden?'));
   body.appendChild(_swSubtitle('Kies wat het beste past.'));
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:9px';
   Object.entries(SW_TYPES).forEach(([type, meta]) => {
-    body.appendChild(_swBigButton(meta.label, meta.icon, () => {
+    list.appendChild(_swBigButton(meta.label, meta.icon, () => {
       _sw.type = type;
       _swGoto(type === 'gemerkt' ? 'pot_pick' : 'location');
-    }));
+    }, '', /*compact=*/true));
   });
-  const spacer = document.createElement('div'); spacer.style.height = '4px';
+  body.appendChild(list);
+  const spacer = document.createElement('div'); spacer.style.height = '2px';
   body.appendChild(spacer);
   body.appendChild(_swBigButton('Bekijk de kaart hier in de buurt', '🗺️', () => _swGoto('nearby_map'),
-    'border-color:#94a3b8;background:#f8fafc;color:#475569'));
+    'border-color:#94a3b8;background:#f8fafc;color:#475569', /*compact=*/true));
 }
 
 // Fix 212: alleen-bekijken kaart, gecentreerd op de huidige locatie — laat zien wat er
@@ -3444,7 +3493,7 @@ function _swRenderNearbyMap(body) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 8, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(nMap).bindPopup('📍 Jouw locatie');
-      nMap.setView(userLL, 17);
+      nMap.setView(userLL, 16);
       statusEl.textContent = '';
     }, () => { statusEl.textContent = '⚠️ Kon geen locatie vinden — kaart toont het laatst bekeken gebied.'; }, { enableHighAccuracy: true, timeout: 8000 });
   } else {
@@ -3641,7 +3690,7 @@ function _swRenderPotPick(body) {
     });
   });
 
-  if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+  if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   else infoEl.textContent = '⚠️ Geen lokpotten gevonden in dit gebied.';
 
   // Fix 212: centreer op de huidige locatie i.p.v. uit te zoomen naar ALLE potjes in de zone —
@@ -3650,7 +3699,7 @@ function _swRenderPotPick(body) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 7, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(potMap);
-      potMap.setView(userLL, 18);
+      potMap.setView(userLL, 16);
     }, () => {}, { enableHighAccuracy: true, timeout: 8000 });
   }
 }
@@ -3712,6 +3761,20 @@ function _swRenderGemerktCompass(body) {
   body.appendChild(startBtn);
 }
 
+// Fix 216: losse, module-brede kopie — de bestaande circularMean() zit genest binnen
+// _openSightLineModal (expert-modus) en was daardoor niet bereikbaar vanuit de wizard.
+// Gevolg: zodra het kompas metingen binnenkreeg, crashte de berekening stil (ReferenceError
+// in een setInterval-callback, dus geen zichtbare foutmelding) en kwam de wizard nooit verder.
+function _swCircularMean(angles) {
+  let sinSum = 0, cosSum = 0;
+  for (const a of angles) {
+    sinSum += Math.sin(a * Math.PI / 180);
+    cosSum += Math.cos(a * Math.PI / 180);
+  }
+  const mean = Math.atan2(sinSum / angles.length, cosSum / angles.length) * 180 / Math.PI;
+  return ((mean % 360) + 360) % 360;
+}
+
 function _swMeasureCompass(durationSec, onProgress, onDone) {
   const readings = [];
   let remaining = durationSec;
@@ -3723,7 +3786,7 @@ function _swMeasureCompass(durationSec, onProgress, onDone) {
       clearInterval(timer);
       stop();
       if (!readings.length) { onDone(null); return; }
-      const avg = circularMean(readings);
+      const avg = _swCircularMean(readings);
       const offset = _isCompassOffsetEnabled() ? _getCompassOffsetLocal() : 0;
       onDone(Math.round((avg + offset + 360) % 360));
     } else {
@@ -3946,7 +4009,7 @@ async function _saveActionPhoto(file, actionId) {
 
 function _swRenderPhoto(body) {
   body.appendChild(_swTitle('Foto toevoegen?'));
-  body.appendChild(_swSubtitle('Optioneel — mag ook overgeslagen worden.'));
+  body.appendChild(_swSubtitle('Optioneel — mag ook overgeslagen worden. Zichtbaar voor alle vrijwilligers, dus liever geen mensen of kentekens in beeld.'));
 
   const preview = document.createElement('div');
   preview.style.cssText = 'display:flex;justify-content:center';
