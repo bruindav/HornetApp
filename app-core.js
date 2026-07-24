@@ -1,4 +1,4 @@
-// app-core.js — Fix 217
+// app-core.js — Fix 218
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3465,16 +3465,17 @@ function _swRenderNearbyMap(body) {
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(nMap);
   setTimeout(() => nMap.invalidateSize(), 60);
 
-  const typeLabels = { hoornaar: 'Waarneming', nest: 'Nest gevonden', nest_geruimd: 'Nest geruimd', lokpot: 'Lokpot', val: 'Val geplaatst' };
   allMarkers.forEach(m => {
     const meta = m._meta || {};
     if (!markersGroup.hasLayer(m)) return; // respecteer actieve filters
     const ll = m.getLatLng();
     const clone = L.marker(ll, { icon: getIconForMarker(meta) }).addTo(nMap);
-    const label = typeLabels[meta.type] || meta.type || 'Icoon';
-    const noteHtml = meta.note ? `<br>${String(meta.note).replace(/</g, '&lt;')}` : '';
-    const dateHtml = meta.date ? `<br><span style="color:#94a3b8;font-size:12px">${meta.date}</span>` : '';
-    clone.bindPopup(`<strong>${label}</strong>${noteHtml}${dateHtml}`);
+    // Fix 218: tik opent het volledige (alleen-lezen) eigenschappen-scherm — zelfde als
+    // in expert-modus — zodat je meer ziet dan alleen de datum: aantal, opmerking, foto,
+    // eventuele bron (GBIF/waarneming.nl), enz.
+    clone.on('click', () => {
+      openPropModal({ type: meta.type, init: { ...meta, _latlng: ll }, readOnly: true, onSave: null });
+    });
   });
   allLines.forEach(l => {
     const latlngs = l.getLatLngs ? l.getLatLngs() : null;
