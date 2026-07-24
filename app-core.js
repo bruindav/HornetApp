@@ -1,4 +1,4 @@
-// app-core.js — Fix 216
+// app-core.js — Fix 217
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3257,9 +3257,9 @@ function _swEffectiveSimple() {
 
 const SW_TYPES = {
   hoornaar: { label: 'Waarneming — ik zag een hoornaar', icon: '🐝' },
-  gemerkt:  { label: 'Hoornaar gemerkt bij een lokpot',  icon: '🎯' },
-  val:      { label: 'Val geplaatst',                     icon: '🪤' },
   lokpot:   { label: 'Lokpot geplaatst',                  icon: '🍯' },
+  gemerkt:  { label: 'Vliegrichting vastleggen',          icon: '🎯' },
+  val:      { label: 'Val geplaatst',                     icon: '🪤' },
   nest:     { label: 'Nest gevonden',                     icon: '🪺' },
 };
 const SW_MARK_COLORS = [
@@ -3355,13 +3355,17 @@ function _swBack() {
 }
 function _swBody() { return document.getElementById('sw-body'); }
 
-function _swBigButton(label, icon, onClick, extraStyle='') {
+function _swBigButton(label, icon, onClick, extraStyle='', compact=false) {
   const btn = document.createElement('button');
   btn.type = 'button';
-  btn.style.cssText = 'width:100%;padding:20px 16px;border-radius:14px;border:2px solid #cbd5e1;background:#fff;'
-    + 'color:#0f172a;font-size:19px;font-weight:700;display:flex;align-items:center;gap:14px;cursor:pointer;'
+  const pad = compact ? '13px 14px' : '20px 16px';
+  const fontSize = compact ? '16px' : '19px';
+  const iconSize = compact ? '22px' : '30px';
+  const gap = compact ? '11px' : '14px';
+  btn.style.cssText = `width:100%;padding:${pad};border-radius:14px;border:2px solid #cbd5e1;background:#fff;`
+    + `color:#0f172a;font-size:${fontSize};font-weight:700;display:flex;align-items:center;gap:${gap};cursor:pointer;`
     + 'text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.08);' + extraStyle;
-  btn.innerHTML = `<span style="font-size:30px;line-height:1;flex:0 0 auto">${icon}</span><span>${label}</span>`;
+  btn.innerHTML = `<span style="font-size:${iconSize};line-height:1;flex:0 0 auto">${icon}</span><span>${label}</span>`;
   btn.addEventListener('click', onClick);
   return btn;
 }
@@ -3422,16 +3426,19 @@ function _swRender() {
 function _swRenderType(body) {
   body.appendChild(_swTitle('Wat wil je melden?'));
   body.appendChild(_swSubtitle('Kies wat het beste past.'));
+  const list = document.createElement('div');
+  list.style.cssText = 'display:flex;flex-direction:column;gap:9px';
   Object.entries(SW_TYPES).forEach(([type, meta]) => {
-    body.appendChild(_swBigButton(meta.label, meta.icon, () => {
+    list.appendChild(_swBigButton(meta.label, meta.icon, () => {
       _sw.type = type;
       _swGoto(type === 'gemerkt' ? 'pot_pick' : 'location');
-    }));
+    }, '', /*compact=*/true));
   });
-  const spacer = document.createElement('div'); spacer.style.height = '4px';
+  body.appendChild(list);
+  const spacer = document.createElement('div'); spacer.style.height = '2px';
   body.appendChild(spacer);
   body.appendChild(_swBigButton('Bekijk de kaart hier in de buurt', '🗺️', () => _swGoto('nearby_map'),
-    'border-color:#94a3b8;background:#f8fafc;color:#475569'));
+    'border-color:#94a3b8;background:#f8fafc;color:#475569', /*compact=*/true));
 }
 
 // Fix 212: alleen-bekijken kaart, gecentreerd op de huidige locatie — laat zien wat er
@@ -3486,7 +3493,7 @@ function _swRenderNearbyMap(body) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 8, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(nMap).bindPopup('📍 Jouw locatie');
-      nMap.setView(userLL, 17);
+      nMap.setView(userLL, 16);
       statusEl.textContent = '';
     }, () => { statusEl.textContent = '⚠️ Kon geen locatie vinden — kaart toont het laatst bekeken gebied.'; }, { enableHighAccuracy: true, timeout: 8000 });
   } else {
@@ -3683,7 +3690,7 @@ function _swRenderPotPick(body) {
     });
   });
 
-  if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
+  if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   else infoEl.textContent = '⚠️ Geen lokpotten gevonden in dit gebied.';
 
   // Fix 212: centreer op de huidige locatie i.p.v. uit te zoomen naar ALLE potjes in de zone —
@@ -3692,7 +3699,7 @@ function _swRenderPotPick(body) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 7, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(potMap);
-      potMap.setView(userLL, 18);
+      potMap.setView(userLL, 16);
     }, () => {}, { enableHighAccuracy: true, timeout: 8000 });
   }
 }
