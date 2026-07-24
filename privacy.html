@@ -18,7 +18,7 @@
 <body>
 
   <h1>🐝 Privacybeleid HoornaarZoeken</h1>
-  <p class="meta">Versie 1.0 — Laatst bijgewerkt: maart 2026</p>
+  <p class="meta">Versie 1.1 — Laatst bijgewerkt: juli 2026</p>
 
   <div class="highlight">
     HoornaarZoeken is een applicatie voor het monitoren en coördineren van Aziatische hoornaar (<em>Vespa velutina</em>) waarnemingen door vrijwilligers en beheerders.
@@ -35,7 +35,9 @@
     <li><strong>E-mailadres</strong> — gebruikt voor inloggen en accountbeheer</li>
     <li><strong>Weergavenaam</strong> — zichtbaar voor andere gebruikers bij waarnemingen</li>
     <li><strong>Locatiegegevens</strong> — coördinaten van geplaatste waarnemingen, nesten, lokpotten en vallen op de kaart</li>
+    <li><strong>GPS-locatie van je toestel (optioneel)</strong> — als je in de app kiest voor "gebruik mijn huidige locatie" (bijvoorbeeld in de eenvoudige modus, of om de kaart op je locatie te centreren), vraagt de app toestemming om je actuele GPS-positie te gebruiken. Dit gebeurt alleen op jouw verzoek, per keer, en wordt niet los bijgehouden — enkel gebruikt om een waarneming op de juiste plek te zetten of de kaart te centreren</li>
     <li><strong>Waarnemingsdata</strong> — datum, type waarneming, opmerkingen die je invoert</li>
+    <li><strong>Foto's (optioneel)</strong> — je kunt vrijwillig een foto toevoegen bij een waarneming, val, lokpot of nest. Foto's worden gecomprimeerd voordat ze worden geüpload en zijn zichtbaar voor iedereen die de kaart bekijkt (net als de locatie en het type van de melding)</li>
     <li><strong>Activiteitslog</strong> — tijdstip en type van acties die je uitvoert in de app</li>
   </ul>
 
@@ -53,20 +55,29 @@
     <li><strong>Jijzelf</strong> — je kunt je eigen waarnemingen bekijken en bewerken</li>
     <li><strong>Beheerders (managers)</strong> — kunnen waarnemingen zien in hun toegewezen werkgebied</li>
     <li><strong>Admins</strong> — hebben toegang tot alle gegevens binnen de app voor beheerdoeleinden</li>
-    <li><strong>Andere vrijwilligers</strong> — kunnen de kaart met waarnemingen inzien (locatie en type, geen persoonsgegevens)</li>
+    <li><strong>Andere vrijwilligers</strong> — kunnen de kaart met waarnemingen inzien (locatie, type en eventuele foto — geen persoonsgegevens zoals je naam of e-mailadres)</li>
   </ul>
+  <p>
+    Let bij het toevoegen van een foto op dat je zo min mogelijk herkenbare personen, kentekens of huisnummers in beeld brengt — foto's zijn immers zichtbaar voor alle vrijwilligers in de app.
+  </p>
 
   <h2>5. Waar worden gegevens opgeslagen?</h2>
   <p>
-    Alle gegevens worden opgeslagen in <strong>Google Firebase Firestore</strong>, een cloudopslagdienst van Google LLC.
+    Tekstgegevens (waarnemingen, accounts, opmerkingen) worden opgeslagen in <strong>Google Firebase Firestore</strong>, een cloudopslagdienst van Google LLC.
     De servers bevinden zich in de Europese Unie (Frankfurt). Google Firebase voldoet aan de AVG/GDPR.
     Meer informatie: <a href="https://firebase.google.com/support/privacy" target="_blank">firebase.google.com/support/privacy</a>
+  </p>
+  <p>
+    Foto's die je toevoegt worden apart opgeslagen in <strong>Google Firebase Cloud Storage</strong> (dezelfde Google-dienst, ander onderdeel).
+    <em>[Beheerder: vul hier de gekozen opslagregio in, bijv. "eveneens Europese Unie" of "Verenigde Staten (gratis opslagtier)" —
+    zie de instellingen in de Firebase Console onder Storage.]</em>
   </p>
 
   <h2>6. Hoe lang bewaren we je gegevens?</h2>
   <ul>
     <li>Accountgegevens worden bewaard zolang je account actief is</li>
     <li>Waarnemingen worden bewaard zolang ze relevant zijn voor de monitoring</li>
+    <li>Foto's worden automatisch verwijderd zodra de bijbehorende waarneming, val, lokpot, nest of zichtlijn wordt verwijderd, of zodra je een foto vervangt door een andere</li>
     <li>Na verwijdering van je account worden je persoonsgegevens verwijderd; waarnemingen kunnen geanonimiseerd worden bewaard voor statistische doeleinden</li>
   </ul>
 

@@ -13,6 +13,26 @@
 
 const CHANGELOG = [
   {
+    version: 'Fix 215', date: '2026-07-24',
+    category: 'Algemeen',
+    text: 'Foto toevoegen kan nu ook bij een normale zichtlijn in expert-modus (was al mogelijk bij iconen en bij "Hoornaar gemerkt"). Foto\'s worden nu ook echt opgeruimd bij verwijderen van een icoon/zichtlijn. Privacybeleid en hulp bijgewerkt'
+  },
+  {
+    version: 'Fix 213–214', date: '2026-07-24',
+    category: 'Algemeen',
+    text: 'Foto-upload krijgt een duidelijke foutmelding i.p.v. oneindig te kunnen hangen · Bug opgelost waarbij de opslaan-knop na een geslaagde foto-upload onklikbaar bleef bij de volgende actie'
+  },
+  {
+    version: 'Fix 212', date: '2026-07-24',
+    category: 'Algemeen',
+    text: 'Foto toevoegen bij alle acties (eenvoudige én expert modus) · Potjes-kaartje bij "Hoornaar gemerkt" centreert nu op je locatie · Nieuwe optie "Bekijk de kaart hier in de buurt"'
+  },
+  {
+    version: 'Fix 209–211', date: '2026-07-24',
+    category: 'Algemeen',
+    text: 'Nieuwe "Eenvoudige modus": meldingen doen via een stap-voor-stap wizard met grote knoppen, GPS-locatie of zelf aanwijzen, en een aparte "Hoornaar gemerkt bij een lokpot"-flow die een volwaardige zichtlijn aanmaakt. Door beheer instelbaar per gebruiker, met een grote knop om terug te schakelen'
+  },
+  {
     version: 'Fix 208', date: '2026-07-24',
     category: 'Kaart',
     text: 'Polygoon bewerken afsluiten via dubbelklik werkt nu betrouwbaar — checkt of de klik echt binnen de vorm valt, ook als het vlak tijdens bewerken tijdelijk niet-interactief is'
