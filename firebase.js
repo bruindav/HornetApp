@@ -1,4 +1,4 @@
-// firebase.js — Fix 212
+// firebase.js — Fix 213
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup,
          createUserWithEmailAndPassword, signInWithEmailAndPassword,
@@ -31,11 +31,35 @@ export function resetPassword(email) {
   return sendPasswordResetEmail(auth, email);
 }
 
-// Fix 212: foto uploaden/verwijderen (gebruikt bij markers en zichtlijnen)
+// Fix 213: foto uploaden/verwijderen (gebruikt bij markers en zichtlijnen)
+// Met timeout: zonder dit kan een upload bij een verkeerd ingestelde Storage-bucket of
+// geblokkeerde rules onbeperkt "hangen" zonder ooit een fout te geven (bekend SDK-gedrag).
+function _withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
 export async function uploadActionPhoto(blob, path) {
   const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' });
-  return getDownloadURL(storageRef);
+  try {
+    await _withTimeout(
+      uploadBytes(storageRef, blob, { contentType: blob.type || 'image/jpeg' }),
+      20000, 'Uploaden duurde te lang (20s) — controleer of Firebase Storage is ingeschakeld en of de opslagregels schrijven toestaan.'
+    );
+  } catch (e) {
+    console.error('[uploadActionPhoto] upload mislukt:', e);
+    throw e;
+  }
+  try {
+    return await _withTimeout(
+      getDownloadURL(storageRef),
+      15000, 'Ophalen van de foto-link duurde te lang (15s).'
+    );
+  } catch (e) {
+    console.error('[uploadActionPhoto] getDownloadURL mislukt:', e);
+    throw e;
+  }
 }
 export async function deleteActionPhoto(path) {
   try { await deleteObject(ref(storage, path)); } catch { /* al weg, of nooit bestaan — negeren */ }
