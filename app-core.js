@@ -1,4 +1,4 @@
-// app-core.js — Fix 205
+// app-core.js — Fix 206
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -144,24 +144,43 @@ function initMap(){
     if (svg) svg.style.transform = 'rotate(' + bearing + 'deg)';
   }
 
-  // Kompas op mobiel: volg het kompas van het apparaat
+  // Kompas op mobiel: volg het kompas van het apparaat (Fix 206: robuuste bronkeuze via _startLiveHeading)
+  let _stopHeaderCompass = null;
   if (window.DeviceOrientationEvent) {
     const requestCompass = () => {
+      if (_stopHeaderCompass) return; // al actief
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         // iOS 13+ vereist expliciete toestemming
         DeviceOrientationEvent.requestPermission().then(state => {
-          if (state === 'granted') window.addEventListener('deviceorientation', _onOrientation, true);
+          if (state === 'granted') _stopHeaderCompass = _startLiveHeading(updateCompassSvg);
         }).catch(() => {});
       } else {
-        window.addEventListener('deviceorientation', _onOrientation, true);
+        _stopHeaderCompass = _startLiveHeading(updateCompassSvg);
       }
     };
     // Aktiveer kompas zodra locatieknop aangeklikt wordt
-    const _origLocClick = _locBtnEl;
     document.addEventListener('click', e => {
       if (e.target === _locBtnEl) requestCompass();
     }, { once: false });
   }
+
+  // ── Fix 206: statische Noord/Zuid-indicatie op de kaart ────────────────
+  // Gebruikt GEEN sensor: de kaart draait nooit (bearing altijd 0), dus "boven = noord"
+  // is altijd waar. Dient ook als vaste referentie om de kompasmeting tegen te checken.
+  const nsCtrl = L.control({ position: 'topright' });
+  nsCtrl.onAdd = () => {
+    const div = L.DomUtil.create('div');
+    div.title = 'De kaart draait niet: boven is altijd noord';
+    div.style.cssText = 'background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.35);'
+      + 'padding:3px 7px;display:flex;flex-direction:column;align-items:center;font-size:10px;'
+      + 'font-weight:700;color:#334155;user-select:none;pointer-events:none;line-height:1.05;gap:1px';
+    div.innerHTML = '<span style="color:#dc2626">N</span>'
+      + '<span style="font-size:11px;color:#cbd5e1;line-height:0.7">│</span>'
+      + '<span style="font-size:11px;color:#cbd5e1;line-height:0.7">│</span>'
+      + '<span style="color:#475569">Z</span>';
+    return div;
+  };
+  nsCtrl.addTo(map);
 
   function _onOrientation(e) {
     const heading = e.webkitCompassHeading ?? (e.alpha != null ? (360 - e.alpha) : null);
@@ -1783,24 +1802,28 @@ function _getScreenAngle() {
 // Doorlopende richtingmeting (géén 3s-gemiddelde): kiest 1 bron en levert live updates,
 // voor gebruik in de waaier-kalibratie hieronder. Retourneert een stopfunctie.
 function _startLiveHeading(onHeading) {
-  let source = null;
+  // Fix 206: bestTrust kan alleen OPWAARTS veranderen — eenmaal een betrouwbare
+  // (echt-noord) meting gezien, wordt een toevallig eerder binnengekomen minder
+  // betrouwbare meting niet meer gebruikt. Voorkomt willekeurige "verkeerde bron wint"-fouten.
+  let bestTrust = 0;
   const screenAngle = _getScreenAngle();
   const onIOS = (e) => {
     if (e.webkitCompassHeading == null) return;
-    if (source && source !== 'ios') return;
-    source = 'ios';
+    if (3 < bestTrust) return;
+    bestTrust = 3;
     onHeading(((e.webkitCompassHeading % 360) + 360) % 360);
   };
   const onAbsolute = (e) => {
     if (!e.absolute || e.alpha == null) return;
-    if (source && source !== 'absolute') return;
-    source = 'absolute';
+    if (2 < bestTrust) return;
+    bestTrust = 2;
     onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
   };
   const onRelative = (e) => {
     if (e.alpha == null) return;
-    if (source && source !== 'relative') return;
-    source = 'relative';
+    const trust = e.absolute ? 2 : 1;
+    if (trust < bestTrust) return;
+    bestTrust = trust;
     onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
   };
   window.addEventListener('deviceorientation', onIOS, true);
@@ -2167,14 +2190,20 @@ function _openSightLineModal(potLatLng, onConfirm) {
           btnCompass.textContent = `🧭 Meten… ${remaining}s`;
         } else {
           clearInterval(compassTimer); compassTimer = null;
-          if (compassReadings.length > 0) {
-            const avg = circularMean(compassReadings);
+          // Fix 206: gebruik alleen de metingen van de BESTE bron die binnenkwam
+          // (niet zomaar de eerst-binnengekomen bron — die kan toevallig de minder
+          // betrouwbare zijn geweest, wat eerder tot afwijkingen van tientallen graden leidde).
+          const bestTrust = compassReadings.reduce((m,r)=>Math.max(m,r.trust), 0);
+          const best = compassReadings.filter(r => r.trust === bestTrust);
+          if (best.length > 0) {
+            const avg = circularMean(best.map(r=>r.h));
             const offsetOn = _isCompassOffsetEnabled();
             const offset = offsetOn ? _getCompassOffsetLocal() : 0;
             const h   = Math.round((avg + offset + 360) % 360);
             bearingInp.value = h;
+            const srcTxt = bestTrust===1 ? ' ⚠️ minder nauwkeurige bron' : '';
             const offsetTxt = !offsetOn ? ', correctie UIT (ruwe meting)' : (offset ? `, correctie ${offset>0?'+':''}${offset}°` : '');
-            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen${offsetTxt})`;
+            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${best.length} metingen${offsetTxt})${srcTxt}`;
             bearingLbl.style.color = '#0aa879';
           } else {
             bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen — kalibreer kompas (8-vorm bewegen) en probeer opnieuw';
@@ -2184,37 +2213,36 @@ function _openSightLineModal(potLatLng, onConfirm) {
         }
       }, 1000);
 
-      // Losse handlers per bron: we kiezen de EERSTE bron die data geeft en
-      // negeren daarna de andere, zodat metingen niet door elkaar lopen.
+      // Fix 206: alle bronnen worden verzameld MET een betrouwbaarheids-label (trust).
+      // We kiezen achteraf de hoogste beschikbare trust i.p.v. de eerst-binnengekomen bron te fixeren.
+      // trust: iOS webkitCompassHeading = 3 (altijd echt-noord), deviceorientationabsolute = 2 (echt-noord),
+      //        losse deviceorientation zonder absolute-vlag = 1 (kan onbetrouwbaar/relatief zijn).
       const screenAngle = getScreenAngle();
 
       const onIOS = (e) => {
         if (e.webkitCompassHeading == null) return;
-        if (compassSourceUsed && compassSourceUsed !== 'ios') return;
-        compassSourceUsed = 'ios';
-        // webkitCompassHeading is al t.o.v. echt noord en houdt al rekening met schermrotatie.
-        pushReading(e.webkitCompassHeading);
+        pushReading(e.webkitCompassHeading, 3);
       };
       const onAbsolute = (e) => {
         if (!e.absolute || e.alpha == null) return;
-        if (compassSourceUsed && compassSourceUsed !== 'absolute') return;
-        compassSourceUsed = 'absolute';
         let heading = (360 - e.alpha + screenAngle + 360) % 360;
-        pushReading(heading);
+        pushReading(heading, 2);
       };
       const onRelative = (e) => {
         if (e.alpha == null) return;
-        // Alleen gebruiken als er geen absolute/iOS-bron actief is (fallback, minder betrouwbaar).
-        if (compassSourceUsed && compassSourceUsed !== 'relative') return;
-        compassSourceUsed = 'relative';
+        // Sommige toestellen geven via dit event ook al absolute (echt-noord) data —
+        // reken dat dan als trust 2 i.p.v. 1, ook al kwam het niet via het 'absolute' event.
         let heading = (360 - e.alpha + screenAngle + 360) % 360;
-        pushReading(heading);
+        pushReading(heading, e.absolute ? 2 : 1);
       };
-      function pushReading(heading){
-        compassReadings.push(((heading % 360) + 360) % 360);
-        const preview = Math.round(circularMean(compassReadings));
-        const warn = compassSourceUsed === 'relative' ? ' ⚠️ minder nauwkeurig' : '';
-        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${compassReadings.length} metingen…)${warn}`;
+      function pushReading(heading, trust){
+        compassSourceUsed = trust;
+        compassReadings.push({ h: ((heading % 360) + 360) % 360, trust });
+        const bestTrust = compassReadings.reduce((m,r)=>Math.max(m,r.trust), 0);
+        const best = compassReadings.filter(r => r.trust === bestTrust);
+        const preview = Math.round(circularMean(best.map(r=>r.h)));
+        const warn = bestTrust===1 ? ' ⚠️ minder nauwkeurig' : '';
+        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${best.length} metingen…)${warn}`;
       }
 
       compassHandler = { onIOS, onAbsolute, onRelative };
