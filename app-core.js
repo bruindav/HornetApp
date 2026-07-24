@@ -1,4 +1,4 @@
-// app-core.js — Fix 212
+// app-core.js — Fix 214
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -859,6 +859,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   const pmBy2     = document.getElementById('pm-by');
   const pmAmount2 = document.getElementById('pm-amount');
   const pmSave2   = document.getElementById('pm-save');
+  if(pmSave2) pmSave2.disabled = false; // Fix 214: vangnet — nooit starten met een (per ongeluk) uitgeschakelde knop
   const pmCancel2 = document.getElementById('pm-cancel');
   const pmTitle   = document.getElementById('pm-title');
   const pmColorRow= document.getElementById('pm-color-row');
@@ -1048,7 +1049,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   }
   function cleanup(){
     if(pmCancel2) pmCancel2.onclick=null;
-    if(pmSave2) pmSave2.onclick=null;
+    if(pmSave2) { pmSave2.onclick=null; pmSave2.disabled=false; } // Fix 214: anders blijft de knop uit na een geslaagde foto-upload
     modalEl2.classList.add('hidden');
   }
   if(pmCancel2) pmCancel2.onclick = ()=>cleanup();
@@ -1078,15 +1079,13 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
       if(vt) vals.valtype = vt;
       if(!isNaN(kn)) vals.koninginnen = kn;
     }
-    // Foto — Fix 212
+    // Foto — Fix 212/213
     if (_pmPhotoNewFile) {
       pmSave2.disabled = true;
       if (pmPhotoStatus) { pmPhotoStatus.textContent = '📤 Foto uploaden…'; pmPhotoStatus.style.color = '#94a3b8'; }
       try {
-        const blob = await _compressImageFile(_pmPhotoNewFile);
-        const path = `action-photos/${genId('photo')}.jpg`;
-        const url = await uploadActionPhoto(blob, path);
-        vals.photoUrl = url; vals.photoPath = path;
+        const photo = await _saveActionPhoto(_pmPhotoNewFile, genId('photo'));
+        vals.photoUrl = photo.url; vals.photoPath = photo.path;
         if (init.photoPath) deleteActionPhoto(init.photoPath); // oude foto opruimen (hoeft niet af te wachten)
       } catch (e) {
         pmSave2.disabled = false;
@@ -3933,9 +3932,15 @@ function _compressImageFile(file, maxDim = 1280, quality = 0.75) {
   });
 }
 async function _saveActionPhoto(file, actionId) {
-  const blob = await _compressImageFile(file);
+  console.log('[foto] compressie starten…', file.name, file.size, 'bytes');
+  const blob = await Promise.race([
+    _compressImageFile(file),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Foto verwerken duurde te lang (10s)')), 10000)),
+  ]);
+  console.log('[foto] compressie klaar, upload starten…', blob.size, 'bytes');
   const path = `action-photos/${actionId}.jpg`;
   const url = await uploadActionPhoto(blob, path);
+  console.log('[foto] upload klaar:', url);
   return { url, path };
 }
 

@@ -1,0 +1,27 @@
+// storage.rules — voor foto's bij acties (Fix 212/213)
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() { return request.auth != null; }
+
+    match /action-photos/{fileName} {
+      // Lezen: voor iedereen (net als markers/lijnen in Firestore — foto's moeten
+      // gewoon zichtbaar zijn in de app, ook zonder inlog, zoals bij read:true elders)
+      allow read: if true;
+      // Schrijven: alleen ingelogde gebruikers, met een basischeck op bestandsgrootte
+      // (max 8MB, ruim boven wat de app zelf al comprimeert naar ~1280px) en dat het
+      // echt een afbeelding is
+      allow write: if isSignedIn()
+        && request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      // Verwijderen: alleen ingelogde gebruikers (nodig om een oude foto te vervangen)
+      allow delete: if isSignedIn();
+    }
+
+    // Alles daarbuiten: dicht (geen andere paden in gebruik)
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
