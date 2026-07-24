@@ -1,4 +1,4 @@
-// app-core.js — Fix 172
+// app-core.js — Fix 207
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -74,7 +74,12 @@ const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
-  map = L.map('map', { zoomControl: true, rotate: true, rotateControl: false }).setView([52.1, 5.3], 8);
+  map = L.map('map', {
+    zoomControl: true, rotate: true, rotateControl: false,
+    zoomSnap: 0.25,          // was standaard 1 — nu ook tussenliggende zoomniveaus mogelijk (fijner, en exacter passend voor screenshots)
+    zoomDelta: 0.5,          // stapgrootte van de +/- knoppen
+    wheelPxPerZoomLevel: 120 // scrollwiel/trackpad reageert geleidelijker i.p.v. in sprongen
+  }).setView([52.1, 5.3], 8);
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -139,24 +144,43 @@ function initMap(){
     if (svg) svg.style.transform = 'rotate(' + bearing + 'deg)';
   }
 
-  // Kompas op mobiel: volg het kompas van het apparaat
+  // Kompas op mobiel: volg het kompas van het apparaat (Fix 206: robuuste bronkeuze via _startLiveHeading)
+  let _stopHeaderCompass = null;
   if (window.DeviceOrientationEvent) {
     const requestCompass = () => {
+      if (_stopHeaderCompass) return; // al actief
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         // iOS 13+ vereist expliciete toestemming
         DeviceOrientationEvent.requestPermission().then(state => {
-          if (state === 'granted') window.addEventListener('deviceorientation', _onOrientation, true);
+          if (state === 'granted') _stopHeaderCompass = _startLiveHeading(updateCompassSvg);
         }).catch(() => {});
       } else {
-        window.addEventListener('deviceorientation', _onOrientation, true);
+        _stopHeaderCompass = _startLiveHeading(updateCompassSvg);
       }
     };
     // Aktiveer kompas zodra locatieknop aangeklikt wordt
-    const _origLocClick = _locBtnEl;
     document.addEventListener('click', e => {
       if (e.target === _locBtnEl) requestCompass();
     }, { once: false });
   }
+
+  // ── Fix 206: statische Noord/Zuid-indicatie op de kaart ────────────────
+  // Gebruikt GEEN sensor: de kaart draait nooit (bearing altijd 0), dus "boven = noord"
+  // is altijd waar. Dient ook als vaste referentie om de kompasmeting tegen te checken.
+  const nsCtrl = L.control({ position: 'topright' });
+  nsCtrl.onAdd = () => {
+    const div = L.DomUtil.create('div');
+    div.title = 'De kaart draait niet: boven is altijd noord';
+    div.style.cssText = 'background:#fff;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.35);'
+      + 'padding:3px 7px;display:flex;flex-direction:column;align-items:center;font-size:10px;'
+      + 'font-weight:700;color:#334155;user-select:none;pointer-events:none;line-height:1.05;gap:1px';
+    div.innerHTML = '<span style="color:#dc2626">N</span>'
+      + '<span style="font-size:11px;color:#cbd5e1;line-height:0.7">│</span>'
+      + '<span style="font-size:11px;color:#cbd5e1;line-height:0.7">│</span>'
+      + '<span style="color:#475569">Z</span>';
+    return div;
+  };
+  nsCtrl.addTo(map);
 
   function _onOrientation(e) {
     const heading = e.webkitCompassHeading ?? (e.alpha != null ? (360 - e.alpha) : null);
@@ -178,7 +202,13 @@ function initMap(){
     drawCircle:false, drawCircleMarker:false, drawText:false,
     editMode:false, dragMode:false, cutPolygon:false, removalMode:false, rotateMode:false
   });
-  map.pm.setGlobalOptions({ finishOn: 'dblclick', snappable: true, allowSelfIntersection: false });
+  map.pm.setGlobalOptions({
+    finishOn: 'dblclick', allowSelfIntersection: false,
+    snappable: true,
+    snapDistance: 30,     // was standaard 20px — groter vangbereik, makkelijker exact aan laten sluiten
+    snapSegment: true,    // snap ook naar lijnstukken van andere polygonen, niet alleen hoekpunten
+    snapMiddle: true       // snap ook naar het midden van bestaande lijnstukken
+  });
 
   // Sateliet-knop als custom Geoman control in de toolbar (topleft)
   map.pm.Toolbar.createCustomControl({
@@ -287,6 +317,54 @@ function initMap(){
   });
   map.on('mouseup touchend', () => { clearTimeout(_lpTimer); });
 }
+// ======================= Wake Lock (scherm niet laten vergrendelen) =======================
+// Fix 200: optionele Wake Lock zodat het scherm niet op slot gaat tijdens gebruik van de app.
+let _wakeLock = null;
+const WAKE_LOCK_PREF_KEY = 'hornetapp_wakelock_enabled';
+
+function isWakeLockPreferred() {
+  const v = localStorage.getItem(WAKE_LOCK_PREF_KEY);
+  return v === null ? true : v === '1'; // standaard AAN
+}
+
+async function requestWakeLock() {
+  if (!('wakeLock' in navigator)) return;
+  if (!isWakeLockPreferred()) return;
+  if (document.visibilityState !== 'visible') return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+  } catch (err) {
+    // Kan falen bij bv. lage batterij of geen toestemming — stil negeren
+    _wakeLock = null;
+  }
+}
+function releaseWakeLock() {
+  if (_wakeLock) { try { _wakeLock.release(); } catch {} _wakeLock = null; }
+}
+function initWakeLock() {
+  if (!('wakeLock' in navigator)) {
+    const toggle = document.getElementById('wakelock-toggle');
+    const row = document.getElementById('wakelock-row');
+    if (row) row.title = 'Niet ondersteund op dit apparaat/deze browser';
+    if (toggle) toggle.disabled = true;
+    return;
+  }
+  const toggle = document.getElementById('wakelock-toggle');
+  if (toggle) {
+    toggle.checked = isWakeLockPreferred();
+    toggle.addEventListener('change', () => {
+      localStorage.setItem(WAKE_LOCK_PREF_KEY, toggle.checked ? '1' : '0');
+      if (toggle.checked) requestWakeLock(); else releaseWakeLock();
+    });
+  }
+  requestWakeLock();
+  // Scherm gaat na tab-wissel/vergrendeling automatisch los; opnieuw aanvragen bij terugkeer.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') requestWakeLock();
+  });
+}
+
 // ======================= UI‑bindingen =======================
 function updateHeaderHeightVar(){
   try{
@@ -1694,6 +1772,182 @@ async function _loadFlightSettings(zone) {
   } catch {}
 }
 
+// ── Kompas-kalibratie (per toestel) ───────────────────────────────────────
+// Fix 203: elk toestel heeft z'n eigen magnetometer-afwijking, dus dit is bewust
+// GEEN globale/gedeelde instelling meer — puur lokaal op dit apparaat (localStorage).
+const COMPASS_OFFSET_KEY = 'hornetapp_compass_offset';
+function _getCompassOffsetLocal() {
+  const v = parseFloat(localStorage.getItem(COMPASS_OFFSET_KEY));
+  return isNaN(v) ? 0 : v;
+}
+function _setCompassOffsetLocal(v) {
+  localStorage.setItem(COMPASS_OFFSET_KEY, String(v));
+}
+const COMPASS_OFFSET_ENABLED_KEY = 'hornetapp_compass_offset_enabled';
+function _isCompassOffsetEnabled() {
+  const v = localStorage.getItem(COMPASS_OFFSET_ENABLED_KEY);
+  return v === null ? true : v === '1'; // standaard AAN
+}
+function _setCompassOffsetEnabled(on) {
+  localStorage.setItem(COMPASS_OFFSET_ENABLED_KEY, on ? '1' : '0');
+}
+
+// Huidige schermrotatie t.o.v. de "natuurlijke" stand van het toestel (module-breed herbruikbaar).
+function _getScreenAngle() {
+  if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+  if (typeof window.orientation === 'number') return window.orientation; // oudere iOS
+  return 0;
+}
+
+// Doorlopende richtingmeting (géén 3s-gemiddelde): kiest 1 bron en levert live updates,
+// voor gebruik in de waaier-kalibratie hieronder. Retourneert een stopfunctie.
+function _startLiveHeading(onHeading) {
+  // Fix 206: bestTrust kan alleen OPWAARTS veranderen — eenmaal een betrouwbare
+  // (echt-noord) meting gezien, wordt een toevallig eerder binnengekomen minder
+  // betrouwbare meting niet meer gebruikt. Voorkomt willekeurige "verkeerde bron wint"-fouten.
+  let bestTrust = 0;
+  const screenAngle = _getScreenAngle();
+  const onIOS = (e) => {
+    if (e.webkitCompassHeading == null) return;
+    if (3 < bestTrust) return;
+    bestTrust = 3;
+    onHeading(((e.webkitCompassHeading % 360) + 360) % 360);
+  };
+  const onAbsolute = (e) => {
+    if (!e.absolute || e.alpha == null) return;
+    if (2 < bestTrust) return;
+    bestTrust = 2;
+    onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
+  };
+  const onRelative = (e) => {
+    if (e.alpha == null) return;
+    const trust = e.absolute ? 2 : 1;
+    if (trust < bestTrust) return;
+    bestTrust = trust;
+    onHeading(((360 - e.alpha + screenAngle) % 360 + 360) % 360);
+  };
+  window.addEventListener('deviceorientation', onIOS, true);
+  window.addEventListener('deviceorientationabsolute', onAbsolute, true);
+  window.addEventListener('deviceorientation', onRelative, true);
+  return function stop() {
+    window.removeEventListener('deviceorientation', onIOS, true);
+    window.removeEventListener('deviceorientationabsolute', onAbsolute, true);
+    window.removeEventListener('deviceorientation', onRelative, true);
+  };
+}
+
+// Fix 204: draaibare waaier-kalibratie — blauwe waaier toont live waar het toestel nu naar wijst,
+// gele pijl sleep je zelf naar de bekende juiste richting; het verschil wordt de opgeslagen correctie.
+function openCompassCalibModal(onApplied) {
+  const existing = document.getElementById('compass-calib-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'compass-calib-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:18px 20px;width:320px;max-width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 6px;font-size:15px;color:#0f172a">🧭 Kompas kalibreren</h3>
+      <p style="font-size:11.5px;color:#64748b;margin:0 0 12px;line-height:1.5">
+        Houd je telefoon plat en richt de bovenkant op een punt waarvan je de richting zeker weet (bv. je garage).
+        Sleep de <strong style="color:#b45309">gele pijl</strong> tot die naar datzelfde punt wijst als je telefoon nu ligt.
+      </p>
+      <svg id="calib-dial" width="230" height="230" viewBox="0 0 230 230" style="touch-action:none;user-select:none;cursor:grab">
+        <circle cx="115" cy="115" r="105" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2"/>
+        <circle cx="115" cy="115" r="70" fill="none" stroke="#e2e8f0" stroke-width="1"/>
+        <text x="115" y="24" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">N</text>
+        <text x="206" y="120" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">O</text>
+        <text x="115" y="212" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">Z</text>
+        <text x="24" y="120" text-anchor="middle" font-size="13" fill="#94a3b8" font-weight="600">W</text>
+        <g id="calib-live-wedge"><path d="M 115 115 L 98 38 A 19 19 0 0 1 132 38 Z" fill="#3b82f6" opacity="0.45"/></g>
+        <g id="calib-target-arrow">
+          <line x1="115" y1="115" x2="115" y2="32" stroke="#d97706" stroke-width="4" stroke-linecap="round"/>
+          <polygon points="115,17 105,38 125,38" fill="#d97706"/>
+        </g>
+        <circle cx="115" cy="115" r="7" fill="#0f172a"/>
+      </svg>
+      <div style="display:flex;justify-content:center;gap:16px;margin-top:6px;font-size:11px;color:#475569">
+        <div><span style="display:inline-block;width:10px;height:10px;background:#3b82f6;opacity:.6;border-radius:2px;vertical-align:middle"></span> kompas nu</div>
+        <div><span style="display:inline-block;width:10px;height:10px;background:#d97706;border-radius:2px;vertical-align:middle"></span> jouw richting</div>
+      </div>
+      <div id="calib-diff" style="font-size:16px;font-weight:700;margin-top:10px;color:#0f172a">Correctie: 0°</div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button id="calib-cancel" style="flex:1;padding:9px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Annuleren</button>
+        <button id="calib-apply" style="flex:1;padding:9px;border-radius:8px;border:none;background:#0aa879;color:#fff;font-size:13px;font-weight:600;cursor:pointer">Gebruik correctie</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const svg         = modal.querySelector('#calib-dial');
+  const liveWedgeEl = modal.querySelector('#calib-live-wedge');
+  const targetEl    = modal.querySelector('#calib-target-arrow');
+  const diffEl      = modal.querySelector('#calib-diff');
+
+  let liveHeading   = 0;
+  let targetHeading = 0; // start bovenaan (noord); gebruiker sleept naar de juiste richting
+
+  function updateDiff() {
+    const diff = Math.round(((targetHeading - liveHeading + 540) % 360) - 180);
+    diffEl.textContent = `Correctie: ${diff > 0 ? '+' : ''}${diff}°`;
+    return diff;
+  }
+  function renderLive()   { liveWedgeEl.setAttribute('transform', `rotate(${liveHeading} 115 115)`); updateDiff(); }
+  function renderTarget() { targetEl.setAttribute('transform', `rotate(${targetHeading} 115 115)`); updateDiff(); }
+  renderLive(); renderTarget();
+
+  let stopLive = null;
+  function beginLive() { stopLive = _startLiveHeading((h) => { liveHeading = h; renderLive(); }); }
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission().then(state => { if (state === 'granted') beginLive(); }).catch(() => {});
+  } else if (typeof DeviceOrientationEvent !== 'undefined') {
+    beginLive();
+  }
+
+  // Sleep-interactie: gele pijl volgt vinger/muis rondom het middelpunt.
+  function angleFromEvent(ev) {
+    const rect = svg.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    const p = ev.touches ? ev.touches[0] : ev;
+    const x = p.clientX - cx, y = p.clientY - cy;
+    const deg = Math.atan2(x, -y) * 180 / Math.PI; // 0° = boven (noord), rechtsom oplopend
+    return ((deg % 360) + 360) % 360;
+  }
+  let dragging = false;
+  function onDragStart(ev) { dragging = true; svg.style.cursor = 'grabbing'; onDragMove(ev); ev.preventDefault(); }
+  function onDragMove(ev) {
+    if (!dragging) return;
+    targetHeading = Math.round(angleFromEvent(ev));
+    renderTarget();
+    ev.preventDefault();
+  }
+  function onDragEnd() { dragging = false; svg.style.cursor = 'grab'; }
+  svg.addEventListener('mousedown', onDragStart);
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('mouseup', onDragEnd);
+  svg.addEventListener('touchstart', onDragStart, { passive: false });
+  window.addEventListener('touchmove', onDragMove, { passive: false });
+  window.addEventListener('touchend', onDragEnd);
+
+  function cleanup() {
+    if (stopLive) stopLive();
+    svg.removeEventListener('mousedown', onDragStart);
+    window.removeEventListener('mousemove', onDragMove);
+    window.removeEventListener('mouseup', onDragEnd);
+    svg.removeEventListener('touchstart', onDragStart);
+    window.removeEventListener('touchmove', onDragMove);
+    window.removeEventListener('touchend', onDragEnd);
+    modal.remove();
+  }
+  modal.querySelector('#calib-cancel').addEventListener('click', cleanup);
+  modal.querySelector('#calib-apply').addEventListener('click', () => {
+    const diff = updateDiff();
+    _setCompassOffsetLocal(diff);
+    cleanup();
+    onApplied?.();
+  });
+  modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
+}
+
 // ── Gestylde modal: stopwatch + afstand ──────────────────────────────────
 function _openSightLineModal(potLatLng, onConfirm) {
   const existing = document.getElementById('sightline-modal');
@@ -1743,8 +1997,29 @@ function _openSightLineModal(potLatLng, onConfirm) {
           <input id="sl-bearing" type="number" min="0" max="359" placeholder="0–359"
             style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
           <button id="sl-compass" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #64748b;background:#f8fafc;color:#475569;font-size:11px;cursor:pointer">🧭 Gebruik kompas</button>
+          <details id="sl-comp-details" style="margin-top:6px">
+            <summary style="cursor:pointer;font-size:11px;color:#64748b;user-select:none;padding:2px 0">⚙️ Kalibratie-instellingen</summary>
+            <div style="margin-top:6px">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;cursor:pointer;margin-bottom:4px">
+                <input type="checkbox" id="sl-comp-enabled"/>
+                <span>Correctie toepassen</span>
+              </label>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;text-align:center">Correctie voor dit toestel</div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <button type="button" id="sl-comp-m5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">−5</button>
+                <button type="button" id="sl-comp-m1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">−1</button>
+                <div id="sl-comp-val" style="flex:1;text-align:center;font-size:13px;font-weight:600;color:#0f172a">0°</div>
+                <button type="button" id="sl-comp-p1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">+1</button>
+                <button type="button" id="sl-comp-p5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">+5</button>
+              </div>
+              <button type="button" id="sl-comp-reset" style="margin-top:4px;width:100%;padding:4px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;font-size:10px;cursor:pointer">Reset naar 0°</button>
+              <button type="button" id="sl-comp-calib" style="margin-top:5px;width:100%;padding:6px;border-radius:6px;border:1px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;cursor:pointer">🎯 Nauwkeurig kalibreren (waaier)</button>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Wil je zien wat het kompas ruw meet, zónder correctie? Zet "Correctie toepassen" uit. Loopt de lijn steeds naar dezelfde kant af? Zet 'm weer aan en stel bij met −/+ of "Nauwkeurig kalibreren".</div>
+            </div>
+          </details>
         </div>
       </div>
+
       <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
 
       <!-- Richting label -->
@@ -1785,6 +2060,32 @@ function _openSightLineModal(potLatLng, onConfirm) {
   const bearingInp = modal.querySelector('#sl-bearing');
   const bearingLbl = modal.querySelector('#sl-bearing-label');
   const btnCompass = modal.querySelector('#sl-compass');
+
+  // ── Correctie voor dit toestel (Fix 203: lokaal, met werkende +/− knoppen i.p.v. typen) ──
+  const compValEl = modal.querySelector('#sl-comp-val');
+  const compEnabledEl = modal.querySelector('#sl-comp-enabled');
+  function renderCompVal(){
+    const v = _getCompassOffsetLocal();
+    compValEl.textContent = (v > 0 ? '+' : '') + v + '°';
+    compValEl.style.color = _isCompassOffsetEnabled() ? '#0f172a' : '#cbd5e1';
+  }
+  function bumpCompOffset(delta){
+    const v = _getCompassOffsetLocal() + delta;
+    _setCompassOffsetLocal(v);
+    renderCompVal();
+  }
+  compEnabledEl.checked = _isCompassOffsetEnabled();
+  compEnabledEl.addEventListener('change', () => {
+    _setCompassOffsetEnabled(compEnabledEl.checked);
+    renderCompVal();
+  });
+  renderCompVal();
+  modal.querySelector('#sl-comp-m5')?.addEventListener('click', () => bumpCompOffset(-5));
+  modal.querySelector('#sl-comp-m1')?.addEventListener('click', () => bumpCompOffset(-1));
+  modal.querySelector('#sl-comp-p1')?.addEventListener('click', () => bumpCompOffset(1));
+  modal.querySelector('#sl-comp-p5')?.addEventListener('click', () => bumpCompOffset(5));
+  modal.querySelector('#sl-comp-reset')?.addEventListener('click', () => { _setCompassOffsetLocal(0); renderCompVal(); });
+  modal.querySelector('#sl-comp-calib')?.addEventListener('click', () => openCompassCalibModal(renderCompVal));
 
   function fmtTime(s){ return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
   function updateInfo(secs){
@@ -1849,11 +2150,14 @@ function _openSightLineModal(potLatLng, onConfirm) {
   });
 
   // ── Kompas (DeviceOrientationEvent) met middeling ──────────────────────
-  let compassHandler = null;
-  let compassActive  = false;
-  let compassReadings = [];
-  let compassTimer    = null;
-  const COMPASS_SECS  = 3;
+  // Fix 200: gebruik nog maar 1 bron per meting (i.p.v. absolute+relatief door elkaar),
+  // en compenseer voor schermrotatie (portret/liggend) zodat de richting klopt.
+  let compassHandler   = null;
+  let compassActive    = false;
+  let compassReadings  = [];
+  let compassTimer     = null;
+  let compassSourceUsed = null; // 'ios' | 'absolute' | 'relative'
+  const COMPASS_SECS   = 3;
 
   function circularMean(angles) {
     let sinSum = 0, cosSum = 0;
@@ -1865,14 +2169,21 @@ function _openSightLineModal(potLatLng, onConfirm) {
     return ((mean % 360) + 360) % 360;
   }
 
+  // Huidige schermrotatie t.o.v. de "natuurlijke" stand van het toestel.
+  function getScreenAngle() {
+    if (screen.orientation && typeof screen.orientation.angle === 'number') return screen.orientation.angle;
+    if (typeof window.orientation === 'number') return window.orientation; // oudere iOS
+    return 0;
+  }
+
   function startCompass(){
     if(compassActive) { stopCompass(); return; }
     const doStart = () => {
-      compassActive = true; compassReadings = [];
+      compassActive = true; compassReadings = []; compassSourceUsed = null;
       btnCompass.textContent = `🧭 Meten… ${COMPASS_SECS}s`;
       btnCompass.style.background = '#fef3c7';
       btnCompass.style.borderColor = '#f59e0b';
-      bearingLbl.textContent = '🧭 Houd telefoon horizontaal, bovenkant naar nest…';
+      bearingLbl.textContent = '🧭 Houd de telefoon plat (horizontaal), bovenkant/camera wijst naar het nest…';
       bearingLbl.style.color = '#f59e0b';
 
       let remaining = COMPASS_SECS;
@@ -1882,36 +2193,65 @@ function _openSightLineModal(potLatLng, onConfirm) {
           btnCompass.textContent = `🧭 Meten… ${remaining}s`;
         } else {
           clearInterval(compassTimer); compassTimer = null;
-          if (compassReadings.length > 0) {
-            const avg = circularMean(compassReadings);
-            const h   = Math.round(avg);
+          // Fix 206: gebruik alleen de metingen van de BESTE bron die binnenkwam
+          // (niet zomaar de eerst-binnengekomen bron — die kan toevallig de minder
+          // betrouwbare zijn geweest, wat eerder tot afwijkingen van tientallen graden leidde).
+          const bestTrust = compassReadings.reduce((m,r)=>Math.max(m,r.trust), 0);
+          const best = compassReadings.filter(r => r.trust === bestTrust);
+          if (best.length > 0) {
+            const avg = circularMean(best.map(r=>r.h));
+            const offsetOn = _isCompassOffsetEnabled();
+            const offset = offsetOn ? _getCompassOffsetLocal() : 0;
+            const h   = Math.round((avg + offset + 360) % 360);
             bearingInp.value = h;
-            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${compassReadings.length} metingen)`;
+            const srcTxt = bestTrust===1 ? ' ⚠️ minder nauwkeurige bron' : '';
+            const offsetTxt = !offsetOn ? ', correctie UIT (ruwe meting)' : (offset ? `, correctie ${offset>0?'+':''}${offset}°` : '');
+            bearingLbl.textContent = '✅ ' + bearingToLabel(h) + ` (gem. van ${best.length} metingen${offsetTxt})${srcTxt}`;
             bearingLbl.style.color = '#0aa879';
           } else {
-            bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen';
+            bearingLbl.textContent = '⚠️ Geen kompasdata ontvangen — kalibreer kompas (8-vorm bewegen) en probeer opnieuw';
             bearingLbl.style.color = '#f59e0b';
           }
           stopCompass();
         }
       }, 1000);
 
-      compassHandler = (e) => {
-        let heading = null;
-        if (e.webkitCompassHeading != null) {
-          heading = e.webkitCompassHeading;
-        } else if (e.absolute && e.alpha != null) {
-          heading = (360 - e.alpha + 360) % 360;
-        } else if (e.alpha != null) {
-          heading = (360 - e.alpha + 360) % 360;
-        }
-        if (heading == null) return;
-        compassReadings.push(heading);
-        const preview = Math.round(circularMean(compassReadings));
-        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${compassReadings.length} metingen…)`;
+      // Fix 206: alle bronnen worden verzameld MET een betrouwbaarheids-label (trust).
+      // We kiezen achteraf de hoogste beschikbare trust i.p.v. de eerst-binnengekomen bron te fixeren.
+      // trust: iOS webkitCompassHeading = 3 (altijd echt-noord), deviceorientationabsolute = 2 (echt-noord),
+      //        losse deviceorientation zonder absolute-vlag = 1 (kan onbetrouwbaar/relatief zijn).
+      const screenAngle = getScreenAngle();
+
+      const onIOS = (e) => {
+        if (e.webkitCompassHeading == null) return;
+        pushReading(e.webkitCompassHeading, 3);
       };
-      window.addEventListener('deviceorientationabsolute', compassHandler, true);
-      window.addEventListener('deviceorientation',         compassHandler, true);
+      const onAbsolute = (e) => {
+        if (!e.absolute || e.alpha == null) return;
+        let heading = (360 - e.alpha + screenAngle + 360) % 360;
+        pushReading(heading, 2);
+      };
+      const onRelative = (e) => {
+        if (e.alpha == null) return;
+        // Sommige toestellen geven via dit event ook al absolute (echt-noord) data —
+        // reken dat dan als trust 2 i.p.v. 1, ook al kwam het niet via het 'absolute' event.
+        let heading = (360 - e.alpha + screenAngle + 360) % 360;
+        pushReading(heading, e.absolute ? 2 : 1);
+      };
+      function pushReading(heading, trust){
+        compassSourceUsed = trust;
+        compassReadings.push({ h: ((heading % 360) + 360) % 360, trust });
+        const bestTrust = compassReadings.reduce((m,r)=>Math.max(m,r.trust), 0);
+        const best = compassReadings.filter(r => r.trust === bestTrust);
+        const preview = Math.round(circularMean(best.map(r=>r.h)));
+        const warn = bestTrust===1 ? ' ⚠️ minder nauwkeurig' : '';
+        bearingLbl.textContent = `🧭 ${bearingToLabel(preview)} (${best.length} metingen…)${warn}`;
+      }
+
+      compassHandler = { onIOS, onAbsolute, onRelative };
+      window.addEventListener('deviceorientation', onIOS, true);
+      window.addEventListener('deviceorientationabsolute', onAbsolute, true);
+      window.addEventListener('deviceorientation', onRelative, true);
     };
 
     if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -1930,8 +2270,9 @@ function _openSightLineModal(potLatLng, onConfirm) {
   function stopCompass(){
     if (compassTimer) { clearInterval(compassTimer); compassTimer = null; }
     if (compassHandler) {
-      window.removeEventListener('deviceorientationabsolute', compassHandler, true);
-      window.removeEventListener('deviceorientation',         compassHandler, true);
+      window.removeEventListener('deviceorientation', compassHandler.onIOS, true);
+      window.removeEventListener('deviceorientationabsolute', compassHandler.onAbsolute, true);
+      window.removeEventListener('deviceorientation', compassHandler.onRelative, true);
       compassHandler = null;
     }
     compassActive = false;
@@ -2214,9 +2555,20 @@ function openUnifiedContextMenu(opts){
         const layer = opts.polygonLayer;
         if(layer.pm?.enabled()) {
           layer.pm.disable();
+          if(layer._pmEndEditHandler){ layer.off('dblclick', layer._pmEndEditHandler); layer._pmEndEditHandler=null; }
           persistPolygon(layer);
         } else {
           layer.pm.enable();
+          // Fix 201: dubbelklik binnen de polygoon beëindigt het bewerken (i.p.v. alleen via het menu)
+          const endEdit = (ev) => {
+            L.DomEvent.stopPropagation(ev);
+            layer.pm.disable();
+            layer.off('dblclick', endEdit);
+            layer._pmEndEditHandler = null;
+            persistPolygon(layer);
+          };
+          layer._pmEndEditHandler = endEdit;
+          layer.on('dblclick', endEdit);
         }
       }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
@@ -2759,6 +3111,7 @@ async function boot(){
   await _loadFlightSettings();
   initMap();
   initUIBindings();
+  initWakeLock();
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
   // Jaar dropdown vullen: 2020 t/m huidig jaar (nieuwste bovenaan)
