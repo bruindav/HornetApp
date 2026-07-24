@@ -13,6 +13,46 @@
 
 const CHANGELOG = [
   {
+    version: 'Fix 208', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Polygoon bewerken afsluiten via dubbelklik werkt nu betrouwbaar — checkt of de klik echt binnen de vorm valt, ook als het vlak tijdens bewerken tijdelijk niet-interactief is'
+  },
+  {
+    version: 'Fix 207', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Kalibratie-instellingen bij de zichtlijn zitten nu onder een inklapbaar "⚙️ Kalibratie-instellingen" kopje — popup blijft compact op kleine schermen'
+  },
+  {
+    version: 'Fix 206', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Kompasmeting flink nauwkeuriger: gebruikt altijd de meest betrouwbare sensorbron i.p.v. toevallig de eerst-binnenkomende. Vast N/Z-kompasje rechtsboven op de kaart toegevoegd'
+  },
+  {
+    version: 'Fix 205', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Kompascorrectie kan nu aan/uit gezet worden bij het meten van een zichtlijn (handig om de ruwe meting te zien) · Reset-knop toegevoegd'
+  },
+  {
+    version: 'Fix 204', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Nieuwe waaier-kalibratie voor het kompas: sleep de pijl naar de richting die je zelf weet te kloppen, de correctie wordt automatisch berekend'
+  },
+  {
+    version: 'Fix 203', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Kompascorrectie is per toestel (elk toestel heeft een eigen afwijking) · Negatieve correctiewaarde werkt nu ook op mobiel (stapknoppen i.p.v. typen)'
+  },
+  {
+    version: 'Fix 201', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'In-/uitzoomen gaat geleidelijker (ook tussenliggende niveaus, handig voor exacte screenshots) · Polygoon bewerken kan afgesloten worden met dubbelklik in de vorm'
+  },
+  {
+    version: 'Fix 200', date: '2026-07-24',
+    category: 'Kaart',
+    text: 'Kompas bij zichtlijn is een stuk nauwkeuriger · Snap-functie polygonen verbeterd (gebieden sluiten makkelijker naadloos aan) · Nieuw: scherm actief houden tijdens gebruik'
+  },
+  {
     version: 'Fix 166', date: '2026-03-22',
     category: 'Algemeen',
     text: 'Demo account (demo@hoornaarzoeken.nl) toont welkomstpopup bij inloggen met uitleg over Wageningen en Rhenen als testgebieden'

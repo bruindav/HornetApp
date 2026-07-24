@@ -1,4 +1,4 @@
-// app-core.js — Fix 207
+// app-core.js — Fix 208
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2492,6 +2492,26 @@ async function _copyPolygonToYear(layer){
   };
 }
 
+// Fix 208: bepaalt of een lat/lng-punt binnen een polygoonlaag valt (ray-casting op de buitenring).
+// Nodig omdat Geoman de polygoon-vlakken tijdens bewerken vaak niet-interactief maakt,
+// waardoor een gewone layer.on('dblclick', …) niet meer afgaat op klikken middenin de vorm.
+function _pointInPolygonLayer(latlng, layer) {
+  try {
+    let ring = layer.getLatLngs();
+    while (Array.isArray(ring) && ring.length && Array.isArray(ring[0])) ring = ring[0];
+    if (!Array.isArray(ring) || ring.length < 3) return layer.getBounds().contains(latlng);
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const xi = ring[i].lng, yi = ring[i].lat;
+      const xj = ring[j].lng, yj = ring[j].lat;
+      const intersect = ((yi > latlng.lat) !== (yj > latlng.lat)) &&
+        (latlng.lng < (xj - xi) * (latlng.lat - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  } catch { return layer.getBounds().contains(latlng); }
+}
+
 function persistPolygon(layer){
   const id = layer._props?.id || genId('poly'); layer._props.id = id;
   const latlngs = layer.getLatLngs().flat(3).map(p=>({lat:p.lat,lng:p.lng}));
@@ -2555,20 +2575,23 @@ function openUnifiedContextMenu(opts){
         const layer = opts.polygonLayer;
         if(layer.pm?.enabled()) {
           layer.pm.disable();
-          if(layer._pmEndEditHandler){ layer.off('dblclick', layer._pmEndEditHandler); layer._pmEndEditHandler=null; }
+          if(layer._pmEndEditHandler){ map.off('dblclick', layer._pmEndEditHandler); layer._pmEndEditHandler=null; }
           persistPolygon(layer);
         } else {
           layer.pm.enable();
-          // Fix 201: dubbelklik binnen de polygoon beëindigt het bewerken (i.p.v. alleen via het menu)
+          // Fix 208: luister op de KAART i.p.v. op de polygoonlaag zelf — tijdens bewerken
+          // maakt Geoman het vlak van de polygoon vaak niet-interactief (alleen de hoekpunten
+          // reageren dan nog), waardoor een dubbelklik middenin de vorm de laag nooit bereikte.
           const endEdit = (ev) => {
-            L.DomEvent.stopPropagation(ev);
+            if (!_pointInPolygonLayer(ev.latlng, layer)) return; // buiten deze polygoon: negeren, gewoon laten inzoomen
+            if (ev.originalEvent) L.DomEvent.preventDefault(ev.originalEvent);
             layer.pm.disable();
-            layer.off('dblclick', endEdit);
+            map.off('dblclick', endEdit);
             layer._pmEndEditHandler = null;
             persistPolygon(layer);
           };
           layer._pmEndEditHandler = endEdit;
-          layer.on('dblclick', endEdit);
+          map.on('dblclick', endEdit);
         }
       }
       else if(act==='poly_copy'){ _copyPolygonToYear(opts.polygonLayer); }
