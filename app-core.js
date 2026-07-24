@@ -1,4 +1,4 @@
-// app-core.js — Fix 208
+// app-core.js — Fix 209
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -18,6 +18,7 @@ let _currentDisplayName = '';
 let _currentRole   = '';
 let _currentZones  = [];   // genormaliseerde zones van ingelogde gebruiker
 let _zoneManagers  = {};   // { 'Zeist': 'Jan de Vries', ... } — geladen bij boot
+let _simpleModeDefault = false; // Fix 209: door beheer ingestelde standaard (roles/{uid}.simpleMode)
 function canEdit()   { return _currentRole === 'admin' || _currentRole === 'manager'; }  // polygonen/gebieden
 function getZoneManagerName(zoneId) {
   const z = normalizeZone(zoneId || '') || normalizeZone($('sel-group')?.value || DEFAULT_GROUP);
@@ -453,6 +454,7 @@ function initUIBindings(){
   updateHeaderHeightVar();
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
   document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
+  document.getElementById('btn-simple-mode')?.addEventListener('click', () => _swShowFromSidebar());
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -3129,6 +3131,312 @@ function _showDemoWelcome() {
   modal.addEventListener('click', e => { if(e.target === modal) modal.remove(); });
 }
 
+// ======================= Fix 209: Eenvoudige modus (wizard) =======================
+// Volledig los bovenop de bestaande app: kaart/sidebar blijven gewoon geladen op de
+// achtergrond, er komt alleen een full-screen overlay overheen. Zo is "Expert modus"
+// direct beschikbaar zonder herladen — precies andersom (van simpel naar expert) werkt hetzelfde.
+
+const SW_MODE_KEY = 'hornetapp_mode_override'; // 'simple' | 'expert' | niet gezet = volg profielinstelling
+
+function _swGetOverride() {
+  const v = localStorage.getItem(SW_MODE_KEY);
+  return (v === 'simple' || v === 'expert') ? v : null;
+}
+function _swSetOverride(mode) {
+  if (mode) localStorage.setItem(SW_MODE_KEY, mode);
+  else localStorage.removeItem(SW_MODE_KEY);
+}
+function _swEffectiveSimple() {
+  const ov = _swGetOverride();
+  if (ov) return ov === 'simple';
+  return _simpleModeDefault;
+}
+
+const SW_TYPES = {
+  hoornaar: { label: 'Waarneming — ik zag een hoornaar', icon: '🐝' },
+  val:      { label: 'Val geplaatst',                     icon: '🪤' },
+  lokpot:   { label: 'Lokpot geplaatst',                  icon: '🍯' },
+  nest:     { label: 'Nest gevonden',                     icon: '🪺' },
+};
+const SW_STEP_NR = { type:1, location:2, location_confirm:2, location_map:2, detail:3, note:4, confirm:5 };
+const SW_STEP_TOTAL = 5;
+
+let _sw = null; // wizard-status; null = niet actief
+
+function _swEnsureDom() {
+  if (document.getElementById('simple-wizard-overlay')) return;
+  const el = document.createElement('div');
+  el.id = 'simple-wizard-overlay';
+  el.style.cssText = 'position:fixed;inset:0;z-index:8000;background:#f1f5f9;display:none;flex-direction:column;'
+    + 'font-family:inherit;-webkit-tap-highlight-color:transparent';
+  el.innerHTML = `
+    <div id="sw-header" style="flex:0 0 auto;padding:14px 14px;background:#0aa879;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <button id="sw-back" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:9px 14px;border-radius:9px;font-size:15px;font-weight:600;cursor:pointer">‹ Terug</button>
+      <div id="sw-progress" style="font-size:13px;opacity:.95;font-weight:700"></div>
+      <button id="sw-expert" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:9px 12px;border-radius:9px;font-size:12px;cursor:pointer">Expert modus →</button>
+    </div>
+    <div id="sw-body" style="flex:1;overflow-y:auto;padding:22px 18px 40px;display:flex;flex-direction:column;gap:14px"></div>`;
+  document.body.appendChild(el);
+  el.querySelector('#sw-expert').addEventListener('click', () => { _swSetOverride('expert'); _swHide(); });
+  el.querySelector('#sw-back').addEventListener('click', () => _swBack());
+}
+
+function _swApplyMode() {
+  _swEnsureDom();
+  const overlay = document.getElementById('simple-wizard-overlay');
+  if (!overlay) return;
+  if (_swEffectiveSimple()) { overlay.style.display = 'flex'; _swStart(); }
+  else { overlay.style.display = 'none'; }
+}
+function _swHide() {
+  const overlay = document.getElementById('simple-wizard-overlay');
+  if (overlay) overlay.style.display = 'none';
+}
+// Aanroepbaar vanuit de zijbalk om terug te schakelen naar eenvoudige modus
+function _swShowFromSidebar() {
+  _swSetOverride('simple');
+  const overlay = document.getElementById('simple-wizard-overlay');
+  if (overlay) { overlay.style.display = 'flex'; _swStart(); }
+}
+
+function _swStart() {
+  _sw = { stack: [], current: 'type', type: null, latlng: null, address: null, detail: {}, note: '' };
+  _swRender();
+}
+function _swGoto(step) {
+  if (_sw.current) _sw.stack.push(_sw.current);
+  _sw.current = step;
+  _swRender();
+}
+function _swBack() {
+  if (!_sw || !_sw.stack.length) return;
+  _sw.current = _sw.stack.pop();
+  _swRender();
+}
+function _swBody() { return document.getElementById('sw-body'); }
+
+function _swBigButton(label, icon, onClick, extraStyle='') {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.style.cssText = 'width:100%;padding:20px 16px;border-radius:14px;border:2px solid #cbd5e1;background:#fff;'
+    + 'color:#0f172a;font-size:19px;font-weight:700;display:flex;align-items:center;gap:14px;cursor:pointer;'
+    + 'text-align:left;box-shadow:0 1px 3px rgba(0,0,0,.08);' + extraStyle;
+  btn.innerHTML = `<span style="font-size:30px;line-height:1;flex:0 0 auto">${icon}</span><span>${label}</span>`;
+  btn.addEventListener('click', onClick);
+  return btn;
+}
+function _swTitle(text) {
+  const h = document.createElement('div');
+  h.style.cssText = 'font-size:23px;font-weight:800;color:#0f172a;line-height:1.25';
+  h.textContent = text;
+  return h;
+}
+function _swSubtitle(text) {
+  const p = document.createElement('div');
+  p.style.cssText = 'font-size:15px;color:#64748b;margin-top:-8px';
+  p.textContent = text;
+  return p;
+}
+async function _swLookupAddress(latlng) {
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latlng.lat}&lon=${latlng.lng}&format=json&addressdetails=1`, { headers: { 'Accept-Language': 'nl' } });
+    const d = await r.json();
+    const a = d.address || {};
+    const road = a.road || a.pedestrian || a.path || '';
+    const nr   = a.house_number || '';
+    const city = a.city || a.town || a.village || a.hamlet || '';
+    return [road + (nr ? ' ' + nr : ''), city].filter(Boolean).join(', ') || null;
+  } catch { return null; }
+}
+
+function _swRender() {
+  const body = _swBody();
+  if (!body || !_sw) return;
+  body.innerHTML = '';
+  const backBtn = document.getElementById('sw-back');
+  if (backBtn) backBtn.style.visibility = _sw.stack.length ? 'visible' : 'hidden';
+  const progEl = document.getElementById('sw-progress');
+  if (progEl) progEl.textContent = (_sw.current === 'success') ? '' : `Stap ${SW_STEP_NR[_sw.current] || 1} van ${SW_STEP_TOTAL}`;
+
+  const renderers = {
+    type: _swRenderType, location: _swRenderLocation, location_confirm: _swRenderLocationConfirm,
+    location_map: _swRenderLocationMap, detail: _swRenderDetail, note: _swRenderNote,
+    confirm: _swRenderConfirm, success: _swRenderSuccess,
+  };
+  (renderers[_sw.current] || _swRenderType)(body);
+}
+
+function _swRenderType(body) {
+  body.appendChild(_swTitle('Wat wil je melden?'));
+  body.appendChild(_swSubtitle('Kies wat het beste past.'));
+  Object.entries(SW_TYPES).forEach(([type, meta]) => {
+    body.appendChild(_swBigButton(meta.label, meta.icon, () => { _sw.type = type; _swGoto('location'); }));
+  });
+}
+
+function _swRenderLocation(body) {
+  body.appendChild(_swTitle('Waar is dit?'));
+  body.appendChild(_swSubtitle('Sta je er nu bij? Gebruik dan gewoon je huidige locatie.'));
+  const statusEl = document.createElement('div');
+  statusEl.style.cssText = 'font-size:15px;color:#475569;min-height:20px';
+  body.appendChild(_swBigButton('Gebruik mijn huidige locatie', '📍', () => {
+    statusEl.textContent = '🔄 Locatie zoeken…';
+    if (!navigator.geolocation) { statusEl.textContent = '⚠️ Geen locatie beschikbaar op dit toestel — wijs de plek zelf aan.'; return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        _sw.latlng = L.latLng(pos.coords.latitude, pos.coords.longitude);
+        _sw.address = null;
+        _swGoto('location_confirm');
+        _swLookupAddress(_sw.latlng).then(addr => { _sw.address = addr; if (_sw.current === 'location_confirm') _swRender(); });
+      },
+      () => { statusEl.textContent = '⚠️ Kon geen locatie vinden. Wijs de plek zelf aan op de kaart.'; },
+      { enableHighAccuracy: true, timeout: 12000 }
+    );
+  }, 'border-color:#0aa879'));
+  body.appendChild(_swBigButton('Ik wijs het zelf aan op de kaart', '🗺️', () => _swGoto('location_map')));
+  body.appendChild(statusEl);
+}
+
+function _swRenderLocationConfirm(body) {
+  body.appendChild(_swTitle('Klopt deze locatie?'));
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border:2px solid #0aa879;border-radius:14px;padding:18px;font-size:17px;color:#0f172a;display:flex;gap:12px;align-items:flex-start';
+  const addrTxt = _sw.address || (_sw.latlng ? `${_sw.latlng.lat.toFixed(5)}, ${_sw.latlng.lng.toFixed(5)}` : '📍 adres ophalen…');
+  card.innerHTML = `<span style="font-size:26px;flex:0 0 auto">📍</span><span>${addrTxt}</span>`;
+  body.appendChild(card);
+  body.appendChild(_swBigButton('Ja, dit is de juiste plek', '✅', () => _swGoto('detail'), 'border-color:#0aa879;background:#0aa879;color:#fff'));
+  body.appendChild(_swBigButton('Nee, ik wijs het zelf aan', '🗺️', () => _swGoto('location_map')));
+}
+
+function _swRenderLocationMap(body) {
+  body.appendChild(_swTitle('Wijs de plek aan'));
+  body.appendChild(_swSubtitle('Schuif de kaart tot de pin op de juiste plek staat.'));
+  const mapWrap = document.createElement('div');
+  mapWrap.style.cssText = 'position:relative;flex:1;min-height:320px;border-radius:14px;overflow:hidden;border:2px solid #cbd5e1';
+  const mapDiv = document.createElement('div');
+  mapDiv.id = 'sw-pick-map';
+  mapDiv.style.cssText = 'width:100%;height:100%;min-height:320px';
+  mapWrap.appendChild(mapDiv);
+  const pin = document.createElement('div');
+  pin.style.cssText = 'position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);font-size:38px;'
+    + 'pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))';
+  pin.textContent = '📍';
+  mapWrap.appendChild(pin);
+  body.appendChild(mapWrap);
+
+  const startCenter = _sw.latlng || (map ? map.getCenter() : L.latLng(52.1, 5.3));
+  const pickMap = L.map('sw-pick-map', { zoomControl: true, attributionControl: false }).setView(startCenter, _sw.latlng ? 17 : 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(pickMap);
+  setTimeout(() => pickMap.invalidateSize(), 60);
+  if (!_sw.latlng && navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => { pickMap.setView([pos.coords.latitude, pos.coords.longitude], 17); }, () => {}, { timeout: 8000 });
+  }
+
+  body.appendChild(_swBigButton('Bevestig deze plek', '✅', () => {
+    const center = pickMap.getCenter();
+    _sw.latlng = center;
+    _sw.address = null;
+    _swGoto('detail');
+    _swLookupAddress(center).then(addr => { _sw.address = addr; });
+  }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+}
+
+function _swRenderDetail(body) {
+  if (_sw.type === 'hoornaar') return _swRenderDetailAantal(body);
+  if (_sw.type === 'lokpot')   return _swRenderDetailSender(body);
+  if (_sw.type === 'val')      return _swRenderDetailValtype(body);
+  if (_sw.type === 'nest')     return _swRenderDetailNesttype(body);
+  _swGoto('note');
+}
+function _swRenderDetailAantal(body) {
+  body.appendChild(_swTitle('Hoeveel hoornaars zag je?'));
+  let n = _sw.detail.aantal || 1;
+  const counter = document.createElement('div');
+  counter.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:26px;margin:14px 0';
+  counter.innerHTML = `
+    <button type="button" id="sw-aantal-min" style="width:58px;height:58px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;font-size:30px;cursor:pointer;line-height:1">−</button>
+    <div id="sw-aantal-val" style="font-size:42px;font-weight:800;min-width:64px;text-align:center">${n}</div>
+    <button type="button" id="sw-aantal-plus" style="width:58px;height:58px;border-radius:50%;border:2px solid #cbd5e1;background:#fff;font-size:30px;cursor:pointer;line-height:1">+</button>`;
+  body.appendChild(counter);
+  const valEl = counter.querySelector('#sw-aantal-val');
+  counter.querySelector('#sw-aantal-min').addEventListener('click', () => { n = Math.max(1, n - 1); valEl.textContent = n; });
+  counter.querySelector('#sw-aantal-plus').addEventListener('click', () => { n = n + 1; valEl.textContent = n; });
+  body.appendChild(_swBigButton('Volgende', '➡️', () => { _sw.detail.aantal = n; _swGoto('note'); }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+}
+function _swRenderDetailSender(body) {
+  body.appendChild(_swTitle('Zit er een zender bij deze lokpot?'));
+  body.appendChild(_swBigButton('Ja', '✅', () => { _sw.detail.sender = 'ja'; _swGoto('note'); }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+  body.appendChild(_swBigButton('Nee', '➖', () => { _sw.detail.sender = 'nee'; _swGoto('note'); }));
+}
+function _swRenderDetailValtype(body) {
+  body.appendChild(_swTitle('Wat voor val heb je geplaatst?'));
+  [['glazen pot', 'Glazen pot', '🫙'], ['ahembriox', 'Ahembriox', '🧪'], ['anders', 'Anders', '❓']].forEach(([val, label, icon]) => {
+    body.appendChild(_swBigButton(label, icon, () => { _sw.detail.valtype = val; _swGoto('note'); }));
+  });
+}
+function _swRenderDetailNesttype(body) {
+  body.appendChild(_swTitle('Wat voor nest is het?'));
+  body.appendChild(_swSubtitle('Weet je het niet zeker? Kies gewoon je beste inschatting.'));
+  [['embryonaal', 'Embryonaal — klein, net begonnen', '🥚'],
+   ['primair', 'Primair — laag bij de grond', '🪺'],
+   ['secundair', 'Secundair — hoog, in een boom', '🌳'],
+   ['verlaten', 'Verlaten — leeg nest', '👻']].forEach(([val, label, icon]) => {
+    body.appendChild(_swBigButton(label, icon, () => { _sw.detail.nesttype = val; _swGoto('note'); }));
+  });
+}
+
+function _swRenderNote(body) {
+  body.appendChild(_swTitle('Nog iets toevoegen?'));
+  body.appendChild(_swSubtitle('Optioneel — mag ook leeg blijven.'));
+  const ta = document.createElement('textarea');
+  ta.value = _sw.note || '';
+  ta.placeholder = 'Bijvoorbeeld: bij de grote eik naast het tuinhek';
+  ta.style.cssText = 'width:100%;min-height:110px;padding:12px;border:2px solid #cbd5e1;border-radius:12px;font-size:16px;box-sizing:border-box;font-family:inherit';
+  body.appendChild(ta);
+  body.appendChild(_swBigButton('Volgende', '➡️', () => { _sw.note = ta.value.trim(); _swGoto('confirm'); }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+}
+
+function _swRenderConfirm(body) {
+  body.appendChild(_swTitle('Klopt dit?'));
+  const meta = SW_TYPES[_sw.type];
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fff;border-radius:14px;border:2px solid #e2e8f0;padding:18px;display:flex;flex-direction:column;gap:10px;font-size:16px;color:#0f172a';
+  let rows = `<div style="display:flex;gap:10px;align-items:center;font-size:19px;font-weight:800"><span style="font-size:28px">${meta.icon}</span>${meta.label}</div>`;
+  rows += `<div>📍 ${_sw.address || (_sw.latlng ? `${_sw.latlng.lat.toFixed(5)}, ${_sw.latlng.lng.toFixed(5)}` : '')}</div>`;
+  if (_sw.type === 'hoornaar') rows += `<div>🔢 Aantal: ${_sw.detail.aantal || 1}</div>`;
+  if (_sw.type === 'lokpot')   rows += `<div>📡 Zender: ${_sw.detail.sender === 'ja' ? 'Ja' : 'Nee'}</div>`;
+  if (_sw.type === 'val')      rows += `<div>🪤 Type: ${_sw.detail.valtype || '-'}</div>`;
+  if (_sw.type === 'nest')     rows += `<div>🪺 Type: ${_sw.detail.nesttype || '-'}</div>`;
+  if (_sw.note) rows += `<div>📝 ${_sw.note.replace(/</g,'&lt;')}</div>`;
+  card.innerHTML = rows;
+  body.appendChild(card);
+  const saveBtn = _swBigButton('Opslaan', '✅', async () => {
+    saveBtn.disabled = true; saveBtn.style.opacity = '0.6';
+    try { await _swSave(); _swGoto('success'); }
+    catch (e) { saveBtn.disabled = false; saveBtn.style.opacity = '1'; alert('Opslaan mislukt: ' + e.message); }
+  }, 'border-color:#0aa879;background:#0aa879;color:#fff');
+  body.appendChild(saveBtn);
+}
+
+async function _swSave() {
+  const vals = { date: nowISODate(), by: _currentDisplayName || '', note: _sw.note || '' };
+  if (_sw.type === 'hoornaar') vals.aantal = _sw.detail.aantal || 1;
+  if (_sw.type === 'lokpot')   vals.sender = _sw.detail.sender || 'nee';
+  if (_sw.type === 'val' && _sw.detail.valtype)     vals.valtype   = _sw.detail.valtype;
+  if (_sw.type === 'nest' && _sw.detail.nesttype)   vals.nesttype  = _sw.detail.nesttype;
+  const m = createMarkerWithPropsAt(_sw.latlng, _sw.type, vals);
+  persistMarker(m);
+  _logAction(_sw.type, vals, m);
+}
+
+function _swRenderSuccess(body) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center';
+  wrap.innerHTML = '<div style="font-size:64px">✅</div><div style="font-size:24px;font-weight:800;color:#0f172a">Gelukt! Je melding is opgeslagen.</div>';
+  body.appendChild(wrap);
+  body.appendChild(_swBigButton('Nog een melding toevoegen', '➕', () => _swStart(), 'border-color:#0aa879;background:#0aa879;color:#fff'));
+}
+
 async function boot(){
   await _loadZonesFromFirestore();
   await _loadFlightSettings();
@@ -3417,6 +3725,7 @@ async function _initUserRole() {
     }
     // Rol en zones opslaan — zones eerst herladen zodat nieuwe zones beschikbaar zijn
     _currentRole  = data?.role || '';
+    _simpleModeDefault = data?.simpleMode === true; // Fix 209: door beheer ingestelde standaard (Eenvoudige modus)
     updateHeaderRole(_currentRole, data?.displayName || auth.currentUser?.displayName || '');
     const rawZones = Array.isArray(data?.zones) ? data.zones : [];
     // Zones herladen om nieuwe gebieden mee te nemen, daarna filteren
@@ -3451,6 +3760,9 @@ async function _initUserRole() {
       _loadFlightSettings(activeZone); // laad vliegtijd voor actief gebied
       activateScope(year, activeZone, /*reload=*/true);
     }
+
+    // Fix 209: eenvoudige modus (wizard) tonen indien dit voor deze gebruiker geldt
+    _swApplyMode();
 
   } catch (e) {
     console.warn('[app] _initUserRole mislukt:', e.message);
