@@ -1,4 +1,4 @@
-// app-core.js — Fix 206
+// app-core.js — Fix 207
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1997,25 +1997,28 @@ function _openSightLineModal(potLatLng, onConfirm) {
           <input id="sl-bearing" type="number" min="0" max="359" placeholder="0–359"
             style="width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:16px;font-weight:600;box-sizing:border-box"/>
           <button id="sl-compass" style="margin-top:4px;width:100%;padding:6px;border-radius:6px;border:1px solid #64748b;background:#f8fafc;color:#475569;font-size:11px;cursor:pointer">🧭 Gebruik kompas</button>
-          <div style="margin-top:6px">
-            <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;cursor:pointer;margin-bottom:4px">
-              <input type="checkbox" id="sl-comp-enabled"/>
-              <span>Correctie toepassen</span>
-            </label>
-            <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;text-align:center">Correctie voor dit toestel</div>
-            <div style="display:flex;align-items:center;gap:3px">
-              <button type="button" id="sl-comp-m5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">−5</button>
-              <button type="button" id="sl-comp-m1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">−1</button>
-              <div id="sl-comp-val" style="flex:1;text-align:center;font-size:13px;font-weight:600;color:#0f172a">0°</div>
-              <button type="button" id="sl-comp-p1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">+1</button>
-              <button type="button" id="sl-comp-p5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">+5</button>
+          <details id="sl-comp-details" style="margin-top:6px">
+            <summary style="cursor:pointer;font-size:11px;color:#64748b;user-select:none;padding:2px 0">⚙️ Kalibratie-instellingen</summary>
+            <div style="margin-top:6px">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:#475569;cursor:pointer;margin-bottom:4px">
+                <input type="checkbox" id="sl-comp-enabled"/>
+                <span>Correctie toepassen</span>
+              </label>
+              <div style="font-size:10px;color:#94a3b8;margin-bottom:2px;text-align:center">Correctie voor dit toestel</div>
+              <div style="display:flex;align-items:center;gap:3px">
+                <button type="button" id="sl-comp-m5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">−5</button>
+                <button type="button" id="sl-comp-m1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">−1</button>
+                <div id="sl-comp-val" style="flex:1;text-align:center;font-size:13px;font-weight:600;color:#0f172a">0°</div>
+                <button type="button" id="sl-comp-p1" style="flex:0 0 auto;padding:5px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:12px;cursor:pointer">+1</button>
+                <button type="button" id="sl-comp-p5" style="flex:0 0 auto;padding:5px 7px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#475569;font-size:11px;cursor:pointer">+5</button>
+              </div>
+              <button type="button" id="sl-comp-reset" style="margin-top:4px;width:100%;padding:4px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;font-size:10px;cursor:pointer">Reset naar 0°</button>
+              <button type="button" id="sl-comp-calib" style="margin-top:5px;width:100%;padding:6px;border-radius:6px;border:1px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;cursor:pointer">🎯 Nauwkeurig kalibreren (waaier)</button>
+              <div style="font-size:10px;color:#94a3b8;margin-top:6px">Wil je zien wat het kompas ruw meet, zónder correctie? Zet "Correctie toepassen" uit. Loopt de lijn steeds naar dezelfde kant af? Zet 'm weer aan en stel bij met −/+ of "Nauwkeurig kalibreren".</div>
             </div>
-            <button type="button" id="sl-comp-reset" style="margin-top:4px;width:100%;padding:4px;border-radius:5px;border:1px solid #e2e8f0;background:#fff;color:#94a3b8;font-size:10px;cursor:pointer">Reset naar 0°</button>
-            <button type="button" id="sl-comp-calib" style="margin-top:5px;width:100%;padding:6px;border-radius:6px;border:1px solid #d97706;background:#fffbeb;color:#b45309;font-size:11px;cursor:pointer">🎯 Nauwkeurig kalibreren (waaier)</button>
-          </div>
+          </details>
         </div>
       </div>
-      <div style="font-size:10px;color:#94a3b8;margin-top:-6px;margin-bottom:8px">Wil je zien wat het kompas ruw meet, zónder correctie? Zet "Correctie toepassen" uit. Loopt de lijn steeds naar dezelfde kant af? Zet 'm weer aan en stel bij met −/+ of "Nauwkeurig kalibreren" — dit toestel onthoudt de laatste waarde.</div>
 
       <div id="sl-calc-info" style="font-size:11px;color:#94a3b8;margin-top:-6px;margin-bottom:10px;min-height:14px"></div>
 
