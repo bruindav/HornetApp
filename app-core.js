@@ -1,4 +1,4 @@
-// app-core.js — Fix 213
+// app-core.js — Fix 214
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -859,6 +859,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   const pmBy2     = document.getElementById('pm-by');
   const pmAmount2 = document.getElementById('pm-amount');
   const pmSave2   = document.getElementById('pm-save');
+  if(pmSave2) pmSave2.disabled = false; // Fix 214: vangnet — nooit starten met een (per ongeluk) uitgeschakelde knop
   const pmCancel2 = document.getElementById('pm-cancel');
   const pmTitle   = document.getElementById('pm-title');
   const pmColorRow= document.getElementById('pm-color-row');
@@ -1048,7 +1049,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   }
   function cleanup(){
     if(pmCancel2) pmCancel2.onclick=null;
-    if(pmSave2) pmSave2.onclick=null;
+    if(pmSave2) { pmSave2.onclick=null; pmSave2.disabled=false; } // Fix 214: anders blijft de knop uit na een geslaagde foto-upload
     modalEl2.classList.add('hidden');
   }
   if(pmCancel2) pmCancel2.onclick = ()=>cleanup();
