@@ -1,4 +1,4 @@
-// app-core.js — Fix 211
+// app-core.js — Fix 212
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -8,7 +8,7 @@
 // Belangrijk: alle DOM‑bindingen pas NA DOMContentLoaded.
 // 
 // ----------------------------------------------------------------------------
-import { auth } from './firebase.js';
+import { auth, uploadActionPhoto, deleteActionPhoto } from './firebase.js';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, orderBy, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
 const _db = getFirestore(app);
@@ -870,6 +870,39 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   if(pmDate2) pmDate2.value = init.date || nowISODate();
   if(pmBy2) pmBy2.value = init.by || _currentDisplayName || '';
   if(pmNote2) pmNote2.value = init.note || '';
+  // Foto — Fix 212
+  const pmPhotoPreview = document.getElementById('pm-photo-preview');
+  const pmPhotoImg     = document.getElementById('pm-photo-img');
+  const pmPhotoInput   = document.getElementById('pm-photo-input');
+  const pmPhotoRemove  = document.getElementById('pm-photo-remove');
+  const pmPhotoStatus  = document.getElementById('pm-photo-status');
+  let _pmPhotoNewFile = null, _pmPhotoRemoved = false;
+  if (pmPhotoInput) pmPhotoInput.value = '';
+  if (pmPhotoStatus) pmPhotoStatus.textContent = '';
+  if (init.photoUrl) {
+    if (pmPhotoImg) pmPhotoImg.src = init.photoUrl;
+    if (pmPhotoPreview) pmPhotoPreview.style.display = 'block';
+    if (pmPhotoRemove) pmPhotoRemove.style.display = 'inline-block';
+  } else {
+    if (pmPhotoPreview) pmPhotoPreview.style.display = 'none';
+    if (pmPhotoRemove) pmPhotoRemove.style.display = 'none';
+  }
+  if (pmPhotoInput) pmPhotoInput.onchange = () => {
+    const f = pmPhotoInput.files?.[0];
+    if (!f) return;
+    _pmPhotoNewFile = f; _pmPhotoRemoved = false;
+    if (pmPhotoImg) pmPhotoImg.src = URL.createObjectURL(f);
+    if (pmPhotoPreview) pmPhotoPreview.style.display = 'block';
+    if (pmPhotoRemove) pmPhotoRemove.style.display = 'inline-block';
+    if (pmPhotoStatus) pmPhotoStatus.textContent = '';
+  };
+  if (pmPhotoRemove) pmPhotoRemove.onclick = () => {
+    _pmPhotoRemoved = true; _pmPhotoNewFile = null;
+    if (pmPhotoInput) pmPhotoInput.value = '';
+    if (pmPhotoPreview) pmPhotoPreview.style.display = 'none';
+    if (pmPhotoRemove) pmPhotoRemove.style.display = 'none';
+    if (pmPhotoStatus) pmPhotoStatus.textContent = '';
+  };
   const onlyH = document.querySelector('.only-hoornaar');
   if(onlyH) onlyH.style.display = (type==='hoornaar' ? 'grid' : 'none');
   if(type==='hoornaar' && pmAmount2) pmAmount2.value = (init.aantal!=null ? init.aantal : '');
@@ -973,9 +1006,10 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
   }
   // Read-only modus (geïmporteerde waarnemingen)
   const ro = readOnly || !onSave;
-  const fields = ['pm-date','pm-by','pm-amount','pm-note','pm-nesttype','pm-ruimer','pm-methode','pm-valtype','pm-koninginnen'];
+  const fields = ['pm-date','pm-by','pm-amount','pm-note','pm-nesttype','pm-ruimer','pm-methode','pm-valtype','pm-koninginnen','pm-photo-input'];
   fields.forEach(id=>{ const el=document.getElementById(id); if(el){ el.disabled=ro; el.style.opacity=ro?'0.7':''; } });
   ['pm-sender-ja','pm-sender-nee','pm-succes-ja','pm-succes-nee'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=ro; });
+  if (pmPhotoRemove) pmPhotoRemove.style.display = (ro || !init.photoUrl) ? 'none' : 'inline-block';
   if(pmSave2) pmSave2.style.display = ro ? 'none' : '';
   if(pmCancel2) pmCancel2.textContent = ro ? 'Sluiten' : 'Annuleren';
   // Hint tonen bij read-only eigen markers (niet bij GBIF/import)
@@ -1018,7 +1052,7 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
     modalEl2.classList.add('hidden');
   }
   if(pmCancel2) pmCancel2.onclick = ()=>cleanup();
-  if(pmSave2) pmSave2.onclick = ()=>{
+  if(pmSave2) pmSave2.onclick = async ()=>{
     const pmNote3 = document.getElementById('pm-note');
     const vals={ date: pmDate2?.value || nowISODate(), by: pmBy2?.value || '', note: pmNote3?.value?.trim()||'' };
     if(type==='hoornaar' && pmAmount2){ const a=parseInt(pmAmount2.value,10); if(!isNaN(a)) vals.aantal=a; }
@@ -1043,6 +1077,25 @@ function openPropModal({type, init={}, onSave, readOnly=false}){
       const kn = parseInt(document.getElementById('pm-koninginnen')?.value, 10);
       if(vt) vals.valtype = vt;
       if(!isNaN(kn)) vals.koninginnen = kn;
+    }
+    // Foto — Fix 212
+    if (_pmPhotoNewFile) {
+      pmSave2.disabled = true;
+      if (pmPhotoStatus) { pmPhotoStatus.textContent = '📤 Foto uploaden…'; pmPhotoStatus.style.color = '#94a3b8'; }
+      try {
+        const blob = await _compressImageFile(_pmPhotoNewFile);
+        const path = `action-photos/${genId('photo')}.jpg`;
+        const url = await uploadActionPhoto(blob, path);
+        vals.photoUrl = url; vals.photoPath = path;
+        if (init.photoPath) deleteActionPhoto(init.photoPath); // oude foto opruimen (hoeft niet af te wachten)
+      } catch (e) {
+        pmSave2.disabled = false;
+        if (pmPhotoStatus) { pmPhotoStatus.textContent = '⚠️ Foto uploaden mislukt: ' + e.message; pmPhotoStatus.style.color = '#dc2626'; }
+        return; // niet verder opslaan — gebruiker kan het nogmaals proberen zonder de rest van het formulier kwijt te raken
+      }
+    } else if (_pmPhotoRemoved) {
+      vals.photoUrl = null; vals.photoPath = null;
+      if (init.photoPath) deleteActionPhoto(init.photoPath);
     }
     onSave && onSave(vals); cleanup();
   };
@@ -1428,6 +1481,7 @@ function attachMarkerPopup(marker){
     if(m.koninginnen!=null) rows += row('Koninginnen', String(m.koninginnen));
   }
   if(m.note) rows += '<div style="margin-top:5px;padding-top:4px;border-top:1px solid #e2e8f0;font-size:12px;color:#374151;font-style:italic">'+m.note+'</div>';
+  if(m.photoUrl) rows += '<div style="margin-top:6px"><img src="'+m.photoUrl+'" style="max-width:100%;max-height:140px;border-radius:6px;border:1px solid #e2e8f0;display:block"/></div>';
   let srcRows = '';
   if(m.source==='GBIF' || m.source==='waarneming.nl'){
     const LIFE={'ADULT':'Volwassen','JUVENILE':'Juveniel','LARVA':'Larve','PUPA':'Pop','EGG':'Ei'};
@@ -1471,6 +1525,10 @@ function applyPropsToMarker(marker, vals){
   if(vals.by) m.by=vals.by; else delete m.by;
   if(vals.note!==undefined){ if(vals.note) m.note=vals.note; else delete m.note; }
   if(vals.sender!==undefined){ m.sender=vals.sender; }
+  if('photoUrl' in vals){
+    if(vals.photoUrl){ m.photoUrl=vals.photoUrl; m.photoPath=vals.photoPath||null; }
+    else { delete m.photoUrl; delete m.photoPath; }
+  }
   if(m.type==='hoornaar'){ if(vals.aantal!=null) m.aantal=vals.aantal; else delete m.aantal; }
   if(m.type==='nest'){
     if(vals.nesttype) m.nesttype=vals.nesttype; else delete m.nesttype;
@@ -1554,7 +1612,8 @@ function persistMarker(marker){
     potId:m.potId||null, note:m.note||null, sender:m.sender||null,
     nesttype:m.nesttype||null,
     ruimer:m.ruimer||null, methode:m.methode||null, succes:m.succes||null,
-    valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null
+    valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null,
+    photoUrl:m.photoUrl||null, photoPath:m.photoPath||null
   };
   saveMarkerToCloud(doc);
 }
@@ -2307,7 +2366,7 @@ function persistLine(line){
     id:m.id, type:'flight',
     pot:m.pot||null, potId:m.potId||null,
     distance:m.distance||0, color:m.color||'#ffcc00', bearing:m.bearing||0,
-    note: m.note||'',
+    note: m.note||'', photoUrl: m.photoUrl||null, photoPath: m.photoPath||null,
     latlngs: ll.map(p=>({lat:p.lat,lng:p.lng}))
   };
   saveLineToCloud(doc);
@@ -2692,6 +2751,7 @@ function upsertMarkerFromCloud(doc){
       nesttype: doc.nesttype||null,
       ruimer: doc.ruimer||null, methode: doc.methode||null, succes: doc.succes||null,
       valtype: doc.valtype||null, koninginnen: doc.koninginnen!=null ? doc.koninginnen : null,
+      photoUrl: doc.photoUrl||null, photoPath: doc.photoPath||null,
       // Bron metadata
       source: doc.source||null, externalId: doc.externalId||null,
       gbifKey: doc.gbifKey||null, gbifDataset: doc.gbifDataset||null,
@@ -2747,6 +2807,8 @@ function upsertMarkerFromCloud(doc){
     m._meta.succes = doc.succes||null;
     m._meta.valtype = doc.valtype||null;
     m._meta.koninginnen = doc.koninginnen!=null ? doc.koninginnen : null;
+    m._meta.photoUrl = doc.photoUrl||null;
+    m._meta.photoPath = doc.photoPath||null;
     m._meta.source = doc.source||null;
     m._meta.externalId = doc.externalId||null;
     m._meta.gbifKey = doc.gbifKey||null;
@@ -3164,8 +3226,8 @@ const SW_MARK_COLORS = [
   ['#ffffff', 'Wit'],  ['#ff8c00', 'Oranje'], ['#ff69b4', 'Roze'], ['#800080', 'Paars'],
 ];
 // Logische stappenreeksen per type, voor de voortgangsindicator ("Stap X van Y")
-const SW_FLOW_STANDARD = ['type', 'location', 'detail', 'note', 'confirm'];
-const SW_FLOW_GEMERKT  = ['type', 'pot_pick', 'gemerkt_color', 'gemerkt_direction', 'gemerkt_time', 'note', 'confirm'];
+const SW_FLOW_STANDARD = ['type', 'location', 'detail', 'note', 'photo', 'confirm'];
+const SW_FLOW_GEMERKT  = ['type', 'pot_pick', 'gemerkt_color', 'gemerkt_direction', 'gemerkt_time', 'note', 'photo', 'confirm'];
 const SW_STEP_ALIAS = {
   location_confirm: 'location', location_map: 'location',
   gemerkt_compass: 'gemerkt_direction', gemerkt_direction_map: 'gemerkt_direction',
@@ -3237,7 +3299,7 @@ function _swShowFromSidebar() {
 }
 
 function _swStart() {
-  _sw = { stack: [], current: 'type', type: null, latlng: null, address: null, detail: {}, note: '' };
+  _sw = { stack: [], current: 'type', type: null, latlng: null, address: null, detail: {}, note: '', photoFile: null };
   _swRender();
 }
 function _swGoto(step) {
@@ -3294,7 +3356,7 @@ function _swRender() {
   if (backBtn) backBtn.style.visibility = _sw.stack.length ? 'visible' : 'hidden';
   const progEl = document.getElementById('sw-progress');
   if (progEl) {
-    if (_sw.current === 'success' || _sw.current === 'pot_flights') {
+    if (_sw.current === 'success' || _sw.current === 'pot_flights' || _sw.current === 'nearby_map') {
       progEl.textContent = '';
     } else {
       const flow = (_sw.type === 'gemerkt') ? SW_FLOW_GEMERKT : SW_FLOW_STANDARD;
@@ -3311,7 +3373,7 @@ function _swRender() {
     pot_pick: _swRenderPotPick, gemerkt_color: _swRenderGemerktColor, gemerkt_direction: _swRenderGemerktDirection,
     gemerkt_compass: _swRenderGemerktCompass, gemerkt_direction_map: _swRenderGemerktDirectionMap,
     gemerkt_time: _swRenderGemerktTime, gemerkt_time_confirm: _swRenderGemerktTimeConfirm,
-    pot_flights: _swRenderPotFlights,
+    pot_flights: _swRenderPotFlights, nearby_map: _swRenderNearbyMap, photo: _swRenderPhoto,
   };
   (renderers[_sw.current] || _swRenderType)(body);
 }
@@ -3325,6 +3387,72 @@ function _swRenderType(body) {
       _swGoto(type === 'gemerkt' ? 'pot_pick' : 'location');
     }));
   });
+  const spacer = document.createElement('div'); spacer.style.height = '4px';
+  body.appendChild(spacer);
+  body.appendChild(_swBigButton('Bekijk de kaart hier in de buurt', '🗺️', () => _swGoto('nearby_map'),
+    'border-color:#94a3b8;background:#f8fafc;color:#475569'));
+}
+
+// Fix 212: alleen-bekijken kaart, gecentreerd op de huidige locatie — laat zien wat er
+// in de buurt al gemeld/geplaatst is (waarnemingen, vallen, lokpotten, nesten, vliegrichtingen).
+function _swRenderNearbyMap(body) {
+  body.appendChild(_swTitle('Wat is hier al bekend?'));
+  body.appendChild(_swSubtitle('Waarnemingen, vallen, lokpotten, nesten en vliegrichtingen in de buurt. Tik op een icoon voor details.'));
+
+  const mapWrap = document.createElement('div');
+  mapWrap.style.cssText = 'position:relative;flex:1;min-height:380px;border-radius:14px';
+  const mapDiv = document.createElement('div');
+  mapDiv.id = 'sw-nearby-map';
+  mapDiv.style.cssText = 'width:100%;height:100%;min-height:380px;border-radius:14px;overflow:hidden;border:2px solid #cbd5e1';
+  mapWrap.appendChild(mapDiv);
+  body.appendChild(mapWrap);
+
+  const statusEl = document.createElement('div');
+  statusEl.style.cssText = 'font-size:13px;color:#94a3b8;text-align:center;min-height:16px';
+  statusEl.textContent = '🔄 Locatie zoeken…';
+  body.appendChild(statusEl);
+
+  const startCenter = map ? map.getCenter() : L.latLng(52.1, 5.3);
+  const nMap = L.map('sw-nearby-map', { zoomControl: true, attributionControl: false }).setView(startCenter, 15);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(nMap);
+  setTimeout(() => nMap.invalidateSize(), 60);
+
+  const typeLabels = { hoornaar: 'Waarneming', nest: 'Nest gevonden', nest_geruimd: 'Nest geruimd', lokpot: 'Lokpot', val: 'Val geplaatst' };
+  allMarkers.forEach(m => {
+    const meta = m._meta || {};
+    if (!markersGroup.hasLayer(m)) return; // respecteer actieve filters
+    const ll = m.getLatLng();
+    const clone = L.marker(ll, { icon: getIconForMarker(meta) }).addTo(nMap);
+    const label = typeLabels[meta.type] || meta.type || 'Icoon';
+    const noteHtml = meta.note ? `<br>${String(meta.note).replace(/</g, '&lt;')}` : '';
+    const dateHtml = meta.date ? `<br><span style="color:#94a3b8;font-size:12px">${meta.date}</span>` : '';
+    clone.bindPopup(`<strong>${label}</strong>${noteHtml}${dateHtml}`);
+  });
+  allLines.forEach(l => {
+    const latlngs = l.getLatLngs ? l.getLatLngs() : null;
+    if (latlngs && latlngs.length === 2) L.polyline(latlngs, { color: l._meta?.color || '#ffcc00', weight: 2, opacity: 0.85 }).addTo(nMap);
+    const sm = l._sector?._meta;
+    if (sm) {
+      createSectorLayer({
+        id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
+        bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
+        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+      }).addTo(nMap);
+    }
+  });
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      L.circleMarker(userLL, { radius: 8, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(nMap).bindPopup('📍 Jouw locatie');
+      nMap.setView(userLL, 17);
+      statusEl.textContent = '';
+    }, () => { statusEl.textContent = '⚠️ Kon geen locatie vinden — kaart toont het laatst bekeken gebied.'; }, { enableHighAccuracy: true, timeout: 8000 });
+  } else {
+    statusEl.textContent = '';
+  }
+
+  body.appendChild(_swBigButton('Terug', '⬅️', () => _swBack(), 'border-color:#0aa879'));
 }
 
 function _swRenderLocation(body) {
@@ -3517,10 +3645,14 @@ function _swRenderPotPick(body) {
   if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
   else infoEl.textContent = '⚠️ Geen lokpotten gevonden in dit gebied.';
 
+  // Fix 212: centreer op de huidige locatie i.p.v. uit te zoomen naar ALLE potjes in de zone —
+  // zo zie je meteen het dichtstbijzijnde potje, ook als er potjes ver weg in hetzelfde gebied staan.
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(pos => {
-      L.circleMarker([pos.coords.latitude, pos.coords.longitude], { radius: 7, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(potMap);
-    }, () => {}, { timeout: 8000 });
+      const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      L.circleMarker(userLL, { radius: 7, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(potMap);
+      potMap.setView(userLL, 18);
+    }, () => {}, { enableHighAccuracy: true, timeout: 8000 });
   }
 }
 
@@ -3775,7 +3907,68 @@ function _swRenderNote(body) {
   ta.placeholder = 'Bijvoorbeeld: bij de grote eik naast het tuinhek';
   ta.style.cssText = 'width:100%;min-height:110px;padding:12px;border:2px solid #cbd5e1;border-radius:12px;font-size:16px;box-sizing:border-box;font-family:inherit';
   body.appendChild(ta);
-  body.appendChild(_swBigButton('Volgende', '➡️', () => { _sw.note = ta.value.trim(); _swGoto('confirm'); }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+  body.appendChild(_swBigButton('Volgende', '➡️', () => { _sw.note = ta.value.trim(); _swGoto('photo'); }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+}
+
+// Fix 212: optionele foto — compressie gebeurt lokaal (canvas) vóór het uploaden,
+// zodat mobiele foto's (vaak 3-8 MB) niet onnodig veel opslag/data verbruiken.
+function _compressImageFile(file, maxDim = 1280, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale); height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compressie mislukt')), 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Kon afbeelding niet laden')); };
+    img.src = url;
+  });
+}
+async function _saveActionPhoto(file, actionId) {
+  const blob = await _compressImageFile(file);
+  const path = `action-photos/${actionId}.jpg`;
+  const url = await uploadActionPhoto(blob, path);
+  return { url, path };
+}
+
+function _swRenderPhoto(body) {
+  body.appendChild(_swTitle('Foto toevoegen?'));
+  body.appendChild(_swSubtitle('Optioneel — mag ook overgeslagen worden.'));
+
+  const preview = document.createElement('div');
+  preview.style.cssText = 'display:flex;justify-content:center';
+  if (_sw.photoFile) {
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(_sw.photoFile);
+    img.style.cssText = 'max-width:100%;max-height:220px;border-radius:12px;border:2px solid #cbd5e1';
+    preview.appendChild(img);
+  }
+  body.appendChild(preview);
+
+  const fileInp = document.createElement('input');
+  fileInp.type = 'file'; fileInp.accept = 'image/*'; fileInp.setAttribute('capture', 'environment');
+  fileInp.style.display = 'none';
+  body.appendChild(fileInp);
+
+  const pickBtn = _swBigButton(_sw.photoFile ? 'Andere foto kiezen' : 'Maak of kies een foto', '📷', () => fileInp.click(), 'border-color:#0aa879');
+  body.appendChild(pickBtn);
+
+  fileInp.addEventListener('change', () => {
+    const file = fileInp.files?.[0];
+    if (!file) return;
+    _sw.photoFile = file;
+    _swRender(); // stap opnieuw tekenen met de gekozen foto als voorbeeld
+  });
+
+  body.appendChild(_swBigButton('Volgende', '➡️', () => _swGoto('confirm'), 'border-color:#0aa879;background:#0aa879;color:#fff'));
 }
 
 function _swRenderConfirm(body) {
@@ -3797,18 +3990,38 @@ function _swRenderConfirm(body) {
   }
   if (_sw.note) rows += `<div>📝 ${_sw.note.replace(/</g,'&lt;')}</div>`;
   card.innerHTML = rows;
+  if (_sw.photoFile) {
+    const photoWrap = document.createElement('div');
+    const img = document.createElement('img');
+    img.src = URL.createObjectURL(_sw.photoFile);
+    img.style.cssText = 'max-width:100%;max-height:160px;border-radius:10px;border:1px solid #e2e8f0;margin-top:4px';
+    photoWrap.appendChild(img);
+    card.appendChild(photoWrap);
+  }
   body.appendChild(card);
   const saveBtn = _swBigButton('Opslaan', '✅', async () => {
     saveBtn.disabled = true; saveBtn.style.opacity = '0.6';
+    const origLabel = saveBtn.querySelector('span:last-child');
+    if (_sw.photoFile && origLabel) origLabel.textContent = 'Foto uploaden…';
     try { await _swSave(); _swGoto('success'); }
-    catch (e) { saveBtn.disabled = false; saveBtn.style.opacity = '1'; alert('Opslaan mislukt: ' + e.message); }
+    catch (e) {
+      saveBtn.disabled = false; saveBtn.style.opacity = '1';
+      if (origLabel) origLabel.textContent = 'Opslaan';
+      alert('Opslaan mislukt: ' + e.message);
+    }
   }, 'border-color:#0aa879;background:#0aa879;color:#fff');
   body.appendChild(saveBtn);
 }
 
 async function _swSave() {
-  if (_sw.type === 'gemerkt') return _swSaveGemerkt();
+  let photo = null;
+  if (_sw.photoFile) {
+    try { photo = await _saveActionPhoto(_sw.photoFile, genId('photo')); }
+    catch (e) { throw new Error('Foto uploaden mislukt: ' + e.message); }
+  }
+  if (_sw.type === 'gemerkt') return _swSaveGemerkt(photo);
   const vals = { date: nowISODate(), by: _currentDisplayName || '', note: _sw.note || '' };
+  if (photo) { vals.photoUrl = photo.url; vals.photoPath = photo.path; }
   if (_sw.type === 'hoornaar') vals.aantal = _sw.detail.aantal || 1;
   if (_sw.type === 'val' && _sw.detail.valtype)     vals.valtype   = _sw.detail.valtype;
   if (_sw.type === 'nest' && _sw.detail.nesttype)   vals.nesttype  = _sw.detail.nesttype;
@@ -3819,7 +4032,7 @@ async function _swSave() {
 
 // Fix 210: bouwt een zichtlijn + sector op precies dezelfde manier als de expert-flow
 // (startSightLine met kompasrichting), zodat het resultaat niet te onderscheiden is.
-function _swSaveGemerkt() {
+function _swSaveGemerkt(photo) {
   const potLatLng = _sw.latlng;
   const potMarker = _sw.potMarker;
   const dist  = Math.max(1, _sw.detail.distance || 1);
@@ -3832,6 +4045,7 @@ function _swSaveGemerkt() {
   const id = genId('flight');
   const line = L.polyline([potLatLng, endLatLng], { color, weight: 3 }).addTo(linesGroup);
   line._meta = { id, type: 'flight', pot: potMeta, potId, distance: dist, color, bearing: brg, note: _sw.note || '' };
+  if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
   registerLine(line);
   line._distLabel = L.tooltip({ permanent: true, direction: 'right', offset: [8, 0], className: 'line-label' })
     .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);

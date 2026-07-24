@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 209 -->
+<!-- index.html — Fix 212 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -377,6 +377,15 @@
             <label id="pm-note-row" style="font-size:13px;display:block">
               Opmerking <textarea id="pm-note" rows="3" style="width:100%;padding:6px;border:1px solid #cbd5e1;border-radius:5px;resize:vertical;font-family:inherit;font-size:13px" placeholder="Bijv. hoogte nest, gedrag..."></textarea>
             </label>
+            <div id="pm-photo-row" style="font-size:13px">
+              <div style="margin-bottom:4px">Foto</div>
+              <div id="pm-photo-preview" style="display:none;margin-bottom:6px">
+                <img id="pm-photo-img" style="max-width:100%;max-height:180px;border-radius:8px;border:1px solid #e2e8f0;display:block"/>
+              </div>
+              <input id="pm-photo-input" type="file" accept="image/*" style="font-size:12px"/>
+              <button id="pm-photo-remove" type="button" style="display:none;margin-left:6px;padding:4px 9px;border:1px solid #fca5a5;border-radius:5px;background:#fff;color:#dc2626;font-size:11px;cursor:pointer">Foto verwijderen</button>
+              <div id="pm-photo-status" style="font-size:11px;color:#94a3b8;margin-top:3px"></div>
+            </div>
             <!-- Broninfo — alleen zichtbaar bij geïmporteerde waarnemingen -->
             <div id="pm-source-block" style="display:none;margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:7px;padding:10px;font-size:12px">
               <div style="font-weight:600;color:#475569;margin-bottom:6px">📡 Brongegevens (alleen lezen)</div>
