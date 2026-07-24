@@ -1,4 +1,4 @@
-// admin.js — Fix 203
+// admin.js — Fix 209
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -326,6 +326,10 @@ function renderTable(users) {
             <option value="manager"   ${u.role==='manager'  ?'selected':''}>🗂️ Coördinator</option>
             <option value="admin"     ${u.role==='admin'    ?'selected':''}>⭐ Admin</option>
           </select>
+          <label style="display:flex;align-items:center;gap:5px;margin-top:8px;font-size:12px;color:#475569;cursor:pointer">
+            <input type="checkbox" ${u.simpleMode ? 'checked' : ''} onchange="adminSetSimpleMode('${u.uid}', this.checked)"/>
+            🧩 Eenvoudige modus
+          </label>
           <div style="margin-top:6px">${deleteBtn}</div>
         </td>`;
     }
@@ -1479,6 +1483,15 @@ window.adminSetRole = async (uid, newRole) => {
     await setDoc(doc(db, 'roles', uid), { role: newRole }, { merge: true });
   } catch (e) {
     alert(`Rol instellen mislukt: ${e.message}`);
+  }
+};
+
+// Fix 209: eenvoudige modus (wizard) standaard aan/uit zetten voor een gebruiker
+window.adminSetSimpleMode = async (uid, on) => {
+  try {
+    await setDoc(doc(db, 'roles', uid), { simpleMode: !!on }, { merge: true });
+  } catch (e) {
+    alert(`Eenvoudige modus instellen mislukt: ${e.message}`);
   }
 };
 
