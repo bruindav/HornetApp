@@ -1,4 +1,4 @@
-// app-core.js — Fix 210
+// app-core.js — Fix 211
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3192,22 +3192,48 @@ function _swEnsureDom() {
   el.querySelector('#sw-back').addEventListener('click', () => _swBack());
 }
 
+// Fix 211: grote, altijd-zichtbare knop linksonder om terug te keren naar eenvoudige modus.
+// Alleen zichtbaar voor gebruikers van wie "eenvoudige modus" de standaard is (door Beheer
+// ingesteld) én die nu naar expert modus zijn overgeschakeld — zodat ze niet in de zijbalk
+// hoeven te zoeken. Voor gewone expert-gebruikers blijft dit onzichtbaar.
+function _swEnsureFab() {
+  if (document.getElementById('sw-return-fab')) return;
+  const fab = document.createElement('button');
+  fab.id = 'sw-return-fab';
+  fab.type = 'button';
+  fab.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:7000;display:none;align-items:center;gap:9px;'
+    + 'padding:14px 20px;border-radius:999px;border:none;background:#0aa879;color:#fff;font-size:16px;font-weight:700;'
+    + 'box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:pointer';
+  fab.innerHTML = '<span style="font-size:22px">🧩</span><span>Eenvoudige modus</span>';
+  fab.addEventListener('click', () => _swShowFromSidebar());
+  document.body.appendChild(fab);
+}
+function _swUpdateFab() {
+  _swEnsureFab();
+  const fab = document.getElementById('sw-return-fab');
+  if (!fab) return;
+  fab.style.display = (_simpleModeDefault && !_swEffectiveSimple()) ? 'flex' : 'none';
+}
+
 function _swApplyMode() {
   _swEnsureDom();
   const overlay = document.getElementById('simple-wizard-overlay');
   if (!overlay) return;
   if (_swEffectiveSimple()) { overlay.style.display = 'flex'; _swStart(); }
   else { overlay.style.display = 'none'; }
+  _swUpdateFab();
 }
 function _swHide() {
   const overlay = document.getElementById('simple-wizard-overlay');
   if (overlay) overlay.style.display = 'none';
+  _swUpdateFab();
 }
-// Aanroepbaar vanuit de zijbalk om terug te schakelen naar eenvoudige modus
+// Aanroepbaar vanuit de zijbalk of de FAB om terug te schakelen naar eenvoudige modus
 function _swShowFromSidebar() {
   _swSetOverride('simple');
   const overlay = document.getElementById('simple-wizard-overlay');
   if (overlay) { overlay.style.display = 'flex'; _swStart(); }
+  _swUpdateFab();
 }
 
 function _swStart() {
@@ -3460,11 +3486,19 @@ function _swRenderPotPick(body) {
     const ll = potMarker.getLatLng();
     bounds.push(ll);
     const potId = potMarker._meta?.potId;
-    // Bestaande vliegrichtingen alvast tonen, zodat je meteen ziet wat er al bekend is
+    // Bestaande vliegrichtingen + het bijbehorende zoekgebied (kwart cirkel) alvast tonen
     allLines.filter(l => (l._meta || {}).potId === potId).forEach(l => {
       const latlngs = l.getLatLngs ? l.getLatLngs() : null;
       if (latlngs && latlngs.length === 2) {
         L.polyline(latlngs, { color: l._meta?.color || '#ffcc00', weight: 2, opacity: 0.85 }).addTo(potMap);
+      }
+      const sm = l._sector?._meta;
+      if (sm) {
+        createSectorLayer({
+          id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
+          bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
+          angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+        }).addTo(potMap);
       }
     });
     const circle = L.circleMarker(ll, { radius: 12, color: '#78350f', weight: 2, fillColor: '#f59e0b', fillOpacity: 0.9 }).addTo(potMap);
@@ -3609,7 +3643,8 @@ function _swRenderGemerktTime(body) {
 
   let seconds = 0, running = false, timer = null;
   const display = document.createElement('div');
-  display.style.cssText = 'font-size:56px;font-weight:800;text-align:center;color:#0f172a;font-variant-numeric:tabular-nums';
+  display.style.cssText = 'font-size:56px;font-weight:800;text-align:center;color:#0f172a;font-variant-numeric:tabular-nums;cursor:pointer';
+  display.title = 'Tik om de tijd zelf in te typen';
   display.textContent = '0:00';
   body.appendChild(display);
 
@@ -3625,6 +3660,11 @@ function _swRenderGemerktTime(body) {
   body.appendChild(btnRow);
 
   const fmtT = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const useSeconds = (s) => {
+    _sw.detail.flightSeconds = s;
+    _sw.detail.distance = Math.max(1, Math.round(s / (_flightSecondsPerMeter || 0.6)));
+    _swGoto('gemerkt_time_confirm');
+  };
   startBtn.addEventListener('click', () => {
     if (running) return; running = true;
     startBtn.disabled = true; startBtn.style.opacity = '0.5';
@@ -3634,9 +3674,37 @@ function _swRenderGemerktTime(body) {
   stopBtn.addEventListener('click', () => {
     if (!running) return; running = false; clearInterval(timer);
     stopBtn.disabled = true; stopBtn.style.opacity = '0.5';
-    _sw.detail.flightSeconds = seconds;
-    _sw.detail.distance = Math.max(1, Math.round(seconds / (_flightSecondsPerMeter || 0.6)));
-    setTimeout(() => _swGoto('gemerkt_time_confirm'), 400);
+    setTimeout(() => useSeconds(seconds), 400);
+  });
+
+  // Handmatige invoer — ook bruikbaar als de stopwatch niet gebruikt is (bv. tijd al genoteerd)
+  body.appendChild(_swSubtitle('Of typ de tijd zelf in (minuten : seconden):'));
+  const manualRow = document.createElement('div');
+  manualRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px';
+  const minInp = document.createElement('input');
+  minInp.type = 'number'; minInp.min = '0'; minInp.placeholder = 'min';
+  minInp.style.cssText = 'width:80px;padding:12px;border:2px solid #cbd5e1;border-radius:10px;font-size:20px;text-align:center';
+  const sep = document.createElement('span'); sep.textContent = ':'; sep.style.cssText = 'font-size:24px;font-weight:800;color:#64748b';
+  const secInp = document.createElement('input');
+  secInp.type = 'number'; secInp.min = '0'; secInp.max = '59'; secInp.placeholder = 'sec';
+  secInp.style.cssText = 'width:80px;padding:12px;border:2px solid #cbd5e1;border-radius:10px;font-size:20px;text-align:center';
+  manualRow.appendChild(minInp); manualRow.appendChild(sep); manualRow.appendChild(secInp);
+  body.appendChild(manualRow);
+  body.appendChild(_swBigButton('Gebruik deze tijd', '➡️', () => {
+    const m = parseInt(minInp.value, 10) || 0;
+    const s = parseInt(secInp.value, 10) || 0;
+    const total = m * 60 + s;
+    if (total <= 0) { minInp.focus(); return; }
+    if (running) { clearInterval(timer); }
+    useSeconds(total);
+  }, 'border-color:#0aa879;background:#0aa879;color:#fff'));
+
+  // Tik op de grote tijd-weergave om die ook meteen als invoer over te nemen
+  display.addEventListener('click', () => {
+    if (running) return;
+    minInp.value = Math.floor(seconds / 60);
+    secInp.value = seconds % 60;
+    minInp.focus();
   });
 }
 
@@ -3686,6 +3754,14 @@ function _swRenderPotFlights(body) {
   allLines.filter(l => (l._meta || {}).potId === potId).forEach(l => {
     const latlngs = l.getLatLngs();
     if (latlngs && latlngs.length === 2) { L.polyline(latlngs, { color: l._meta?.color || '#ffcc00', weight: 3 }).addTo(fMap); bounds.push(latlngs[1]); }
+    const sm = l._sector?._meta;
+    if (sm) {
+      createSectorLayer({
+        id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
+        bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
+        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+      }).addTo(fMap);
+    }
   });
   fMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 18 });
   body.appendChild(_swBigButton('Terug naar potje kiezen', '⬅️', () => _swBack(), 'border-color:#0aa879'));
