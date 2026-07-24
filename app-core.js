@@ -1,4 +1,4 @@
-// app-core.js — Fix 215
+// app-core.js — Fix 216
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3754,6 +3754,20 @@ function _swRenderGemerktCompass(body) {
   body.appendChild(startBtn);
 }
 
+// Fix 216: losse, module-brede kopie — de bestaande circularMean() zit genest binnen
+// _openSightLineModal (expert-modus) en was daardoor niet bereikbaar vanuit de wizard.
+// Gevolg: zodra het kompas metingen binnenkreeg, crashte de berekening stil (ReferenceError
+// in een setInterval-callback, dus geen zichtbare foutmelding) en kwam de wizard nooit verder.
+function _swCircularMean(angles) {
+  let sinSum = 0, cosSum = 0;
+  for (const a of angles) {
+    sinSum += Math.sin(a * Math.PI / 180);
+    cosSum += Math.cos(a * Math.PI / 180);
+  }
+  const mean = Math.atan2(sinSum / angles.length, cosSum / angles.length) * 180 / Math.PI;
+  return ((mean % 360) + 360) % 360;
+}
+
 function _swMeasureCompass(durationSec, onProgress, onDone) {
   const readings = [];
   let remaining = durationSec;
@@ -3765,7 +3779,7 @@ function _swMeasureCompass(durationSec, onProgress, onDone) {
       clearInterval(timer);
       stop();
       if (!readings.length) { onDone(null); return; }
-      const avg = circularMean(readings);
+      const avg = _swCircularMean(readings);
       const offset = _isCompassOffsetEnabled() ? _getCompassOffsetLocal() : 0;
       onDone(Math.round((avg + offset + 360) % 360));
     } else {
