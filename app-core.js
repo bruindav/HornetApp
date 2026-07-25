@@ -1,4 +1,4 @@
-// app-core.js — Fix 217
+// app-core.js — Fix 221
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -646,24 +646,38 @@ const DOTS = {
 function getIconForMarker(meta){
   const zoom = map?.getZoom() || 14;
   const type = meta?.type || 'pending';
+  let icon;
   if(zoom >= ZOOM_FULL){
     // Volledig icoon met emoji + label
-    if(type==='hoornaar') return ICONS.hoornaar(meta.aantal,'full');
-    return ICONS[type]?.('full') || ICONS.pending('full');
+    if(type==='hoornaar') icon = ICONS.hoornaar(meta.aantal,'full');
+    else icon = ICONS[type]?.('full') || ICONS.pending('full');
   } else if(zoom >= ZOOM_SMALL){
     // Klein icoon: alleen emoji
-    if(type==='hoornaar') return ICONS.hoornaar(meta.aantal,'small');
-    return ICONS[type]?.('small') || ICONS.pending('small');
+    if(type==='hoornaar') icon = ICONS.hoornaar(meta.aantal,'small');
+    else icon = ICONS[type]?.('small') || ICONS.pending('small');
   } else if(zoom >= ZOOM_DOT){
     // Stip met letter (size 13)
-    return (DOTS[type]||DOTS.pending)(false);
+    icon = (DOTS[type]||DOTS.pending)(false);
   } else if(zoom >= ZOOM_TINY){
     // Kleine stip zonder letter (size 8)
-    return (DOTS[type]||DOTS.pending)(true);
+    icon = (DOTS[type]||DOTS.pending)(true);
   } else {
     // Onder ZOOM_TINY: nog kleinere stip (size 5)
-    return (DOTS[type]||DOTS.pending)('micro');
+    icon = (DOTS[type]||DOTS.pending)('micro');
   }
+  return meta?.demo ? _wrapDemoIcon(icon) : icon;
+}
+// Fix 221: demo-markers krijgen een stippelrand + 🧪-badge, zodat ze in de kaart en
+// het overzicht altijd herkenbaar blijven als testdata en nooit met echte data kunnen
+// worden verward — outline (i.p.v. border) wijzigt de afmetingen niet, dus iconSize/
+// iconAnchor van het onderliggende icoon blijven kloppen.
+function _wrapDemoIcon(icon){
+  const opts = icon.options || {};
+  const html = '<div style="position:relative;width:100%;height:100%;outline:2px dashed #f59e0b;'
+    + 'outline-offset:2px;border-radius:50%">' + (opts.html || '')
+    + '<span style="position:absolute;top:-9px;right:-9px;font-size:11px;line-height:1;'
+    + 'filter:drop-shadow(0 1px 1px rgba(0,0,0,.6))">🧪</span></div>';
+  return L.divIcon({ className: opts.className || '', html, iconSize: opts.iconSize, iconAnchor: opts.iconAnchor });
 }
 // Alle markers bijwerken bij zoom
 function refreshAllMarkerIcons(){
@@ -1603,6 +1617,13 @@ function deleteMarkerAndAssociations(marker){
   if(meta.photoPath){ deleteActionPhoto(meta.photoPath); } // Fix 215: foto opruimen uit Storage
   markersGroup.removeLayer(marker); allMarkers = allMarkers.filter(m=>m!==marker);
 }
+// Fix 221: demo-account-herkenning — hergebruikt om testdata van dit account apart te
+// markeren (demo:true), zodat het nooit met echte waarnemingen kan worden verward.
+const DEMO_EMAIL = 'demo@hoornaarzoeken.nl';
+function _isDemoAccount(){
+  return (auth.currentUser?.email || '').toLowerCase() === DEMO_EMAIL;
+}
+
 function persistMarker(marker){
   const m=marker._meta||{}; if(!m.id) m.id=genId('mk'); marker._meta=m;
   const ll=marker.getLatLng();
@@ -1615,6 +1636,7 @@ function persistMarker(marker){
     valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null,
     photoUrl:m.photoUrl||null, photoPath:m.photoPath||null
   };
+  if(_isDemoAccount()) doc.demo = true;
   saveMarkerToCloud(doc);
 }
 // ======================= Zichtlijnen =======================
@@ -2410,6 +2432,7 @@ function persistLine(line){
     note: m.note||'', photoUrl: m.photoUrl||null, photoPath: m.photoPath||null,
     latlngs: ll.map(p=>({lat:p.lat,lng:p.lng}))
   };
+  if(_isDemoAccount()) doc.demo = true;
   saveLineToCloud(doc);
 }
 function persistSector(sector){
@@ -2417,6 +2440,7 @@ function persistSector(sector){
   const doc = { id:m.id, type:'sector', pot:m.pot||null, distance:m.distance||0,
     color:m.color||'#ffcc00', bearing:m.bearing||0, rInner:m.rInner||0, rOuter:m.rOuter||0,
     angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null };
+  if(_isDemoAccount()) doc.demo = true;
   saveSectorToCloud(doc);
 }
 // Verplaats alle lijnen/sectoren van een pot naar nieuwe positie (live tijdens drag)
@@ -2621,6 +2645,7 @@ function persistPolygon(layer){
   const zoneId = layer._props.zoneId || normalizeZone($('sel-group')?.value || '');
   if(!layer._props.zoneId) layer._props.zoneId = zoneId;
   const doc = { id, label:layer._props.label||'', color:layer._props.color||'#0aa879', latlngs, zoneId };
+  if(_isDemoAccount()) doc.demo = true;
   savePolygonToCloud(doc);
 }
 // ======================= Unified contextmenu =======================
@@ -2793,6 +2818,7 @@ function upsertMarkerFromCloud(doc){
       ruimer: doc.ruimer||null, methode: doc.methode||null, succes: doc.succes||null,
       valtype: doc.valtype||null, koninginnen: doc.koninginnen!=null ? doc.koninginnen : null,
       photoUrl: doc.photoUrl||null, photoPath: doc.photoPath||null,
+      demo: doc.demo === true,
       // Bron metadata
       source: doc.source||null, externalId: doc.externalId||null,
       gbifKey: doc.gbifKey||null, gbifDataset: doc.gbifDataset||null,
@@ -2850,6 +2876,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.koninginnen = doc.koninginnen!=null ? doc.koninginnen : null;
     m._meta.photoUrl = doc.photoUrl||null;
     m._meta.photoPath = doc.photoPath||null;
+    m._meta.demo = doc.demo === true;
     m._meta.source = doc.source||null;
     m._meta.externalId = doc.externalId||null;
     m._meta.gbifKey = doc.gbifKey||null;
@@ -2914,6 +2941,7 @@ function upsertSectorFromCloud(doc){
     id: doc.id, pot: doc.pot, distance: doc.distance, color: doc.color, bearing: doc.bearing,
     rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft||45, angleRight: doc.angleRight||45, steps: doc.steps||36, flightId: doc.flightId
   }).addTo(circlesGroup);
+  sector._meta.demo = doc.demo === true;
   registerSector(sector);
   if(line){ line._sector = sector; sector._line = line; }
   else {
@@ -2947,7 +2975,7 @@ function upsertPolygonFromCloud(doc){
   const latlngs = (doc.latlngs||[]).map(pt=>L.latLng(pt.lat,pt.lng));
   const lp = L.polygon(latlngs).addTo(polygonsGroup);
   // Label altijd opslaan — refreshPolygonLabel bepaalt zichtbaarheid op basis van actief gebied
-  lp._props = { id: doc.id, label: doc.label||'', color: doc.color||'#0aa879', zoneId: doc.zoneId||'' };
+  lp._props = { id: doc.id, label: doc.label||'', color: doc.color||'#0aa879', zoneId: doc.zoneId||'', demo: doc.demo === true };
   initPolygon(lp);
 }
 function _removePolygonLayer(p){
@@ -3457,7 +3485,7 @@ function _swRenderNearbyMap(body) {
 
   const statusEl = document.createElement('div');
   statusEl.style.cssText = 'font-size:13px;color:#94a3b8;text-align:center;min-height:16px';
-  statusEl.textContent = '🔄 Locatie zoeken…';
+  statusEl.textContent = _isDemoAccount() ? '' : '🔄 Locatie zoeken…';
   body.appendChild(statusEl);
 
   const startCenter = map ? map.getCenter() : L.latLng(52.1, 5.3);
@@ -3489,7 +3517,9 @@ function _swRenderNearbyMap(body) {
     }
   });
 
-  if (navigator.geolocation) {
+  // Fix 221: voor het demo-account geen GPS gebruiken — anders centreert de kaart op de
+  // échte locatie van de tester i.p.v. binnen het toegewezen demo-gebied te blijven.
+  if (navigator.geolocation && !_isDemoAccount()) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 8, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(nMap).bindPopup('📍 Jouw locatie');
@@ -3505,9 +3535,18 @@ function _swRenderNearbyMap(body) {
 
 function _swRenderLocation(body) {
   body.appendChild(_swTitle('Waar is dit?'));
-  body.appendChild(_swSubtitle('Sta je er nu bij? Gebruik dan gewoon je huidige locatie.'));
   const statusEl = document.createElement('div');
   statusEl.style.cssText = 'font-size:15px;color:#475569;min-height:20px';
+  if (_isDemoAccount()) {
+    // Fix 221: GPS uitgeschakeld voor het demo-account — anders zou testdata op de
+    // WERKELIJKE locatie van de tester terechtkomen, mogelijk buiten (of zelfs binnen,
+    // en dan niet meer te onderscheiden van) de gebieden waar dit demo-account voor bedoeld is.
+    body.appendChild(_swSubtitle('Demo-account: wijs de plek zelf aan binnen het demo-gebied.'));
+    body.appendChild(_swBigButton('Ik wijs het zelf aan op de kaart', '🗺️', () => _swGoto('location_map'), 'border-color:#0aa879'));
+    body.appendChild(statusEl);
+    return;
+  }
+  body.appendChild(_swSubtitle('Sta je er nu bij? Gebruik dan gewoon je huidige locatie.'));
   body.appendChild(_swBigButton('Gebruik mijn huidige locatie', '📍', () => {
     statusEl.textContent = '🔄 Locatie zoeken…';
     if (!navigator.geolocation) { statusEl.textContent = '⚠️ Geen locatie beschikbaar op dit toestel — wijs de plek zelf aan.'; return; }
@@ -3557,7 +3596,7 @@ function _swRenderLocationMap(body) {
   const pickMap = L.map('sw-pick-map', { zoomControl: true, attributionControl: false }).setView(startCenter, _sw.latlng ? 17 : 14);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(pickMap);
   setTimeout(() => pickMap.invalidateSize(), 60);
-  if (!_sw.latlng && navigator.geolocation) {
+  if (!_sw.latlng && navigator.geolocation && !_isDemoAccount()) {
     navigator.geolocation.getCurrentPosition(pos => { pickMap.setView([pos.coords.latitude, pos.coords.longitude], 17); }, () => {}, { timeout: 8000 });
   }
 
@@ -3693,9 +3732,11 @@ function _swRenderPotPick(body) {
   if (bounds.length) potMap.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
   else infoEl.textContent = '⚠️ Geen lokpotten gevonden in dit gebied.';
 
-  // Fix 212: centreer op de huidige locatie i.p.v. uit te zoomen naar ALLE potjes in de zone —
+  // Fix 212/221: centreer op de huidige locatie i.p.v. uit te zoomen naar ALLE potjes in de zone —
   // zo zie je meteen het dichtstbijzijnde potje, ook als er potjes ver weg in hetzelfde gebied staan.
-  if (navigator.geolocation) {
+  // Voor het demo-account NIET doen: dat zou de kaart naar de échte locatie van de tester
+  // verplaatsen, mogelijk ver buiten (of verwarrend middenin) het toegewezen demo-gebied.
+  if (navigator.geolocation && !_isDemoAccount()) {
     navigator.geolocation.getCurrentPosition(pos => {
       const userLL = L.latLng(pos.coords.latitude, pos.coords.longitude);
       L.circleMarker(userLL, { radius: 7, color: '#2563eb', weight: 2, fillColor: '#60a5fa', fillOpacity: 0.9 }).addTo(potMap);
@@ -4284,6 +4325,7 @@ async function loadReport(days, targetId = 'report-content', excludeGbif = false
       const markers = [];
       markerSnap.forEach(d => {
         const data = d.data();
+        if (data.demo === true) return; // demo-account-data telt nooit mee in de tellingen
         if (excludeGbif && data.source === 'GBIF') return;
         if (isToday) {
           if (!data.date || data.date !== todayStr) return;
@@ -4295,6 +4337,7 @@ async function loadReport(days, targetId = 'report-content', excludeGbif = false
       const polys = [];
       polySnap.forEach(d => {
         const data = d.data();
+        if (data.demo === true) return; // demo-account-polygonen niet in het overzicht
         if (data.latlngs && data.latlngs.length > 2) {
           polys.push({ label: data.label || '(geen naam)', latlngs: data.latlngs, count: emptyCount() });
         }
@@ -4447,8 +4490,7 @@ async function _initUserRole() {
     setTimeout(() => _cleanupOrphanSectors(), 3000);
 
     // Demo account welkomstpopup
-    const DEMO_EMAIL = 'demo@hoornaarzoeken.nl';
-    if ((auth.currentUser?.email || '').toLowerCase() === DEMO_EMAIL) {
+    if (_isDemoAccount()) {
       _showDemoWelcome();
     }
 
