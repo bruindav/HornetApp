@@ -1,4 +1,4 @@
-// admin.js — Fix 209
+// admin.js — Fix 221
 // Wijziging t.o.v. Fix 26:
 // - Welkomst-email via EmailJS (client-side) i.p.v. Firebase Trigger Email extensie
 // - sendWelcomeEmail() gebruikt emailjs.send() via CDN
@@ -1627,6 +1627,8 @@ function openOverzichtTab() {
   const yearOpts = Array.from({length: curY - 2019}, (_, i) => curY - i)
     .map(y => `<option value="${y}"${y===curY?' selected':''}>${y}</option>`).join('');
 
+  const isAdmin = _adminRole === 'admin';
+
   body.innerHTML = `
     <div style="padding:12px">
       <div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -1640,6 +1642,11 @@ function openOverzichtTab() {
           <input type="checkbox" id="rpt-exclude-gbif"/> GBIF uitsluiten
         </label>
       </div>
+      ${isAdmin ? `
+      <div style="margin-bottom:10px;padding:8px 10px;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:#92400e">🧪 Testdata van het demo-account telt al niet mee hierboven, maar staat nog wel op de kaart.</span>
+        <button id="rpt-wipe-demo" style="padding:5px 10px;border-radius:5px;border:1px solid #dc2626;background:#fff;color:#dc2626;font-size:12px;cursor:pointer">🗑️ Wis demo-data (jaar ${curY})</button>
+      </div>` : ''}
       <div id="report-content-modal" style="font-size:12px">
         <span style="color:#94a3b8">Laden...</span>
       </div>
@@ -1668,7 +1675,38 @@ function openOverzichtTab() {
     }
   });
 
+  body.querySelector('#rpt-wipe-demo')?.addEventListener('click', () => _wipeDemoData(curY));
+
   _triggerReportLoad('today');
+}
+
+// Fix 221: alle demo-account-data (demo:true) voor een jaar verwijderen, over alle
+// gebieden heen. Alleen zichtbaar/uitvoerbaar voor admins.
+async function _wipeDemoData(year) {
+  if (!confirm(`Alle demo-data uit ${year} verwijderen (alle gebieden)? Dit kan niet ongedaan gemaakt worden.`)) return;
+  const btn = document.getElementById('rpt-wipe-demo');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Bezig...'; }
+  try {
+    const zonesSnap = await getDoc(doc(db, 'config', 'zones'));
+    const zones = zonesSnap.exists() ? (zonesSnap.data().zones || []).map(z => z.key || z) : [];
+    let removed = 0;
+    for (const zone of zones) {
+      const base = 'maps/' + year + '/' + zone + '/data';
+      for (const col of ['markers', 'lines', 'sectors', 'polygons']) {
+        const q = query(collection(db, base, col), where('demo', '==', true));
+        const snap = await getDocs(q);
+        for (const d of snap.docs) {
+          await deleteDoc(doc(db, base, col, d.id));
+          removed++;
+        }
+      }
+    }
+    alert(`Klaar — ${removed} demo-item(s) verwijderd uit ${year}.`);
+  } catch (e) {
+    alert('Opruimen mislukt: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = `🗑️ Wis demo-data (jaar ${year})`; }
+  }
 }
 
 function _triggerReportLoad(days) {
