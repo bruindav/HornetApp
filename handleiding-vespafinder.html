@@ -1,0 +1,264 @@
+<!-- Fix 222 -->
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vespa Finder – balletjes uitgelegd</title>
+<style>
+  :root{
+    --inkt:#20201c;
+    --papier:#faf6ec;
+    --goud:#c99a1e;
+    --goud-donker:#93720f;
+    --geel:#f2b400;
+    --blauw:#2f7dd1;
+    --oranje:#e06a1c;
+    --rood:#c0392b;
+    --lijn:#e2d9c2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--papier);
+    color:var(--inkt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    line-height:1.5;
+  }
+  header{
+    background:linear-gradient(135deg,var(--goud) 0%, var(--goud-donker) 100%);
+    color:#fff;
+    padding:28px 20px 24px;
+  }
+  header h1{
+    margin:0 0 4px;
+    font-size:1.5rem;
+    letter-spacing:-0.01em;
+  }
+  header p{
+    margin:0;
+    opacity:.92;
+    font-size:.95rem;
+  }
+  main{
+    max-width:640px;
+    margin:0 auto;
+    padding:20px 16px 60px;
+  }
+  .intro{
+    background:#fff;
+    border:1px solid var(--lijn);
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:22px;
+    font-size:.98rem;
+  }
+  section{
+    margin-bottom:30px;
+  }
+  h2{
+    font-size:1.15rem;
+    margin:0 0 12px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  h2 .nr{
+    background:var(--inkt);
+    color:#fff;
+    width:28px;height:28px;
+    border-radius:50%;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    font-size:.9rem;
+    flex-shrink:0;
+  }
+  .kaart{
+    background:#fff;
+    border:1px solid var(--lijn);
+    border-radius:14px;
+    padding:18px;
+  }
+  .rij{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:12px 0;
+    border-bottom:1px solid var(--lijn);
+  }
+  .rij:last-child{border-bottom:none;}
+  .voorbeeld{
+    flex-shrink:0;
+    width:56px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .bal{
+    width:40px;height:40px;
+    border-radius:50%;
+    background:var(--geel);
+    display:flex;align-items:center;justify-content:center;
+    color:#fff;font-weight:700;font-size:1rem;
+    box-shadow:0 1px 3px rgba(0,0,0,.2);
+  }
+  .bal.lokaal{border:4px solid var(--geel);background:var(--oranje);}
+  .bal.afstand{border:4px solid var(--blauw);background:var(--oranje);}
+  .bal.dun{border-width:2px;}
+  .driehoek{
+    width:0;height:0;
+    border-left:20px solid transparent;
+    border-right:20px solid transparent;
+    border-bottom:36px solid var(--oranje);
+    position:relative;
+  }
+  .driehoek::after{
+    content:"8";
+    position:absolute;
+    top:14px;left:-6px;
+    color:#fff;font-weight:700;font-size:.85rem;
+  }
+  .uitleg strong{display:block;font-size:.98rem;margin-bottom:2px;}
+  .uitleg span{font-size:.9rem;color:#4a4638;}
+  .tip{
+    background:#fff7e0;
+    border:1px solid #ecd48a;
+    border-radius:12px;
+    padding:14px 16px;
+    font-size:.92rem;
+    margin-top:14px;
+  }
+  .tag-scherm{
+    background:var(--inkt);
+    color:#f5f0e0;
+    border-radius:14px;
+    padding:16px 18px;
+    font-family:"Courier New",monospace;
+    font-size:.95rem;
+  }
+  .tag-scherm .label{color:#c99a1e;font-weight:700;}
+  .balken{
+    display:flex;
+    align-items:flex-end;
+    gap:3px;
+    height:26px;
+    margin:10px 0;
+  }
+  .balken div{
+    width:6px;
+    background:#4a4638;
+    border-radius:2px;
+  }
+  .balken div.aan{background:var(--geel);}
+  .balken div:nth-child(1){height:25%;}
+  .balken div:nth-child(2){height:50%;}
+  .balken div:nth-child(3){height:70%;}
+  .balken div:nth-child(4){height:100%;}
+  footer{
+    text-align:center;
+    font-size:.8rem;
+    color:#8a8470;
+    padding:0 16px 30px;
+  }
+  .let-op{
+    border-left:4px solid var(--rood);
+    background:#fdecea;
+    padding:12px 14px;
+    border-radius:0 10px 10px 0;
+    font-size:.9rem;
+    margin-top:18px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🐝 Vespa Finder – de balletjes uitgelegd</h1>
+  <p>Korte handleiding voor het lezen van signalen op de kaart</p>
+</header>
+
+<main>
+
+  <div class="intro">
+    Als je een hoornaar hebt gezenderd, zie je op de kaart in Vespa Finder gekleurde balletjes en driehoekjes met een nummer. Dit legt uit wat je ziet en wat het betekent.
+  </div>
+
+  <section>
+    <h2><span class="nr">1</span> Vorm van het balletje</h2>
+    <div class="kaart">
+      <div class="rij">
+        <div class="voorbeeld"><div class="bal">1</div></div>
+        <div class="uitleg">
+          <strong>Rond balletje</strong>
+          <span>Signaal komt rechtstreeks van de zender op de hoornaar.</span>
+        </div>
+      </div>
+      <div class="rij">
+        <div class="voorbeeld"><div class="driehoek"></div></div>
+        <div class="uitleg">
+          <strong>Driehoek</strong>
+          <span>Signaal is doorgestuurd via een repeater (versterker), niet rechtstreeks ontvangen.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">2</span> Kleur van de rand</h2>
+    <div class="kaart">
+      <div class="rij">
+        <div class="voorbeeld"><div class="bal lokaal">6</div></div>
+        <div class="uitleg">
+          <strong>Gele rand</strong>
+          <span>Signaal lokaal opgevangen — jouw eigen telefoon heeft dit rechtstreeks ontvangen van tag of repeater.</span>
+        </div>
+      </div>
+      <div class="rij">
+        <div class="voorbeeld"><div class="bal afstand">6</div></div>
+        <div class="uitleg">
+          <strong>Blauwe rand</strong>
+          <span>Signaal op afstand ontvangen — een andere speurder heeft dit gedetecteerd en gedeeld via online synchronisatie.</span>
+        </div>
+      </div>
+      <div class="tip">
+        💡 Let ook op de <strong>dikte van de rand</strong>: een dikke rand betekent dat dit het laatste (meest recente) signaal is.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">3</span> Het nummer op het balletje</h2>
+    <div class="kaart">
+      <p style="margin-top:0;">Het nummer is <em>niet</em> de signaalsterkte. Vermoedelijk geeft het de volgorde van de waarnemingen aan, waarbij <strong>1 de meest recente</strong> is — dit is nog niet 100% bevestigd.</p>
+      <p style="margin-bottom:0;">Tik op een balletje om de details van die specifieke tag te openen (zie hieronder).</p>
+    </div>
+    <div class="tip">
+      🔍 <strong>Nog te verifiëren:</strong> of nummer 1 altijd de meest recente waarneming is, en of de volgorde per zender of over alle tags samen loopt.
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">4</span> Signaalsterkte aflezen (na tikken op een tag)</h2>
+    <div class="tag-scherm">
+      <span class="label">Tag 145A</span><br>
+      Signaal: -100 dB (0%)<br>
+      <div class="balken"><div></div><div></div><div></div><div></div></div>
+      Teller: 6290
+    </div>
+    <div class="tip">
+      💡 Hoe dichter bij <strong>0 dB</strong> (of hoe hoger het <strong>percentage</strong>), hoe sterker het signaal. -100 dB / 0% betekent nagenoeg geen signaal — loop rustig verder rond om een sterker signaal te vinden.
+    </div>
+    <div class="let-op">
+      ⚠️ Een zwak signaal (ver naar -100 dB) wil niet automatisch zeggen dat je ver van het nest bent — bomen, gebouwen en het gedrag van de hoornaar spelen ook mee. Combineer signaalsterkte altijd met geduldig observeren.
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  HoornaarZoeken — hulpmiddel bij het gebruik van de Vespa Finder app van Robor
+</footer>
+
+</body>
+</html>
