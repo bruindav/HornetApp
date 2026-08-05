@@ -1,10 +1,10 @@
-<!-- Fix 226 -->
+<!-- Fix 227 -->
 <!DOCTYPE html>
 <html lang="nl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vespa Finder – balletjes uitgelegd</title>
+<title>Vespa Finder – handleiding</title>
 <style>
   :root{
     --inkt:#20201c;
@@ -29,17 +29,33 @@
     background:linear-gradient(135deg,var(--goud) 0%, var(--goud-donker) 100%);
     color:#fff;
     padding:28px 20px 24px;
+    position:sticky;top:0;z-index:5;
   }
   header h1{
     margin:0 0 4px;
-    font-size:1.5rem;
+    font-size:1.4rem;
     letter-spacing:-0.01em;
   }
   header p{
     margin:0;
     opacity:.92;
-    font-size:.95rem;
+    font-size:.92rem;
   }
+  nav.inhoud{
+    max-width:640px;
+    margin:0 auto;
+    padding:16px 16px 0;
+  }
+  nav.inhoud ol{
+    background:#fff;
+    border:1px solid var(--lijn);
+    border-radius:14px;
+    padding:14px 18px 14px 34px;
+    margin:0;
+    font-size:.93rem;
+  }
+  nav.inhoud li{margin:4px 0;}
+  nav.inhoud a{color:var(--goud-donker);text-decoration:none;font-weight:600;}
   main{
     max-width:640px;
     margin:0 auto;
@@ -53,25 +69,39 @@
     margin-bottom:22px;
     font-size:.98rem;
   }
+  h1.hoofdstuk{
+    font-size:1.3rem;
+    margin:44px 0 6px;
+    padding-top:10px;
+    border-top:3px solid var(--goud);
+    scroll-margin-top:90px;
+  }
+  h1.hoofdstuk:first-of-type{margin-top:10px;}
+  .hoofdstuk-sub{
+    font-size:.92rem;
+    color:#7a7460;
+    margin:0 0 18px;
+  }
   section{
-    margin-bottom:30px;
+    margin-bottom:26px;
   }
   h2{
-    font-size:1.15rem;
+    font-size:1.1rem;
     margin:0 0 12px;
     display:flex;
     align-items:center;
     gap:10px;
+    scroll-margin-top:90px;
   }
   h2 .nr{
     background:var(--inkt);
     color:#fff;
-    width:28px;height:28px;
+    width:26px;height:26px;
     border-radius:50%;
     display:inline-flex;
     align-items:center;
     justify-content:center;
-    font-size:.9rem;
+    font-size:.85rem;
     flex-shrink:0;
   }
   .kaart{
@@ -80,6 +110,8 @@
     border-radius:14px;
     padding:18px;
   }
+  .kaart img{width:100%;border-radius:10px;border:1px solid var(--lijn);}
+  .kaart img + p, .kaart p + img{margin-top:12px;}
   .rij{
     display:flex;
     align-items:center;
@@ -88,103 +120,84 @@
     border-bottom:1px solid var(--lijn);
   }
   .rij:last-child{border-bottom:none;}
-  .voorbeeld{
-    flex-shrink:0;
-    width:56px;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
+  .voorbeeld{flex-shrink:0;width:56px;display:flex;align-items:center;justify-content:center;}
   .bal{
-    width:40px;height:40px;
-    border-radius:50%;
-    background:var(--geel);
+    width:40px;height:40px;border-radius:50%;background:var(--geel);
     display:flex;align-items:center;justify-content:center;
-    color:#fff;font-weight:700;font-size:1rem;
-    box-shadow:0 1px 3px rgba(0,0,0,.2);
+    color:#fff;font-weight:700;font-size:1rem;box-shadow:0 1px 3px rgba(0,0,0,.2);
   }
   .bal.lokaal{border:4px solid var(--geel);background:var(--oranje);}
   .bal.afstand{border:4px solid var(--blauw);background:var(--oranje);}
-  .bal.dun{border-width:2px;}
   .driehoek{
-    width:0;height:0;
-    border-left:20px solid transparent;
-    border-right:20px solid transparent;
-    border-bottom:36px solid var(--oranje);
-    position:relative;
+    width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;
+    border-bottom:36px solid var(--oranje);position:relative;
   }
-  .driehoek::after{
-    content:"8";
-    position:absolute;
-    top:14px;left:-6px;
-    color:#fff;font-weight:700;font-size:.85rem;
-  }
-  .uitleg strong{display:block;font-size:.98rem;margin-bottom:2px;}
-  .uitleg span{font-size:.9rem;color:#4a4638;}
-  .uitleg-blok strong{display:block;font-size:1rem;margin-bottom:4px;}
-  .uitleg-blok span{font-size:.92rem;color:#4a4638;}
+  .driehoek::after{content:"8";position:absolute;top:14px;left:-6px;color:#fff;font-weight:700;font-size:.85rem;}
+  .uitleg strong, .uitleg-blok strong{display:block;font-size:.98rem;margin-bottom:2px;}
+  .uitleg span, .uitleg-blok span{font-size:.9rem;color:#4a4638;}
   .tip{
-    background:#fff7e0;
-    border:1px solid #ecd48a;
-    border-radius:12px;
-    padding:14px 16px;
-    font-size:.92rem;
-    margin-top:14px;
+    background:#fff7e0;border:1px solid #ecd48a;border-radius:12px;
+    padding:14px 16px;font-size:.92rem;margin-top:14px;
   }
   .tag-scherm{
-    background:var(--inkt);
-    color:#f5f0e0;
-    border-radius:14px;
-    padding:16px 18px;
-    font-family:"Courier New",monospace;
-    font-size:.95rem;
+    background:var(--inkt);color:#f5f0e0;border-radius:14px;padding:16px 18px;
+    font-family:"Courier New",monospace;font-size:.95rem;
   }
   .tag-scherm .label{color:#c99a1e;font-weight:700;}
-  .balken{
-    display:flex;
-    align-items:flex-end;
-    gap:3px;
-    height:26px;
-    margin:10px 0;
-  }
-  .balken div{
-    width:6px;
-    background:#4a4638;
-    border-radius:2px;
-  }
+  .balken{display:flex;align-items:flex-end;gap:3px;height:26px;margin:10px 0;}
+  .balken div{width:6px;background:#4a4638;border-radius:2px;}
   .balken div.aan{background:var(--geel);}
   .balken div:nth-child(1){height:25%;}
   .balken div:nth-child(2){height:50%;}
   .balken div:nth-child(3){height:70%;}
   .balken div:nth-child(4){height:100%;}
-  footer{
-    text-align:center;
-    font-size:.8rem;
-    color:#8a8470;
-    padding:0 16px 30px;
-  }
   .let-op{
-    border-left:4px solid var(--rood);
-    background:#fdecea;
-    padding:12px 14px;
-    border-radius:0 10px 10px 0;
-    font-size:.9rem;
-    margin-top:18px;
+    border-left:4px solid var(--rood);background:#fdecea;padding:12px 14px;
+    border-radius:0 10px 10px 0;font-size:.9rem;margin-top:18px;
   }
+  ul.check{margin:0 0 0 -6px;padding-left:20px;}
+  ul.check li{margin:4px 0;}
+  footer{text-align:center;font-size:.8rem;color:#8a8470;padding:0 16px 30px;}
 </style>
 </head>
 <body>
 
 <header>
-  <h1>🐝 Vespa Finder – de balletjes uitgelegd</h1>
-  <p>Korte handleiding voor het lezen van signalen op de kaart</p>
+  <h1>🐝 Vespa Finder – handleiding</h1>
+  <p>Voor speurders van de Aziatische hoornaar</p>
 </header>
+
+<nav class="inhoud">
+  <ol>
+    <li><a href="#voorbereiding">Voorbereiding bij zenderactie</a></li>
+    <li><a href="#instellingen">Instellingen</a></li>
+    <li><a href="#kaartlezen">De kaart lezen tijdens zenderactie</a></li>
+    <li><a href="#registreren">Een hoornaar registreren</a></li>
+  </ol>
+</nav>
 
 <main>
 
   <div class="intro">
-    Als je een hoornaar hebt gezenderd, zie je op de kaart in Vespa Finder gekleurde balletjes en driehoekjes met een nummer. Dit legt uit wat je ziet en wat het betekent.
+    Vespa Finder is de app van Robor Nature waarmee je een gezenderde Aziatische hoornaar volgt naar het nest. Deze handleiding legt uit hoe je de app voorbereidt, instelt en tijdens het zoeken de kaart leest.
   </div>
+
+  <!-- ================= HOOFDSTUK 1: VOORBEREIDING ================= -->
+  <h1 class="hoofdstuk" id="voorbereiding">1. Voorbereiding bij zenderactie</h1>
+  <p class="hoofdstuk-sub">Wat je klaarzet en checkt vóór je het veld in gaat</p>
+
+  <section>
+    <div class="kaart">
+      <p style="margin-top:0;"><strong>Vóór vertrek:</strong></p>
+      <ul class="check">
+        <li>Telefoon volledig opgeladen (100%) — eventueel een powerbank meenemen</li>
+        <li>Bluetooth ingeschakeld</li>
+        <li>GPS / locatievoorziening ingeschakeld</li>
+        <li>Vespa Finder-app geïnstalleerd (Play Store voor Android, App Store voor iPhone)</li>
+        <li>Zender(s) en eventuele repeaters opgeladen en bij de hand</li>
+      </ul>
+    </div>
+  </section>
 
   <section>
     <h2><span class="nr">0</span> Wat is een zender en een repeater?</h2>
@@ -201,7 +214,7 @@
           <text x="106" y="20" font-size="11" fill="#c0392b" text-anchor="middle" font-family="inherit">signaal</text>
         </svg>
         <strong>Zender</strong>
-        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent. In de app zelf (en in dit document waar het over het schermpje gaat) heet dit onderdeel <strong>"tag"</strong> — dat is dezelfde zender.</span>
+        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent. In de app zelf heet dit onderdeel <strong>"tag"</strong> — dat is dezelfde zender.</span>
       </div>
       <div class="uitleg-blok" style="margin-top:20px;">
         <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
@@ -222,13 +235,108 @@
           <text x="250" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">telefoon</text>
         </svg>
         <strong>Repeater</strong>
-        <span>Een los apparaat dat je ergens in het veld neerzet (bv. op een paal, hek of in je rugzak). Het vangt het zwakke signaal van de zender op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren. Vandaar dat driehoekje op de kaart: dat signaal liep via de repeater, niet rechtstreeks van de zender naar jouw telefoon.</span>
+        <span>Een los apparaat dat je ergens in het veld neerzet of meeneemt (bv. op een paal, autodak of fiets). Het vangt het zwakke signaal van de zender op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren.</span>
       </div>
       <div class="tip">
-        ✅ <strong>Bevestigd — repeater = richtpistool:</strong> volgens een handleiding van stopfrelons.ch (partner van Robor Nature) worden de ontvangers/repeaters daar letterlijk <em>"pistolets"</em> (pistolen) genoemd, met montage-opties zoals op een autodak of fiets. Jouw "richtpistool" is dus vermoedelijk hetzelfde apparaat als de repeater — geen apart hulpmiddel. Dit klopt met het instellingenscherm van de app zelf, waar je bij <strong>Oriëntatie</strong> kunt kiezen tussen drie opstellingen voor je repeaters: <strong>T</strong>, <strong>Ster</strong> en <strong>Vork</strong> (zie sectie 5 hieronder).
+        ✅ <strong>Repeater = richtpistool:</strong> volgens een handleiding van stopfrelons.ch (partner van Robor Nature) worden repeaters daar letterlijk <em>"pistolets"</em> (pistolen) genoemd. Jouw "richtpistool" is dus hetzelfde apparaat als de repeater.
       </div>
     </div>
   </section>
+
+  <!-- ================= HOOFDSTUK 2: INSTELLINGEN ================= -->
+  <h1 class="hoofdstuk" id="instellingen">2. Instellingen</h1>
+  <p class="hoofdstuk-sub">Onder het tandwiel-icoon rechtsboven in de app</p>
+
+  <section>
+    <h2><span class="nr">1</span> Algemeen</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-algemeen.jpg" alt="Instellingen Algemeen: App Instellingen, Batterijoptimalisatie, Taal">
+      <p><strong>Batterijoptimalisatie uitschakelen</strong> is belangrijk: als Android/iOS de app op de achtergrond beperkt, kan die signalen missen tijdens het zoeken. Zet dit dus vooraf uit voor betrouwbaar scannen.</p>
+      <p style="margin-bottom:0;">Bij <strong>Taal</strong> stel je de schermtaal van de app in (bijvoorbeeld Nederlands).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">2</span> Kaart</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-kaart.jpg" alt="Instellingen Kaart: Wegen Tonen, Kaarttype, Offline kaarten, Cirkel Tekenen">
+      <ul class="check">
+        <li><strong>Wegen Tonen</strong> — overlay van straatnamen op de kaart</li>
+        <li><strong>Kaarttype</strong> — schakel tussen kaartweergave en satellietfoto</li>
+        <li><strong>Offline kaarten downloaden</strong> — handig voor gebieden zonder bereik</li>
+        <li><strong>Cirkel Tekenen</strong> — schakelt de cirkel-teken-functie op de kaart in (bv. voor zoekgebieden)</li>
+        <li><strong>Cirkel Teken Modus</strong> — kies of je de cirkel tekent op diameter of op straal</li>
+        <li><strong>Grenzen Tonen</strong> — toont gemeente-/plaatsgrenzen op de kaart</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">3</span> Kaartgedrag</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-kaartgedrag.jpg" alt="Instellingen: Auto-Centreren, Auto-Draaien, Schaalbalks, Stealth Modus">
+      <ul class="check">
+        <li><strong>Auto-Centreren op Nieuwste Marker</strong> — de kaart springt automatisch mee naar het laatste signaal</li>
+        <li><strong>Auto-Centreren op Huidige Positie</strong> — de kaart volgt in plaats daarvan jouw eigen locatie</li>
+        <li><strong>Auto-Draaien op Huidige Koers</strong> — de kaart draait mee met de richting waarin je loopt</li>
+        <li><strong>Schaalbalks Tonen</strong> — toont de afstandsschaal linksonder op de kaart</li>
+        <li><strong>Stealth Modus</strong> — maakt het scherm zwart/donker, handig om 's avonds minder op te vallen of batterij te sparen</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">4</span> Repeaters &amp; oriëntatie</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-repeaters.jpg" alt="Instellingen Repeaters: Inschakelen, Wissen, Oriëntatie T/Ster/Vork, Repeater-details">
+      <p><strong>Repeaters Inschakelen</strong> zet de repeater-functionaliteit aan; met <strong>Repeaters Wissen</strong> verwijder je alle ontdekte repeaters uit de lijst (bv. na een actie, om de lijst weer schoon te hebben).</p>
+      <p>Bij <strong>Oriëntatie</strong> kies je hoe je repeaters fysiek zijn opgesteld, zodat de app de peiling goed kan berekenen:</p>
+      <ul class="check">
+        <li><strong>T</strong> — repeaters in een T-vorm, bijvoorbeeld op een autodak</li>
+        <li><strong>Ster</strong> — repeaters in een stervorm (drie richtingen tegelijk)</li>
+        <li><strong>Vork</strong> — repeaters in een V-vorm, bijvoorbeeld op een fiets</li>
+      </ul>
+      <p style="margin-bottom:0;">Per repeater zie je naam, ID, signaalsterkte (dBm), status en van welke zender hij het laatst iets ontving.</p>
+      <img src="images/handleiding/vork-layout-kaart.jpg" alt="Voorbeeld van een Vork-opstelling met drie repeaters op de kaart" style="margin-top:12px;">
+      <p style="margin-bottom:0;font-size:.9rem;color:#4a4638;">Voorbeeld van een Vork-opstelling: drie repeaters (1, 2, 3) in V-vorm.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">5</span> Navigatie</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-navigatie.jpg" alt="Instellingen Navigatie: Deel waarschijnlijke nestrichting, Spoor Starten">
+      <ul class="check">
+        <li><strong>Deel waarschijnlijke nestrichting</strong> — deelt een richtingspijl naar de vermoedelijke nestlocatie met je team zodra een hoornaar is geselecteerd</li>
+        <li><strong>Spoor Starten</strong> — beheert de opname van jouw gelopen/gereden route (spoor) op de kaart</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">6</span> Opslag</h2>
+    <div class="kaart">
+      <img src="images/handleiding/instellingen-opslag.jpg" alt="Instellingen Opslag: Metingen, Markers en Cirkels Wissen, Melden bij Meldpunt Aziatische Hoornaar">
+      <ul class="check">
+        <li><strong>Metingen Wissen</strong> — verwijdert alle eerder gedetecteerde metingen</li>
+        <li><strong>Markers Wissen</strong> — verwijdert alle markers van de kaart</li>
+        <li><strong>Cirkels Wissen</strong> — verwijdert alle getekende cirkels</li>
+        <li><strong>Melden bij Meldpunt Aziatische Hoornaar</strong> — voegt deze optie toe wanneer je een nest deelt</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="nr">7</span> Online Sync</h2>
+    <div class="kaart">
+      <img src="images/handleiding/online-sync-uitleg.jpg" alt="Uitleg Online Synchronisatie in de app">
+      <p style="margin:0;">Met <strong>Online Sync</strong> aan deelt je telefoon zenderlocaties in real-time met andere apparaten in je zoekteam — en ontvang je ook hun waarnemingen. Dit is de reden dat je balletjes met een <strong>blauwe rand</strong> kunt zien in het volgende hoofdstuk: die komen van een teamgenoot, niet van je eigen telefoon.</p>
+    </div>
+  </section>
+
+  <!-- ================= HOOFDSTUK 3: KAART LEZEN ================= -->
+  <h1 class="hoofdstuk" id="kaartlezen">3. De kaart lezen tijdens zenderactie</h1>
+  <p class="hoofdstuk-sub">Wat de balletjes, driehoekjes en kleuren betekenen zodra een hoornaar gezenderd is</p>
 
   <section>
     <h2><span class="nr">1</span> Vorm van het balletje</h2>
@@ -244,7 +352,7 @@
         <div class="voorbeeld"><div class="driehoek"></div></div>
         <div class="uitleg">
           <strong>Driehoek</strong>
-          <span>Signaal is doorgestuurd via een repeater (versterker), niet rechtstreeks ontvangen.</span>
+          <span>Signaal is doorgestuurd via een repeater, niet rechtstreeks ontvangen.</span>
         </div>
       </div>
     </div>
@@ -264,7 +372,7 @@
         <div class="voorbeeld"><div class="bal afstand">6</div></div>
         <div class="uitleg">
           <strong>Blauwe rand</strong>
-          <span>Signaal op afstand ontvangen — een andere speurder heeft dit gedetecteerd en gedeeld via online synchronisatie.</span>
+          <span>Signaal op afstand ontvangen — een andere speurder heeft dit gedetecteerd en gedeeld via Online Sync.</span>
         </div>
       </div>
       <div class="tip">
@@ -277,8 +385,8 @@
     <h2><span class="nr">3</span> Het nummer en de kleur van het balletje</h2>
     <div class="kaart">
       <p style="margin-top:0;">Het nummer is <em>niet</em> de signaalsterkte. Het geeft de volgorde van de waarnemingen aan: <strong>1 is de meest recente</strong> waarneming.<br>
-      <span style="font-size:.85rem;color:#4a4638;">✅ Bevestigd via een handleiding van stopfrelons.ch (partner van Robor Nature): "het laatst waargenomen balletje krijgt nummer 1".</span></p>
-      <p>De <strong>vulkleur</strong> van het balletje (bijvoorbeeld rood of oranje) komt overeen met de <strong>markeerkleur</strong> die je zelf kiest wanneer je die hoornaar registreert bij "Nieuwe Voorspelling" (zie sectie 6 hieronder) — dus de kleur verf/stift waarmee de hoornaar fysiek gemarkeerd is. Zo herken je bij meerdere gezenderde hoornaars snel welk balletje bij welk exemplaar hoort. ✅ Bevestigd met screenshot van het registratiescherm.</p>
+      <span style="font-size:.85rem;color:#4a4638;">✅ Bevestigd via een handleiding van stopfrelons.ch: "het laatst waargenomen balletje krijgt nummer 1".</span></p>
+      <p>De <strong>vulkleur</strong> van het balletje (bijvoorbeeld rood of oranje) komt overeen met de <strong>markeerkleur</strong> die je zelf kiest wanneer je die hoornaar registreert bij "Nieuwe Voorspelling" (zie hoofdstuk 4) — dus de kleur verf/stift waarmee de hoornaar fysiek gemarkeerd is. Zo herken je bij meerdere gezenderde hoornaars snel welk balletje bij welk exemplaar hoort.</p>
       <p style="margin-bottom:0;">Tik op een balletje om de details van die specifieke zender te openen (in de app zelf heet dit scherm "tag" — zie hieronder).</p>
     </div>
     <div class="let-op">
@@ -302,46 +410,25 @@
     </div>
   </section>
 
-  <section>
-    <h2><span class="nr">5</span> Repeaters opstellen en beheren</h2>
-    <div class="kaart">
-      <img src="images/handleiding/repeaters-orientatie.jpg" alt="Instellingen: Repeaters en Oriëntatie T/Ster/Vork" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin-bottom:12px;">
-      <p style="margin-top:0;">Bij <strong>Instellingen → Repeaters</strong> schakel je repeaters in en zie je per repeater: naam, ID, signaalsterkte (dBm), status, en van welke zender hij het laatst iets ontving.</p>
-      <p>Bij <strong>Oriëntatie</strong> kies je hoe je repeaters fysiek zijn opgesteld, zodat de app de peiling goed kan berekenen:</p>
-      <ul style="margin:0 0 0 -6px;padding-left:20px;">
-        <li><strong>T</strong> — repeaters in een T-vorm, bijvoorbeeld op een autodak</li>
-        <li><strong>Ster</strong> — repeaters in een stervorm (drie richtingen tegelijk)</li>
-        <li><strong>Vork</strong> — repeaters in een V-vorm, bijvoorbeeld op een fiets</li>
-      </ul>
-      <img src="images/handleiding/vork-layout-kaart.jpg" alt="Voorbeeld van een Vork-opstelling met drie repeaters op de kaart" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin-top:12px;">
-      <p style="margin-bottom:0;font-size:.9rem;color:#4a4638;">Voorbeeld van een Vork-opstelling: drie repeaters (1, 2, 3) in V-vorm. De kleur van de driehoek geeft hier vermoedelijk de signaalkwaliteit van die specifieke repeater aan op dat moment (groen = sterker, oranje = zwakker) — nog te bevestigen.</p>
-    </div>
-  </section>
+  <!-- ================= HOOFDSTUK 4: HOORNAAR REGISTREREN ================= -->
+  <h1 class="hoofdstuk" id="registreren">4. Een hoornaar registreren</h1>
+  <p class="hoofdstuk-sub">Via "Nieuwe Voorspelling", zodra je een gemarkeerde hoornaar spot</p>
 
   <section>
-    <h2><span class="nr">6</span> Een hoornaar registreren (Nieuwe Voorspelling)</h2>
     <div class="kaart">
-      <img src="images/handleiding/context-menu.jpg" alt="Menu op de kaart: Nieuwe Voorspelling, Nieuw Nest, Locatie Kopiëren" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin-bottom:12px;">
+      <img src="images/handleiding/context-menu.jpg" alt="Menu op de kaart: Nieuwe Voorspelling, Nieuw Nest, Locatie Kopiëren">
       <p style="margin-top:0;">Tik en houd vast op de kaart (of op je huidige positie) om dit menu te openen. Kies <strong>"Nieuwe Voorspelling"</strong> om een gemarkeerde hoornaar te registreren.</p>
-      <img src="images/handleiding/nieuwe-voorspelling-kleur.jpg" alt="Formulier Nieuwe Voorspelling: naam, markeerkleur, positie wiekpot" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin:12px 0;">
+      <img src="images/handleiding/nieuwe-voorspelling-kleur.jpg" alt="Formulier Nieuwe Voorspelling: naam, markeerkleur, positie wiekpot">
       <p><strong>Naam</strong> en de <strong>markeerkleur</strong> (Rood, Blauw, Goud, Groen, Oranje, Paars of Wit) — dit is de kleur verf/stift die je fysiek op de hoornaar hebt aangebracht, en wordt ook de vulkleur van het balletje op de kaart. Daaronder vul je de <strong>positie van de wiekpot</strong> (breedte-/lengtegraad) in, met knoppen om je huidige positie te gebruiken of te plakken.</p>
-      <img src="images/handleiding/vliegrichting-gewicht.jpg" alt="Terugkeertijd, vliegrichting, gewicht en temperatuur invullen" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin:12px 0;">
+      <img src="images/handleiding/vliegrichting-gewicht.jpg" alt="Terugkeertijd, vliegrichting, gewicht en temperatuur invullen">
       <p style="margin-bottom:0;">Vervolgens meet je de <strong>terugkeertijd</strong> (met start/reset-knop, afstand wordt automatisch berekend), de <strong>vliegrichting</strong> (kompas), en optioneel het <strong>gewicht</strong> (mg) en de <strong>buitentemperatuur</strong> (°C).</p>
-    </div>
-  </section>
-
-  <section>
-    <h2><span class="nr">7</span> Online Sync</h2>
-    <div class="kaart">
-      <img src="images/handleiding/online-sync-uitleg.jpg" alt="Uitleg Online Synchronisatie in de app" style="width:100%;border-radius:10px;border:1px solid var(--lijn);margin-bottom:12px;">
-      <p style="margin:0;">Met <strong>Online Sync</strong> aan deelt je telefoon zenderlocaties in real-time met andere apparaten in je zoekteam — en ontvang je ook hun waarnemingen. Dit is de reden dat je balletjes met een <strong>blauwe rand</strong> kunt zien (zie sectie 2): die komen van een teamgenoot, niet van je eigen telefoon.</p>
     </div>
   </section>
 
 </main>
 
 <footer>
-  HoornaarZoeken — hulpmiddel bij het gebruik van de Vespa Finder app van Robor
+  HoornaarZoeken — hulpmiddel bij het gebruik van de Vespa Finder app van Robor Nature
 </footer>
 
 </body>
