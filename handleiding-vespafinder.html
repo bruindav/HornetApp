@@ -1,4 +1,4 @@
-<!-- Fix 228 -->
+<!-- Fix 229 -->
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -206,49 +206,74 @@
   </section>
 
   <section>
-    <h2><span class="nr">0</span> Wat is een zender en een repeater?</h2>
+    <h2><span class="nr">0</span> Wat is een zender en een richtpistool (repeater)?</h2>
     <div class="kaart">
-      <div class="uitleg-blok">
-        <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
-          <ellipse cx="70" cy="55" rx="34" ry="16" fill="#f2b400"/>
-          <ellipse cx="95" cy="55" rx="14" ry="12" fill="#20201c"/>
-          <circle cx="106" cy="52" r="5" fill="#c0392b"/>
-          <circle cx="106" cy="52" r="9" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".6"/>
-          <circle cx="106" cy="52" r="15" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".35"/>
-          <circle cx="106" cy="52" r="21" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".2"/>
-          <text x="70" y="98" font-size="13" fill="#4a4638" text-anchor="middle" font-family="inherit">hoornaar + zender</text>
-          <text x="106" y="20" font-size="11" fill="#c0392b" text-anchor="middle" font-family="inherit">signaal</text>
-        </svg>
-        <strong>Zender</strong>
-        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent. In de app zelf heet dit onderdeel <strong>"tag"</strong> — dat is dezelfde zender.</span>
-      </div>
-      <div class="uitleg-blok" style="margin-top:20px;">
-        <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
-          <circle cx="40" cy="60" r="7" fill="#c0392b"/>
-          <circle cx="40" cy="60" r="13" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".5"/>
-          <rect x="130" y="40" width="34" height="46" rx="4" fill="#e06a1c"/>
-          <rect x="140" y="48" width="14" height="8" rx="2" fill="#fff"/>
-          <line x1="147" y1="40" x2="147" y2="24" stroke="#e06a1c" stroke-width="3"/>
-          <circle cx="147" cy="20" r="4" fill="#e06a1c"/>
-          <line x1="55" y1="55" x2="122" y2="45" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3 3"/>
-          <circle cx="250" cy="60" r="30" fill="none" stroke="#2f7dd1" stroke-width="2" opacity=".5"/>
-          <circle cx="250" cy="60" r="20" fill="none" stroke="#2f7dd1" stroke-width="2" opacity=".7"/>
-          <rect x="238" y="52" width="24" height="38" rx="4" fill="#20201c"/>
-          <rect x="242" y="58" width="16" height="22" rx="2" fill="#2f7dd1"/>
-          <line x1="172" y1="55" x2="228" y2="58" stroke="#2f7dd1" stroke-width="1.5" stroke-dasharray="3 3"/>
-          <text x="40" y="90" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">zender</text>
-          <text x="147" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">repeater</text>
-          <text x="250" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">telefoon</text>
-        </svg>
-        <strong>Repeater</strong>
-        <span>Een los apparaat dat je ergens in het veld neerzet of meeneemt (bv. op een paal, autodak of fiets). Het vangt het zwakke signaal van de zender op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren.</span>
-      </div>
+      <svg width="100%" height="290" viewBox="0 0 400 290" style="display:block;">
+        <style>
+          text{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;fill:#4a4638;}
+          .kop{font-weight:700;fill:#20201c;}
+        </style>
+
+        <!-- verbindingslijnen: zender naar richtpistolen (rood, gestippeld = direct signaal) -->
+        <line x1="80" y1="145" x2="185" y2="75" stroke="#c0392b" stroke-width="1.8" stroke-dasharray="4 4"/>
+        <line x1="80" y1="145" x2="185" y2="215" stroke="#c0392b" stroke-width="1.8" stroke-dasharray="4 4"/>
+        <!-- zender rechtstreeks naar 'Jij' telefoon (grijs gestippeld = ook mogelijk, maar zwakker) -->
+        <line x1="90" y1="145" x2="330" y2="145" stroke="#b7b0a0" stroke-width="1.5" stroke-dasharray="2 5"/>
+
+        <!-- verbindingslijnen: richtpistolen naar telefoons (oranje = versterkt/doorgestuurd signaal) -->
+        <line x1="215" y1="75" x2="315" y2="45" stroke="#e06a1c" stroke-width="2"/>
+        <line x1="215" y1="75" x2="315" y2="145" stroke="#e06a1c" stroke-width="2"/>
+        <line x1="215" y1="215" x2="315" y2="145" stroke="#e06a1c" stroke-width="2"/>
+        <line x1="215" y1="215" x2="315" y2="245" stroke="#e06a1c" stroke-width="2"/>
+
+        <!-- hoornaar + zender -->
+        <ellipse cx="55" cy="150" rx="30" ry="14" fill="#f2b400"/>
+        <ellipse cx="76" cy="150" rx="12" ry="10" fill="#20201c"/>
+        <circle cx="86" cy="147" r="4.5" fill="#c0392b"/>
+        <circle cx="86" cy="147" r="8" fill="none" stroke="#c0392b" stroke-width="1.3" opacity=".5"/>
+        <circle cx="86" cy="147" r="13" fill="none" stroke="#c0392b" stroke-width="1.3" opacity=".3"/>
+        <text x="55" y="180" font-size="12" text-anchor="middle">hoornaar + zender</text>
+
+        <!-- richtpistool 1 -->
+        <rect x="185" y="55" width="30" height="40" rx="4" fill="#e06a1c"/>
+        <rect x="192" y="63" width="16" height="9" rx="2" fill="#fff"/>
+        <line x1="200" y1="55" x2="200" y2="40" stroke="#e06a1c" stroke-width="3"/>
+        <circle cx="200" cy="36" r="3.5" fill="#e06a1c"/>
+        <text x="200" y="112" font-size="12" text-anchor="middle">Richtpistool 1</text>
+
+        <!-- richtpistool 2 -->
+        <rect x="185" y="195" width="30" height="40" rx="4" fill="#e06a1c"/>
+        <rect x="192" y="203" width="16" height="9" rx="2" fill="#fff"/>
+        <line x1="200" y1="195" x2="200" y2="180" stroke="#e06a1c" stroke-width="3"/>
+        <circle cx="200" cy="176" r="3.5" fill="#e06a1c"/>
+        <text x="200" y="252" font-size="12" text-anchor="middle">Richtpistool 2</text>
+
+        <!-- telefoon A: teamgenoot -->
+        <rect x="300" y="25" width="30" height="42" rx="5" fill="#8a8470"/>
+        <circle cx="315" cy="60" r="2.5" fill="#faf6ec"/>
+        <text x="315" y="82" font-size="11" text-anchor="middle">Teamgenoot</text>
+
+        <!-- telefoon B: Jij (uitgelicht) -->
+        <rect x="300" y="124" width="34" height="46" rx="5" fill="#2f7dd1" stroke="#20201c" stroke-width="1.5"/>
+        <circle cx="317" cy="162" r="2.5" fill="#faf6ec"/>
+        <text x="317" y="187" font-size="13" text-anchor="middle" class="kop">Jij</text>
+
+        <!-- telefoon C: teamgenoot -->
+        <rect x="300" y="225" width="30" height="42" rx="5" fill="#8a8470"/>
+        <circle cx="315" cy="260" r="2.5" fill="#faf6ec"/>
+        <text x="315" y="282" font-size="11" text-anchor="middle">Teamgenoot</text>
+      </svg>
+
+      <p style="margin-top:14px;"><strong>Zender</strong> — een klein zendertje op de hoornaar. Zendt continu een Bluetooth-signaal uit. In de app zelf heet dit onderdeel <strong>"tag"</strong> — dat is dezelfde zender.</p>
+      <p><strong>Richtpistool (repeater)</strong> — een los, richtinggevoelig apparaat dat het signaal van de zender opvangt en versterkt doorstuurt naar de telefoons in de buurt. Jullie gebruiken er meestal 3 tegelijk (hier zijn er 2 getekend voor overzicht); meer richtpistolen geven een betere peiling van de richting.</p>
+      <p style="margin-bottom:0;"><strong>Telefoon</strong> — ontvangt het signaal via een richtpistool (<span style="color:#e06a1c;">oranje lijn</span>, versterkt) óf rechtstreeks van de zender (<span style="color:#9a9382;">grijze stippellijn</span>, zwakker en op kortere afstand). Elke telefoon in het team kan zo meekijken.</p>
+
       <div class="tip">
         ✅ <strong>Repeater = richtpistool:</strong> volgens een handleiding van stopfrelons.ch (partner van Robor Nature) worden repeaters daar letterlijk <em>"pistolets"</em> (pistolen) genoemd. Jouw "richtpistool" is dus hetzelfde apparaat als de repeater.
       </div>
       <div class="tip">
         🔧 <strong>Hoe maakt de app contact met de zender? (moet je koppelen/pairen?)</strong><br>
-        Nee — er is geen traditionele Bluetooth-koppeling (pairing) nodig, zoals bij bijvoorbeeld oordopjes. De zender zendt continu een <strong>Bluetooth Low Energy (BLE)</strong>-signaal uit (een soort "roepsignaal" zonder verbinding), en je telefoon (of repeater) luistert dit signaal gewoon af zodra Bluetooth aanstaat. Volgens Robor Nature is dit bewust zo ontworpen: recente kits melden expliciet dat koppelen van zenders niet meer nodig is. Zet dus alleen Bluetooth aan — een koppelstap in je telefooninstellingen hoef je niet te doorlopen.
+        Nee — er is geen traditionele Bluetooth-koppeling (pairing) nodig, zoals bij bijvoorbeeld oordopjes. De zender zendt continu een <strong>Bluetooth Low Energy (BLE)</strong>-signaal uit (een soort "roepsignaal" zonder verbinding), en je telefoon of richtpistool luistert dit signaal gewoon af zodra Bluetooth aanstaat. Volgens Robor Nature is dit bewust zo ontworpen: recente kits melden expliciet dat koppelen van zenders niet meer nodig is. Zet dus alleen Bluetooth aan — een koppelstap in je telefooninstellingen hoef je niet te doorlopen.
       </div>
     </div>
   </section>
