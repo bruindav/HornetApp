@@ -1,4 +1,4 @@
-<!-- Fix 223 -->
+<!-- Fix 224 -->
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -187,7 +187,7 @@
   </div>
 
   <section>
-    <h2><span class="nr">0</span> Wat is een tag en een repeater?</h2>
+    <h2><span class="nr">0</span> Wat is een zender en een repeater?</h2>
     <div class="kaart">
       <div class="uitleg-blok">
         <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
@@ -197,11 +197,11 @@
           <circle cx="106" cy="52" r="9" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".6"/>
           <circle cx="106" cy="52" r="15" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".35"/>
           <circle cx="106" cy="52" r="21" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".2"/>
-          <text x="70" y="98" font-size="13" fill="#4a4638" text-anchor="middle" font-family="inherit">hoornaar + tag</text>
+          <text x="70" y="98" font-size="13" fill="#4a4638" text-anchor="middle" font-family="inherit">hoornaar + zender</text>
           <text x="106" y="20" font-size="11" fill="#c0392b" text-anchor="middle" font-family="inherit">signaal</text>
         </svg>
-        <strong>Tag (zender)</strong>
-        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent.</span>
+        <strong>Zender</strong>
+        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent. In de app zelf (en in dit document waar het over het schermpje gaat) heet dit onderdeel <strong>"tag"</strong> — dat is dezelfde zender.</span>
       </div>
       <div class="uitleg-blok" style="margin-top:20px;">
         <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
@@ -217,12 +217,15 @@
           <rect x="238" y="52" width="24" height="38" rx="4" fill="#20201c"/>
           <rect x="242" y="58" width="16" height="22" rx="2" fill="#2f7dd1"/>
           <line x1="172" y1="55" x2="228" y2="58" stroke="#2f7dd1" stroke-width="1.5" stroke-dasharray="3 3"/>
-          <text x="40" y="90" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">tag</text>
+          <text x="40" y="90" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">zender</text>
           <text x="147" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">repeater</text>
           <text x="250" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">telefoon</text>
         </svg>
         <strong>Repeater</strong>
-        <span>Een los apparaat dat je ergens in het veld neerzet (bv. op een paal, hek of in je rugzak). Het vangt het zwakke signaal van de tag op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren. Vandaar dat driehoekje op de kaart: dat signaal liep via de repeater, niet rechtstreeks van de tag naar jouw telefoon.</span>
+        <span>Een los apparaat dat je ergens in het veld neerzet (bv. op een paal, hek of in je rugzak). Het vangt het zwakke signaal van de zender op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren. Vandaar dat driehoekje op de kaart: dat signaal liep via de repeater, niet rechtstreeks van de zender naar jouw telefoon.</span>
+      </div>
+      <div class="tip">
+        🔍 <strong>Nog te verifiëren — repeater vs. richtpistool:</strong> volgens Robor's eigen documentatie lijkt de <strong>repeater</strong> een apparaat dat je ergens neerzet om het bereik te vergroten (relay), terwijl de <strong>handontvanger / richtantenne</strong> ("richtpistool") een apparaat is dat je vasthoudt en op een richting mikt om uit te peilen waar het signaal vandaan komt. Dat lijken dus twee verschillende hulpmiddelen te zijn, geen synoniem. Kun je bevestigen of jouw "richtpistool" inderdaad het richt-/uitpeilapparaat is, en niet de repeater?
       </div>
     </div>
   </section>
@@ -254,7 +257,7 @@
         <div class="voorbeeld"><div class="bal lokaal">6</div></div>
         <div class="uitleg">
           <strong>Gele rand</strong>
-          <span>Signaal lokaal opgevangen — jouw eigen telefoon heeft dit rechtstreeks ontvangen van tag of repeater.</span>
+          <span>Signaal lokaal opgevangen — jouw eigen telefoon heeft dit rechtstreeks ontvangen van zender of repeater.</span>
         </div>
       </div>
       <div class="rij">
@@ -274,15 +277,15 @@
     <h2><span class="nr">3</span> Het nummer op het balletje</h2>
     <div class="kaart">
       <p style="margin-top:0;">Het nummer is <em>niet</em> de signaalsterkte. Vermoedelijk geeft het de volgorde van de waarnemingen aan, waarbij <strong>1 de meest recente</strong> is — dit is nog niet 100% bevestigd.</p>
-      <p style="margin-bottom:0;">Tik op een balletje om de details van die specifieke tag te openen (zie hieronder).</p>
+      <p style="margin-bottom:0;">Tik op een balletje om de details van die specifieke zender te openen (in de app zelf heet dit scherm "tag" — zie hieronder).</p>
     </div>
     <div class="tip">
-      🔍 <strong>Nog te verifiëren:</strong> of nummer 1 altijd de meest recente waarneming is, en of de volgorde per zender of over alle tags samen loopt.
+      🔍 <strong>Nog te verifiëren:</strong> of nummer 1 altijd de meest recente waarneming is, en of de volgorde per zender of over alle zenders samen loopt.
     </div>
   </section>
 
   <section>
-    <h2><span class="nr">4</span> Signaalsterkte aflezen (na tikken op een tag)</h2>
+    <h2><span class="nr">4</span> Signaalsterkte aflezen (na tikken op een zender)</h2>
     <div class="tag-scherm">
       <span class="label">Tag 145A</span><br>
       Signaal: -100 dB (0%)<br>
