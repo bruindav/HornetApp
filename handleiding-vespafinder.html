@@ -1,4 +1,4 @@
-<!-- Fix 222 -->
+<!-- Fix 223 -->
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -121,6 +121,8 @@
   }
   .uitleg strong{display:block;font-size:.98rem;margin-bottom:2px;}
   .uitleg span{font-size:.9rem;color:#4a4638;}
+  .uitleg-blok strong{display:block;font-size:1rem;margin-bottom:4px;}
+  .uitleg-blok span{font-size:.92rem;color:#4a4638;}
   .tip{
     background:#fff7e0;
     border:1px solid #ecd48a;
@@ -183,6 +185,47 @@
   <div class="intro">
     Als je een hoornaar hebt gezenderd, zie je op de kaart in Vespa Finder gekleurde balletjes en driehoekjes met een nummer. Dit legt uit wat je ziet en wat het betekent.
   </div>
+
+  <section>
+    <h2><span class="nr">0</span> Wat is een tag en een repeater?</h2>
+    <div class="kaart">
+      <div class="uitleg-blok">
+        <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
+          <ellipse cx="70" cy="55" rx="34" ry="16" fill="#f2b400"/>
+          <ellipse cx="95" cy="55" rx="14" ry="12" fill="#20201c"/>
+          <circle cx="106" cy="52" r="5" fill="#c0392b"/>
+          <circle cx="106" cy="52" r="9" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".6"/>
+          <circle cx="106" cy="52" r="15" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".35"/>
+          <circle cx="106" cy="52" r="21" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".2"/>
+          <text x="70" y="98" font-size="13" fill="#4a4638" text-anchor="middle" font-family="inherit">hoornaar + tag</text>
+          <text x="106" y="20" font-size="11" fill="#c0392b" text-anchor="middle" font-family="inherit">signaal</text>
+        </svg>
+        <strong>Tag (zender)</strong>
+        <span>Een klein zendertje dat op de hoornaar wordt bevestigd. Het zendt continu een radiosignaal uit, dat de Vespa Finder-app opvangt. Zo kun je de hoornaar te voet volgen — hoe sterker het signaal, hoe dichterbij je meestal bent.</span>
+      </div>
+      <div class="uitleg-blok" style="margin-top:20px;">
+        <svg width="100%" height="110" viewBox="0 0 320 110" style="display:block;margin-bottom:8px;">
+          <circle cx="40" cy="60" r="7" fill="#c0392b"/>
+          <circle cx="40" cy="60" r="13" fill="none" stroke="#c0392b" stroke-width="1.5" opacity=".5"/>
+          <rect x="130" y="40" width="34" height="46" rx="4" fill="#e06a1c"/>
+          <rect x="140" y="48" width="14" height="8" rx="2" fill="#fff"/>
+          <line x1="147" y1="40" x2="147" y2="24" stroke="#e06a1c" stroke-width="3"/>
+          <circle cx="147" cy="20" r="4" fill="#e06a1c"/>
+          <line x1="55" y1="55" x2="122" y2="45" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <circle cx="250" cy="60" r="30" fill="none" stroke="#2f7dd1" stroke-width="2" opacity=".5"/>
+          <circle cx="250" cy="60" r="20" fill="none" stroke="#2f7dd1" stroke-width="2" opacity=".7"/>
+          <rect x="238" y="52" width="24" height="38" rx="4" fill="#20201c"/>
+          <rect x="242" y="58" width="16" height="22" rx="2" fill="#2f7dd1"/>
+          <line x1="172" y1="55" x2="228" y2="58" stroke="#2f7dd1" stroke-width="1.5" stroke-dasharray="3 3"/>
+          <text x="40" y="90" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">tag</text>
+          <text x="147" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">repeater</text>
+          <text x="250" y="100" font-size="12" fill="#4a4638" text-anchor="middle" font-family="inherit">telefoon</text>
+        </svg>
+        <strong>Repeater</strong>
+        <span>Een los apparaat dat je ergens in het veld neerzet (bv. op een paal, hek of in je rugzak). Het vangt het zwakke signaal van de tag op en stuurt het versterkt door naar je telefoon. Zo vergroot je het bereik, bijvoorbeeld over grotere afstand of achter bomen/gebouwen die het directe signaal blokkeren. Vandaar dat driehoekje op de kaart: dat signaal liep via de repeater, niet rechtstreeks van de tag naar jouw telefoon.</span>
+      </div>
+    </div>
+  </section>
 
   <section>
     <h2><span class="nr">1</span> Vorm van het balletje</h2>
