@@ -1,4 +1,4 @@
-<!-- Fix 227 -->
+<!-- Fix 228 -->
 <!DOCTYPE html>
 <html lang="nl">
 <head>
@@ -180,6 +180,11 @@
 
   <div class="intro">
     Vespa Finder is de app van Robor Nature waarmee je een gezenderde Aziatische hoornaar volgt naar het nest. Deze handleiding legt uit hoe je de app voorbereidt, instelt en tijdens het zoeken de kaart leest.
+    <p style="margin:12px 0 0;">De app op je eigen telefoon is zowel een <strong>alternatief</strong> als een <strong>aanvulling</strong> op de richtpistolen (repeaters):</p>
+    <ul class="check" style="margin-top:6px;">
+      <li><strong>Alternatief</strong> — je telefoon kan zelf het BLE-signaal van de zender ontvangen, dus je kunt ook zonder richtpistool zoeken (handig als je er niet genoeg hebt, of als iedereen in het team meekijkt).</li>
+      <li><strong>Aanvulling</strong> — een richtpistool is gevoeliger en richtingsgevoelig, en kan het signaal versterkt doorsturen naar je telefoon (dan zie je een driehoekje i.p.v. een rondje). Zo vergroot je het bereik en de nauwkeurigheid t.o.v. alleen je telefoon.</li>
+    </ul>
   </div>
 
   <!-- ================= HOOFDSTUK 1: VOORBEREIDING ================= -->
@@ -193,7 +198,8 @@
         <li>Telefoon volledig opgeladen (100%) — eventueel een powerbank meenemen</li>
         <li>Bluetooth ingeschakeld</li>
         <li>GPS / locatievoorziening ingeschakeld</li>
-        <li>Vespa Finder-app geïnstalleerd (Play Store voor Android, App Store voor iPhone)</li>
+        <li>Vespa Finder-app geïnstalleerd (Play Store voor Android, App Store voor iPhone) én <strong>bijgewerkt naar de laatste versie</strong> — updates verbeteren regelmatig de ontvangst</li>
+        <li><strong>Batterijbesparing/batterijoptimalisatie uitgeschakeld</strong> voor de app — anders beperkt je telefoon de achtergrondactiviteit, wat zorgt voor een zwakkere of onderbroken ontvangst (zie ook hoofdstuk 2, Algemeen)</li>
         <li>Zender(s) en eventuele repeaters opgeladen en bij de hand</li>
       </ul>
     </div>
@@ -239,6 +245,10 @@
       </div>
       <div class="tip">
         ✅ <strong>Repeater = richtpistool:</strong> volgens een handleiding van stopfrelons.ch (partner van Robor Nature) worden repeaters daar letterlijk <em>"pistolets"</em> (pistolen) genoemd. Jouw "richtpistool" is dus hetzelfde apparaat als de repeater.
+      </div>
+      <div class="tip">
+        🔧 <strong>Hoe maakt de app contact met de zender? (moet je koppelen/pairen?)</strong><br>
+        Nee — er is geen traditionele Bluetooth-koppeling (pairing) nodig, zoals bij bijvoorbeeld oordopjes. De zender zendt continu een <strong>Bluetooth Low Energy (BLE)</strong>-signaal uit (een soort "roepsignaal" zonder verbinding), en je telefoon (of repeater) luistert dit signaal gewoon af zodra Bluetooth aanstaat. Volgens Robor Nature is dit bewust zo ontworpen: recente kits melden expliciet dat koppelen van zenders niet meer nodig is. Zet dus alleen Bluetooth aan — een koppelstap in je telefooninstellingen hoef je niet te doorlopen.
       </div>
     </div>
   </section>
