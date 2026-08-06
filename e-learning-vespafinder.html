@@ -1,0 +1,546 @@
+<!-- Fix 231 -->
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vespa Finder – e-learning</title>
+<style>
+  :root{
+    --inkt:#20201c;
+    --papier:#faf6ec;
+    --goud:#c99a1e;
+    --goud-donker:#93720f;
+    --geel:#f2b400;
+    --blauw:#2f7dd1;
+    --oranje:#e06a1c;
+    --rood:#c0392b;
+    --groen:#3a8c4a;
+    --lijn:#e2d9c2;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--papier);
+    color:var(--inkt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    line-height:1.5;
+  }
+  header{
+    background:linear-gradient(135deg,var(--goud) 0%, var(--goud-donker) 100%);
+    color:#fff;
+    padding:24px 20px 20px;
+    position:sticky;top:0;z-index:5;
+  }
+  header h1{margin:0 0 4px;font-size:1.35rem;letter-spacing:-0.01em;}
+  header p{margin:0 0 14px;opacity:.92;font-size:.9rem;}
+
+  .stepper{display:flex;gap:6px;max-width:640px;margin:0 auto;}
+  .stap{
+    flex:1;height:8px;border-radius:5px;
+    background:rgba(255,255,255,.35);
+    cursor:pointer;
+    position:relative;
+  }
+  .stap.klaar{background:#fff;}
+  .stap.actief{background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.5);}
+
+  main{max-width:640px;margin:0 auto;padding:20px 16px 70px;}
+
+  .voortgangtekst{font-size:.85rem;color:#7a7460;margin-bottom:16px;text-align:center;}
+
+  .hoofdstuk{display:none;}
+  .hoofdstuk.actief{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  .hoofdstuk h2.titel{font-size:1.3rem;margin:0 0 4px;}
+  .hoofdstuk .sub{font-size:.92rem;color:#7a7460;margin:0 0 18px;}
+
+  section{margin-bottom:24px;}
+  h3{font-size:1.05rem;margin:0 0 10px;display:flex;align-items:center;gap:9px;}
+  h3 .nr{
+    background:var(--inkt);color:#fff;width:24px;height:24px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;
+  }
+  .kaart{background:#fff;border:1px solid var(--lijn);border-radius:14px;padding:18px;}
+  .kaart img{width:100%;border-radius:10px;border:1px solid var(--lijn);}
+  .kaart img + p, .kaart p + img{margin-top:12px;}
+  ul.check{margin:0 0 0 -6px;padding-left:20px;}
+  ul.check li{margin:4px 0;}
+  .tip{background:#fff7e0;border:1px solid #ecd48a;border-radius:12px;padding:14px 16px;font-size:.92rem;margin-top:14px;}
+
+  .rij{display:flex;align-items:center;gap:16px;padding:12px 0;border-bottom:1px solid var(--lijn);}
+  .rij:last-child{border-bottom:none;}
+  .voorbeeld{flex-shrink:0;width:56px;display:flex;align-items:center;justify-content:center;}
+  .bal{width:40px;height:40px;border-radius:50%;background:var(--geel);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:1rem;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .bal.lokaal{border:4px solid var(--geel);background:var(--oranje);}
+  .bal.afstand{border:4px solid var(--blauw);background:var(--oranje);}
+  .driehoek{width:0;height:0;border-left:20px solid transparent;border-right:20px solid transparent;border-bottom:36px solid var(--oranje);position:relative;}
+  .driehoek::after{content:"8";position:absolute;top:14px;left:-6px;color:#fff;font-weight:700;font-size:.85rem;}
+  .uitleg strong{display:block;font-size:.98rem;margin-bottom:2px;}
+  .uitleg span{font-size:.9rem;color:#4a4638;}
+
+  /* Toets */
+  .toets{background:#fff;border:2px solid var(--goud);border-radius:14px;padding:18px;}
+  .toets h3{margin-bottom:14px;}
+  .vraag{margin-bottom:22px;}
+  .vraag:last-child{margin-bottom:0;}
+  .vraag p.tekst{font-weight:600;margin:0 0 10px;}
+  .opties{display:flex;flex-direction:column;gap:8px;}
+  .optie{
+    text-align:left;background:var(--papier);border:1.5px solid var(--lijn);border-radius:10px;
+    padding:11px 14px;font-size:.95rem;cursor:pointer;color:var(--inkt);
+    font-family:inherit;
+  }
+  .optie:disabled{cursor:default;}
+  .optie.goed{background:#e5f3e7;border-color:var(--groen);color:#215c2c;font-weight:600;}
+  .optie.fout{background:#fdecea;border-color:var(--rood);color:#8c2c22;}
+  .optie.gemist{border-color:var(--groen);border-style:dashed;}
+  .feedback{font-size:.85rem;margin-top:6px;color:#4a4638;}
+
+  .navigatie{display:flex;justify-content:space-between;gap:10px;margin-top:26px;}
+  .btn{
+    border:none;border-radius:12px;padding:13px 20px;font-size:.98rem;font-weight:700;
+    cursor:pointer;font-family:inherit;
+  }
+  .btn.primair{background:var(--goud-donker);color:#fff;}
+  .btn.primair:disabled{background:#d8cfa9;cursor:not-allowed;}
+  .btn.secundair{background:#fff;border:1.5px solid var(--lijn);color:var(--inkt);}
+
+  .badge-voltooid{
+    display:inline-flex;align-items:center;gap:6px;background:#e5f3e7;color:#215c2c;
+    border-radius:20px;padding:4px 12px;font-size:.82rem;font-weight:600;margin-bottom:14px;
+  }
+
+  .afronding{text-align:center;padding:30px 10px;}
+  .afronding .emoji{font-size:3rem;margin-bottom:10px;}
+  .afronding h2{font-size:1.4rem;margin:0 0 8px;}
+  .scorebord{
+    display:flex;justify-content:center;gap:18px;margin:20px 0;flex-wrap:wrap;
+  }
+  .scorebord .item{background:#fff;border:1px solid var(--lijn);border-radius:12px;padding:12px 18px;min-width:110px;}
+  .scorebord .item .getal{font-size:1.5rem;font-weight:700;color:var(--goud-donker);}
+  .scorebord .item .label{font-size:.8rem;color:#7a7460;}
+
+  footer{text-align:center;font-size:.8rem;color:#8a8470;padding:20px 16px 30px;}
+  .reset-link{background:none;border:none;color:#8a8470;text-decoration:underline;font-size:.8rem;cursor:pointer;font-family:inherit;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎓 Vespa Finder – e-learning</h1>
+  <p id="voortgang-header">Hoofdstuk 1 van 4</p>
+  <div class="stepper" id="stepper"></div>
+</header>
+
+<main>
+  <div class="voortgangtekst" id="voortgangtekst"></div>
+  <div id="hoofdstukken"></div>
+
+  <div class="afronding" id="afronding" style="display:none;">
+    <div class="emoji">🏆</div>
+    <h2>Gefeliciteerd, module voltooid!</h2>
+    <p>Je hebt alle hoofdstukken van de Vespa Finder e-learning doorlopen.</p>
+    <div class="scorebord" id="scorebord"></div>
+    <button class="btn secundair" onclick="opnieuwBeginnen()">Opnieuw beginnen</button>
+  </div>
+</main>
+
+<footer>
+  HoornaarZoeken — e-learning voor de Vespa Finder app van Robor Nature<br>
+  <button class="reset-link" onclick="opnieuwBeginnen()">Voortgang wissen</button>
+</footer>
+
+<script>
+const HOOFDSTUKKEN = [
+{
+  titel: "1. Voorbereiding & basisbegrippen",
+  sub: "Wat je klaarzet vóór je het veld in gaat, en wat een zender/richtpistool is",
+  inhoud: `
+    <section>
+      <div class="kaart">
+        <p style="margin-top:0;"><strong>Vóór vertrek:</strong></p>
+        <ul class="check">
+          <li>Telefoon volledig opgeladen (100%)</li>
+          <li>Bluetooth en GPS ingeschakeld</li>
+          <li>Vespa Finder-app bijgewerkt naar de laatste versie</li>
+          <li>Batterijbesparing/batterijoptimalisatie uitgeschakeld voor de app</li>
+          <li>Zender(s) en richtpistolen opgeladen</li>
+        </ul>
+      </div>
+    </section>
+    <section>
+      <h3><span class="nr">i</span> Zender en richtpistool</h3>
+      <div class="kaart">
+        <p style="margin-top:0;"><strong>Zender</strong> — klein zendertje op de hoornaar, zendt continu een Bluetooth Low Energy (BLE)-signaal uit. In de app heet dit "tag".</p>
+        <p><strong>Richtpistool (repeater)</strong> — los, richtinggevoelig apparaat dat het signaal opvangt en versterkt doorstuurt naar je telefoon. Jullie gebruiken er meestal 3 tegelijk, rondom het zoekgebied.</p>
+        <p style="margin-bottom:0;">Er is <strong>geen pairing/koppeling</strong> nodig — je telefoon of richtpistool "luistert" het BLE-signaal gewoon af zodra Bluetooth aanstaat.</p>
+        <div class="tip">💡 De telefoon-app is zowel een <strong>alternatief</strong> (je kunt ook zonder richtpistool zoeken) als een <strong>aanvulling</strong> (een richtpistool is gevoeliger en richtingsgevoelig).</div>
+      </div>
+    </section>
+  `,
+  toets: [
+    {
+      vraag: "Wat moet je vóór vertrek zeker doen voor een betrouwbare ontvangst?",
+      opties: ["Bluetooth uitzetten", "Batterijbesparing/batterijoptimalisatie voor de app uitschakelen", "Alleen wifi gebruiken, geen mobiele data"],
+      goed: 1,
+      uitleg: "Batterijbesparing kan de app op de achtergrond beperken, waardoor je signalen mist."
+    },
+    {
+      vraag: "Is pairing (koppelen) nodig tussen je telefoon en de zender?",
+      opties: ["Ja, altijd via Bluetooth-instellingen", "Nee, de zender zendt continu BLE uit en je telefoon luistert dit af", "Alleen bij Android, niet bij iPhone"],
+      goed: 1,
+      uitleg: "Er is geen traditionele Bluetooth-koppeling nodig, zoals bij oordopjes."
+    },
+    {
+      vraag: "Een richtpistool wordt in de app-documentatie ook wel genoemd:",
+      opties: ["Tag", "Repeater", "Wiekpot"],
+      goed: 1,
+      uitleg: "Repeater = richtpistool: hetzelfde apparaat, twee namen."
+    },
+    {
+      vraag: "Wat kan een richtpistool beter dan je telefoon alleen?",
+      opties: ["Het is goedkoper", "Het is gevoeliger en richtingsgevoelig", "Het heeft meer opslagruimte"],
+      goed: 1,
+      uitleg: "Een richtpistool versterkt en richt het signaal, wat de peiling nauwkeuriger maakt."
+    }
+  ]
+},
+{
+  titel: "2. Instellingen",
+  sub: "De belangrijkste opties onder het tandwiel-icoon",
+  inhoud: `
+    <section>
+      <h3><span class="nr">1</span> Algemeen & kaart</h3>
+      <div class="kaart">
+        <img src="images/handleiding/instellingen-algemeen.jpg" alt="Instellingen Algemeen">
+        <p><strong>Batterijoptimalisatie uitschakelen</strong> voorkomt gemiste signalen tijdens het zoeken.</p>
+        <p style="margin-bottom:0;">Bij <strong>Kaart</strong> stel je o.a. kaarttype, offline kaarten en cirkel tekenen in.</p>
+      </div>
+    </section>
+    <section>
+      <h3><span class="nr">2</span> Repeaters & oriëntatie</h3>
+      <div class="kaart">
+        <img src="images/handleiding/instellingen-repeaters.jpg" alt="Instellingen Repeaters en Oriëntatie">
+        <p style="margin-bottom:0;">Bij <strong>Oriëntatie</strong> kies je hoe je richtpistolen zijn opgesteld: <strong>T</strong> (bv. autodak), <strong>Ster</strong> (drie richtingen), of <strong>Vork</strong> (V-vorm, bv. op de fiets).</p>
+      </div>
+    </section>
+    <section>
+      <h3><span class="nr">3</span> Online Sync</h3>
+      <div class="kaart">
+        <img src="images/handleiding/online-sync-uitleg.jpg" alt="Online Sync uitleg">
+        <p style="margin:0;">Deelt zenderlocaties real-time met je team — verklaart de blauwe rand rond balletjes van teamgenoten (zie hoofdstuk 3).</p>
+      </div>
+    </section>
+  `,
+  toets: [
+    {
+      vraag: "Waarom batterijoptimalisatie uitschakelen voor de app?",
+      opties: ["Voor een langere batterijduur van je telefoon", "Anders beperkt de telefoon de achtergrondactiviteit → zwakkere ontvangst", "Om sneller kaarten te downloaden"],
+      goed: 1,
+      uitleg: "Achtergrondbeperking kan signalen missen tijdens het zoeken."
+    },
+    {
+      vraag: "Welke drie repeater-oriëntaties kun je kiezen?",
+      opties: ["Lijn / Cirkel / Kruis", "T / Ster / Vork", "Boven / Onder / Zijkant"],
+      goed: 1,
+      uitleg: "T, Ster en Vork zijn de drie fysieke opstellingen voor je richtpistolen."
+    },
+    {
+      vraag: "Wat doet Online Sync?",
+      opties: ["Downloadt offline kaarten", "Deelt zenderlocaties real-time met je team", "Verhoogt de signaalsterkte van je zender"],
+      goed: 1,
+      uitleg: "Online Sync zorgt dat je ook waarnemingen van teamgenoten ziet."
+    }
+  ]
+},
+{
+  titel: "3. De kaart lezen tijdens zenderactie",
+  sub: "Balletjes, driehoekjes, kleuren en signaalsterkte",
+  inhoud: `
+    <section>
+      <h3><span class="nr">1</span> Vorm van het balletje</h3>
+      <div class="kaart">
+        <div class="rij">
+          <div class="voorbeeld"><div class="bal">1</div></div>
+          <div class="uitleg"><strong>Rond balletje</strong><span>Signaal rechtstreeks van de zender.</span></div>
+        </div>
+        <div class="rij">
+          <div class="voorbeeld"><div class="driehoek"></div></div>
+          <div class="uitleg"><strong>Driehoek</strong><span>Signaal doorgestuurd via een repeater.</span></div>
+        </div>
+      </div>
+    </section>
+    <section>
+      <h3><span class="nr">2</span> Kleur van de rand</h3>
+      <div class="kaart">
+        <div class="rij">
+          <div class="voorbeeld"><div class="bal lokaal">6</div></div>
+          <div class="uitleg"><strong>Gele rand</strong><span>Lokaal opgevangen door jouw telefoon.</span></div>
+        </div>
+        <div class="rij">
+          <div class="voorbeeld"><div class="bal afstand">6</div></div>
+          <div class="uitleg"><strong>Blauwe rand</strong><span>Ontvangen via Online Sync van een teamgenoot.</span></div>
+        </div>
+        <div class="tip">💡 Een dikke rand = het meest recente signaal.</div>
+      </div>
+    </section>
+    <section>
+      <h3><span class="nr">3</span> Nummer, kleur en signaal</h3>
+      <div class="kaart">
+        <p style="margin-top:0;"><strong>Nummer</strong> = volgorde van waarneming, <strong>1 is meest recent</strong> (niet de signaalsterkte).</p>
+        <p><strong>Vulkleur</strong> = de markeerkleur die je zelf koos bij registratie.</p>
+        <p style="margin-bottom:0;"><strong>Signaal</strong> in dB/%: hoe dichter bij <strong>0 dB</strong>, hoe sterker.</p>
+      </div>
+    </section>
+  `,
+  toets: [
+    {
+      vraag: "Wat betekent een driehoekje op de kaart?",
+      opties: ["Direct signaal van de zender", "Signaal doorgestuurd via een repeater", "De hoornaar zit op die exacte plek"],
+      goed: 1,
+      uitleg: "Rond = direct, driehoek = via repeater doorgestuurd."
+    },
+    {
+      vraag: "Wat betekent een blauwe rand om een balletje?",
+      opties: ["Signaal lokaal ontvangen door jouw telefoon", "Signaal via Online Sync van een teamgenoot ontvangen", "De zender heeft een zwakke batterij"],
+      goed: 1,
+      uitleg: "Blauw = op afstand ontvangen; geel = lokaal door jezelf ontvangen."
+    },
+    {
+      vraag: "Wat geeft het nummer op het balletje aan?",
+      opties: ["De signaalsterkte in dB", "De volgorde van waarneming — 1 is meest recent", "Het aantal keer dat de zender is opgeladen"],
+      goed: 1,
+      uitleg: "Het nummer zegt niets over signaalsterkte, alleen over de volgorde."
+    },
+    {
+      vraag: "Waar staat de vulkleur (bv. rood/oranje) van het balletje voor?",
+      opties: ["Het batterijniveau van de zender", "De markeerkleur die je zelf koos bij registratie", "De afstand tot het nest"],
+      goed: 1,
+      uitleg: "Dit is de kleur verf/stift waarmee de hoornaar fysiek gemarkeerd is."
+    },
+    {
+      vraag: "Hoe lees je de signaalsterkte in dB?",
+      opties: ["Hoe dichter bij 0 dB, hoe sterker het signaal", "Hoe dichter bij -100 dB, hoe sterker het signaal", "Het maakt niet uit, alleen het percentage telt"],
+      goed: 0,
+      uitleg: "-100 dB / 0% betekent nagenoeg geen signaal."
+    }
+  ]
+},
+{
+  titel: "4. Een hoornaar registreren",
+  sub: "Via \"Nieuwe Voorspelling\", zodra je een gemarkeerde hoornaar spot",
+  inhoud: `
+    <section>
+      <div class="kaart">
+        <img src="images/handleiding/context-menu.jpg" alt="Menu op de kaart">
+        <p style="margin-top:0;">Tik en houd vast op de kaart, kies <strong>"Nieuwe Voorspelling"</strong>.</p>
+        <img src="images/handleiding/nieuwe-voorspelling-kleur.jpg" alt="Formulier Nieuwe Voorspelling">
+        <p><strong>Naam</strong>, <strong>markeerkleur</strong> en de <strong>positie van de wiekpot</strong> (breedte-/lengtegraad) vul je in.</p>
+        <img src="images/handleiding/vliegrichting-gewicht.jpg" alt="Terugkeertijd en vliegrichting">
+        <p style="margin-bottom:0;"><strong>Terugkeertijd</strong>, <strong>vliegrichting</strong> en optioneel <strong>gewicht</strong> en <strong>temperatuur</strong>.</p>
+      </div>
+    </section>
+  `,
+  toets: [
+    {
+      vraag: "Via welk menu start je een nieuwe registratie?",
+      opties: ["Instellingen → Repeaters", "Lang indrukken op de kaart → \"Nieuwe Voorspelling\"", "De knop 'Legenda'"],
+      goed: 1,
+      uitleg: "Tik en houd vast op de kaart om het menu te openen."
+    },
+    {
+      vraag: "Wat vul je in bij 'Positie Wiekpot'?",
+      opties: ["Breedte- en lengtegraad", "Alleen een postcode", "De naam van de straat"],
+      goed: 0,
+      uitleg: "Je kunt je huidige positie gebruiken of coördinaten plakken."
+    },
+    {
+      vraag: "Welke gegevens zijn optioneel bij de registratie?",
+      opties: ["Naam en markeerkleur", "Gewicht en buitentemperatuur", "Positie van de wiekpot"],
+      goed: 1,
+      uitleg: "Gewicht (mg) en temperatuur (°C) zijn optionele velden."
+    }
+  ]
+}
+];
+
+let voortgang = JSON.parse(localStorage.getItem('vespaElearningVoortgang') || '{}');
+let huidigHoofdstuk = voortgang.huidig || 0;
+if(!voortgang.antwoorden) voortgang.antwoorden = {};
+if(!voortgang.voltooid) voortgang.voltooid = [];
+
+function bewaar(){
+  voortgang.huidig = huidigHoofdstuk;
+  localStorage.setItem('vespaElearningVoortgang', JSON.stringify(voortgang));
+}
+
+function bouwStepper(){
+  const el = document.getElementById('stepper');
+  el.innerHTML = '';
+  HOOFDSTUKKEN.forEach((h,i)=>{
+    const d = document.createElement('div');
+    d.className = 'stap' + (voortgang.voltooid.includes(i) ? ' klaar' : '') + (i===huidigHoofdstuk ? ' actief' : '');
+    d.onclick = () => { huidigHoofdstuk = i; render(); };
+    el.appendChild(d);
+  });
+}
+
+function bouwHoofdstuk(i){
+  const h = HOOFDSTUKKEN[i];
+  const wrap = document.createElement('div');
+  wrap.className = 'hoofdstuk' + (i===huidigHoofdstuk ? ' actief' : '');
+  wrap.id = 'hfst-' + i;
+
+  const klaar = voortgang.voltooid.includes(i);
+  wrap.innerHTML = `
+    ${klaar ? '<div class="badge-voltooid">✅ Voltooid</div>' : ''}
+    <h2 class="titel">${h.titel}</h2>
+    <p class="sub">${h.sub}</p>
+    ${h.inhoud}
+    <div class="toets" id="toets-${i}">
+      <h3>📝 Korte toets</h3>
+      <div id="vragen-${i}"></div>
+    </div>
+    <div class="navigatie">
+      <button class="btn secundair" ${i===0 ? 'disabled style="visibility:hidden;"' : ''} onclick="vorige()">← Vorige</button>
+      <button class="btn primair" id="volgende-${i}" onclick="volgende(${i})" ${klaar ? '' : 'disabled'}>${i===HOOFDSTUKKEN.length-1 ? 'Afronden' : 'Volgende →'}</button>
+    </div>
+  `;
+  return wrap;
+}
+
+function bouwVragen(i){
+  const h = HOOFDSTUKKEN[i];
+  const container = document.getElementById('vragen-' + i);
+  if(!container) return;
+  container.innerHTML = '';
+  const antwoorden = voortgang.antwoorden[i] || {};
+
+  h.toets.forEach((v, qi) => {
+    const div = document.createElement('div');
+    div.className = 'vraag';
+    const beantwoord = antwoorden[qi] !== undefined;
+    let optiesHtml = '';
+    v.opties.forEach((o, oi) => {
+      let klasse = 'optie';
+      if(beantwoord){
+        if(oi === v.goed) klasse += ' goed';
+        else if(oi === antwoorden[qi]) klasse += ' fout';
+      }
+      optiesHtml += `<button class="${klasse}" ${beantwoord ? 'disabled' : ''} onclick="beantwoord(${i},${qi},${oi})">${o}</button>`;
+    });
+    div.innerHTML = `
+      <p class="tekst">${qi+1}. ${v.vraag}</p>
+      <div class="opties">${optiesHtml}</div>
+      ${beantwoord ? `<p class="feedback">${antwoorden[qi]===v.goed ? '✔️ Goed! ' : '❌ Niet helemaal. '}${v.uitleg}</p>` : ''}
+    `;
+    container.appendChild(div);
+  });
+
+  checkHoofdstukKlaar(i);
+}
+
+function beantwoord(hi, qi, oi){
+  if(!voortgang.antwoorden[hi]) voortgang.antwoorden[hi] = {};
+  voortgang.antwoorden[hi][qi] = oi;
+  bewaar();
+  bouwVragen(hi);
+}
+
+function checkHoofdstukKlaar(i){
+  const h = HOOFDSTUKKEN[i];
+  const antwoorden = voortgang.antwoorden[i] || {};
+  const alleBeantwoord = h.toets.every((v, qi) => antwoorden[qi] !== undefined);
+  const knop = document.getElementById('volgende-' + i);
+  if(alleBeantwoord){
+    if(!voortgang.voltooid.includes(i)) voortgang.voltooid.push(i);
+    bewaar();
+    if(knop) knop.disabled = false;
+    const badgeCheck = document.querySelector('#hfst-' + i + ' .badge-voltooid');
+    if(!badgeCheck){
+      const titel = document.querySelector('#hfst-' + i + ' .titel');
+      const badge = document.createElement('div');
+      badge.className = 'badge-voltooid';
+      badge.textContent = '✅ Voltooid';
+      titel.parentNode.insertBefore(badge, titel);
+    }
+  } else if(knop){
+    knop.disabled = true;
+  }
+  bouwStepper();
+}
+
+function volgende(i){
+  if(i === HOOFDSTUKKEN.length - 1){
+    toonAfronding();
+  } else {
+    huidigHoofdstuk = i + 1;
+    render();
+  }
+}
+function vorige(){
+  huidigHoofdstuk = Math.max(0, huidigHoofdstuk - 1);
+  render();
+}
+
+function toonAfronding(){
+  document.getElementById('hoofdstukken').style.display = 'none';
+  document.getElementById('voortgangtekst').style.display = 'none';
+  const afronding = document.getElementById('afronding');
+  afronding.style.display = 'block';
+
+  let totaalGoed = 0, totaalVragen = 0;
+  HOOFDSTUKKEN.forEach((h, i) => {
+    const antwoorden = voortgang.antwoorden[i] || {};
+    h.toets.forEach((v, qi) => {
+      totaalVragen++;
+      if(antwoorden[qi] === v.goed) totaalGoed++;
+    });
+  });
+
+  document.getElementById('scorebord').innerHTML = `
+    <div class="item"><div class="getal">${voortgang.voltooid.length}/${HOOFDSTUKKEN.length}</div><div class="label">hoofdstukken</div></div>
+    <div class="item"><div class="getal">${totaalGoed}/${totaalVragen}</div><div class="label">goede antwoorden</div></div>
+  `;
+  document.getElementById('voortgang-header').textContent = 'Module voltooid 🎉';
+}
+
+function opnieuwBeginnen(){
+  if(!confirm('Weet je zeker dat je je voortgang wilt wissen?')) return;
+  localStorage.removeItem('vespaElearningVoortgang');
+  voortgang = {antwoorden:{}, voltooid:[]};
+  huidigHoofdstuk = 0;
+  document.getElementById('hoofdstukken').style.display = 'block';
+  document.getElementById('voortgangtekst').style.display = 'block';
+  document.getElementById('afronding').style.display = 'none';
+  render();
+}
+
+function render(){
+  bewaar();
+  const container = document.getElementById('hoofdstukken');
+  container.innerHTML = '';
+  HOOFDSTUKKEN.forEach((h, i) => {
+    if(i === huidigHoofdstuk){
+      container.appendChild(bouwHoofdstuk(i));
+    }
+  });
+  bouwVragen(huidigHoofdstuk);
+  bouwStepper();
+  document.getElementById('voortgang-header').textContent = `Hoofdstuk ${huidigHoofdstuk+1} van ${HOOFDSTUKKEN.length}`;
+  document.getElementById('voortgangtekst').textContent = `${voortgang.voltooid.length} van ${HOOFDSTUKKEN.length} hoofdstukken voltooid`;
+  window.scrollTo({top:0, behavior:'instant'});
+}
+
+if(voortgang.voltooid.length === HOOFDSTUKKEN.length){
+  bouwStepper();
+  toonAfronding();
+} else {
+  render();
+}
+</script>
+
+</body>
+</html>
