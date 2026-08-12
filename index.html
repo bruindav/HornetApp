@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 232 -->
+<!-- index.html — Fix 233 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -251,6 +251,18 @@
             <label>Gebied <input id="sel-group" list="groups" placeholder="Hoornaar_Zeist"/></label>
             <datalist id="groups"><option value="Hoornaar_Zeist"></option></datalist>
             <button id="apply-scope">Toepassen</button>
+          </div>
+
+          <button id="btn-tracking-mode" style="width:100%;margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <span>🎯</span><span>Opsporingsmodus</span>
+          </button>
+          <div style="font-size:10px;color:#94a3b8;margin-top:3px;text-align:center">Toont alleen zichtlijnen, verbergt alle iconen (alleen bij jou)</div>
+
+          <div style="margin-top:12px">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:flex;justify-content:space-between">
+              <span>📏 Dikte zichtlijnen</span><span id="line-weight-val">1.0</span>
+            </label>
+            <input id="line-weight-slider" type="range" min="0.5" max="1.5" step="0.1" value="1.0" style="width:100%;margin-top:4px"/>
           </div>
 
           <!-- Filters verplaatst naar filter popup (🔽 knop in kaart toolbar) -->
