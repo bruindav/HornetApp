@@ -1,4 +1,4 @@
-// app-core.js — Fix 240
+// app-core.js — Fix 241
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -562,7 +562,26 @@ const ZOOM_DOT   = 12;  // stip met letter
 const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 // Labels en zichtlijnen/sectoren alleen op straatniveau
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
-const ZOOM_LINES  = 11; // zichtlijnen + sectoren tonen >= dit niveau (was 13 — nog verder uitzoomen kan nu nog, handig voor screenshots)
+const LINES_MAX_SCALE_M = 500; // zichtlijnen/sectoren verbergen zodra de schaalbalk dit (of meer) toont
+
+// Fix 241: exact dezelfde 'mooi afgeronde' berekening als Leaflet's eigen schaalbalk
+// (L.Control.Scale), zodat "verberg boven 500m" precies overeenkomt met wat je op de
+// schaalbalk zelf ziet staan, i.p.v. een los geschat zoomniveau.
+function _currentScaleMeters(){
+  if(!map) return 0;
+  const bounds = map.getBounds();
+  const centerLat = bounds.getCenter().lat;
+  const halfWorldMeters = 6378137 * Math.PI * Math.cos(centerLat * Math.PI / 180);
+  const dist = halfWorldMeters * (bounds.getNorthEast().lng - bounds.getSouthWest().lng) / 180;
+  const size = map.getSize();
+  const maxWidth = 100; // zelfde standaardbreedte als L.control.scale()
+  const maxMeters = size.x > 0 ? dist * (maxWidth / size.x) : 0;
+  if(maxMeters <= 0) return 0;
+  const pow10 = Math.pow(10, (Math.floor(maxMeters) + '').length - 1);
+  const d = maxMeters / pow10;
+  const niceD = d >= 10 ? 10 : d >= 5 ? 5 : d >= 3 ? 3 : d >= 2 ? 2 : 1;
+  return pow10 * niceD;
+}
 
 // Icoon afbeeldingen — base64 PNG gebaseerd op gebruikersiconen
 const IMG = {
@@ -704,7 +723,7 @@ function refreshAllMarkerIcons(){
 function refreshZoomVisibility(){
   const zoom = map?.getZoom() || 14;
   const showLabels = zoom >= ZOOM_LABELS;
-  const showLines  = zoom >= ZOOM_LINES;
+  const showLines  = _currentScaleMeters() < LINES_MAX_SCALE_M;
 
   // Polygon labels — via Leaflet add/remove (betrouwbaarder dan display:none op tooltip)
   polygonsGroup.getLayers().forEach(layer => {
@@ -1773,8 +1792,9 @@ function _syncLineStartBall(line){
   const start = ll[0];
   const color = meta.color || '#ffcc00';
   const w = _getLineWeight();
-  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:w, color, fillColor:color}); }
-  else { line._startBall = L.circleMarker(start, {radius:w, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
+  const r = w * 2; // straal = 2x dikte → doorsnee = 4x dikte
+  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
+  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
 }
 
 function setSightLineColor(line,color,save=false){
@@ -2933,8 +2953,7 @@ function applyFilters(){
     }
     // Afstandslabel
     if(line._distLabel){
-      const zoom = map?.getZoom() || 14;
-      const showDist = should && zoom >= ZOOM_LINES;
+      const showDist = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
       const dle = line._distLabel.getElement?.();
       if(dle) dle.style.visibility = showDist ? '' : 'hidden';
     }
