@@ -1,4 +1,4 @@
-// app-core.js — Fix 242
+// app-core.js — Fix 243
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -470,6 +470,18 @@ function initUIBindings(){
       _setLineWeight(v);
     });
   }
+  const sectorOpacitySlider = document.getElementById('sector-opacity-slider');
+  const sectorOpacityVal = document.getElementById('sector-opacity-val');
+  if (sectorOpacitySlider) {
+    const initO = _getSectorOpacity();
+    sectorOpacitySlider.value = initO;
+    if (sectorOpacityVal) sectorOpacityVal.textContent = initO.toFixed(2);
+    sectorOpacitySlider.addEventListener('input', () => {
+      const v = parseFloat(sectorOpacitySlider.value);
+      if (sectorOpacityVal) sectorOpacityVal.textContent = v.toFixed(2);
+      _setSectorOpacity(v);
+    });
+  }
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -747,7 +759,7 @@ function refreshZoomVisibility(){
   });
   // Sectoren
   circlesGroup.getLayers().forEach(s => {
-    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? 0.25 : 0 });
+    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
   });
 }
 // ======================= Contextmenu infra =======================
@@ -1754,7 +1766,7 @@ function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner,
   const outer  = arcPoints(center, rOuter, start, end, steps);
   const inner  = arcPoints(center, rInner, end,   start, steps);
   const ring   = [...outer, ...inner];
-  const poly   = L.polygon(ring, {color, weight:1, dashArray:'6 6', fillColor:color, fillOpacity:0.25});
+  const poly   = L.polygon(ring, {color, weight:1, dashArray:'6 6', fillColor:color, fillOpacity:_getSectorOpacity()});
   poly._meta   = { id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
   return poly;
 }
@@ -2897,6 +2909,18 @@ function _setLineWeight(v){
   v = Math.min(1.5, Math.max(0.5, parseFloat(v) || 1.0));
   localStorage.setItem(LINE_WEIGHT_KEY, String(v));
   allLines.forEach(l => { l.setStyle({ weight: v }); _syncLineStartBall(l); });
+}
+
+// Fix 243: transparantie van de sectoren/bogen instelbaar (0.1-0.8), lokaal per toestel.
+const SECTOR_OPACITY_KEY = 'hornetapp_sector_opacity';
+function _getSectorOpacity(){
+  const v = parseFloat(localStorage.getItem(SECTOR_OPACITY_KEY));
+  return (!isNaN(v) && v >= 0.1 && v <= 0.8) ? v : 0.25;
+}
+function _setSectorOpacity(v){
+  v = Math.min(0.8, Math.max(0.1, parseFloat(v) || 0.25));
+  localStorage.setItem(SECTOR_OPACITY_KEY, String(v));
+  refreshZoomVisibility(); // herberekent fillOpacity per sector, met respect voor de schaal-zichtbaarheid
 }
 
 function applyFilters(){
