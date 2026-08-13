@@ -1,4 +1,4 @@
-// app-core.js — Fix 243
+// app-core.js — Fix 244
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -86,6 +86,11 @@ function initMap(){
   });
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     maxZoom:19, attribution:'© Esri — satelliet'
+  });
+  // Fix 244: CARTO Voyager — zelfde OSM-data, maar met veel beter leesbare, halo-omrande
+  // straatnamen die langs de weg meebuigen. Gratis raster-tegeldienst, geen API-sleutel nodig.
+  const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    maxZoom:20, subdomains:'abcd', attribution:'© OpenStreetMap-bijdragers, © CARTO'
   });
   osmLayer.addTo(map);
 
@@ -189,8 +194,8 @@ function initMap(){
     updateCompassSvg(heading);
   }
 
-  // Satelliet toggle — alleen via kaart contextmenu, geen losse knop
-  let _satMode = false;
+  // Kaartlaag-keuze — via kaart contextmenu, geen losse knop. Fix 244: nu 3 opties i.p.v. 2.
+  let _mapMode = 'osm'; // 'osm' | 'voyager' | 'sat'
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -211,23 +216,23 @@ function initMap(){
     snapMiddle: true       // snap ook naar het midden van bestaande lijnstukken
   });
 
-  // Sateliet-knop als custom Geoman control in de toolbar (topleft)
+  // Kaartlaag-knop als custom Geoman control in de toolbar (topleft)
   map.pm.Toolbar.createCustomControl({
     name: 'toggleSat',
     block: 'custom',
-    title: 'Wissel kaart / satelliet',
-    className: 'pm-icon-sat',
+    title: 'Kaartstijl wisselen (OpenStreetMap / CARTO Voyager / Satelliet)',
+    className: 'pm-icon-sat pm-icon-sat-osm',
     onClick: () => {
-      _satMode = !_satMode;
-      if (_satMode) {
-        map.removeLayer(osmLayer); satLayer.addTo(map);
-        document.querySelector('.pm-icon-sat')?.classList.add('active-sat');
-      } else {
-        map.removeLayer(satLayer); osmLayer.addTo(map);
-        document.querySelector('.pm-icon-sat')?.classList.remove('active-sat');
+      const layers = { osm: osmLayer, voyager: voyagerLayer, sat: satLayer };
+      const order = ['osm', 'voyager', 'sat'];
+      map.removeLayer(layers[_mapMode]);
+      _mapMode = order[(order.indexOf(_mapMode) + 1) % order.length];
+      layers[_mapMode].addTo(map);
+      const btn = document.querySelector('.pm-icon-sat');
+      if (btn) {
+        btn.classList.remove('pm-icon-sat-osm', 'pm-icon-sat-voyager', 'pm-icon-sat-sat');
+        btn.classList.add('pm-icon-sat-' + _mapMode);
       }
-      // Ook de losse toggle knop rechtsonder bijwerken
-      // (toggle knop staat alleen in contextmenu)
     },
     toggle: false,
   });
