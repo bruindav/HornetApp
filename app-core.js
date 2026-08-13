@@ -1,4 +1,4 @@
-// app-core.js — Fix 221
+// app-core.js — Fix 233
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -455,6 +455,20 @@ function initUIBindings(){
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
   document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
   document.getElementById('btn-simple-mode')?.addEventListener('click', () => _swShowFromSidebar());
+  document.getElementById('btn-tracking-mode')?.addEventListener('click', () => _setTrackingMode(!_trackingMode));
+  _updateTrackingModeButton();
+  const lineWeightSlider = document.getElementById('line-weight-slider');
+  const lineWeightVal = document.getElementById('line-weight-val');
+  if (lineWeightSlider) {
+    const initW = _getLineWeight();
+    lineWeightSlider.value = initW;
+    if (lineWeightVal) lineWeightVal.textContent = initW.toFixed(1);
+    lineWeightSlider.addEventListener('input', () => {
+      const v = parseFloat(lineWeightSlider.value);
+      if (lineWeightVal) lineWeightVal.textContent = v.toFixed(1);
+      _setLineWeight(v);
+    });
+  }
   window.addEventListener('resize', _updateStatusbar, {passive:true});
   window.addEventListener('orientationchange', ()=>{ setTimeout(()=>{ updateHeaderHeightVar(); _updateStatusbar(); }, 250); }, {passive:true});
   setTimeout(()=>{ updateHeaderHeightVar(); try{ map?.invalidateSize(); }catch{} }, 200);
@@ -819,10 +833,12 @@ function openMarkerContextMenu(marker, x, y){
 function openLineContextMenu(line, x, y){
   closeContextMenu();
   const note = line._meta?.note || '';
+  const isHidden = _hiddenLineIds.has(line._meta?.id);
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Zichtlijn</h4>
   <button data-act="color">🎨 Kleur</button>
   <button data-act="note">📝 Opmerking</button>
+  <button data-act="toggle_visibility">${isHidden ? '👁️ Weer tonen' : '🙈 Verbergen (alleen bij mij)'}</button>
   <button data-act="fix_sector">🔧 Sector herstellen</button>
   <button data-act="delete">🗑️ Verwijderen</button>`;
   el.addEventListener('click',ev=>{
@@ -831,6 +847,7 @@ function openLineContextMenu(line, x, y){
     if(act==='delete'){ deleteSightLine(line,true); }
     else if(act==='color'){ openColorModal(line._meta?.color||'#ffcc00', col=>{ setSightLineColor(line,col,true); }); }
     else if(act==='note'){ openLineNoteModal(line); }
+    else if(act==='toggle_visibility'){ _toggleLineVisibility(line); }
     else if(act==='fix_sector'){
       // Verwijder en hermaak de sector voor deze lijn
       if(line._sector){ const sid=line._sector._meta?.id; if(sid) deleteSectorFromCloud(sid); circlesGroup.removeLayer(line._sector); line._sector=null; }
@@ -1787,7 +1804,7 @@ function startSightLine(lokpotMarker){
       const brg = ((compassBearing % 360) + 360) % 360;
       const endLatLng = destinationPoint(potLatLng, dist, brg);
       const id = genId('flight');
-      const line = L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:3}).addTo(linesGroup);
+      const line = L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:_getLineWeight()}).addTo(linesGroup);
       line._meta = { id, type:'flight',
         pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
         potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg, note:note||''
@@ -1815,7 +1832,7 @@ function startSightLine(lokpotMarker){
       const clicked = e.latlng; const brg = bearingBetween(potLatLng, clicked);
       const endLatLng = destinationPoint(potLatLng, dist, brg);
       const id = genId('flight');
-      const line = L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:3}).addTo(linesGroup);
+      const line = L.polyline([potLatLng, endLatLng],{color:defaultColor,weight:_getLineWeight()}).addTo(linesGroup);
       line._meta = { id, type:'flight',
         pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
         potId: lokpotMarker._meta?.potId||null, distance:dist, color:defaultColor, bearing:brg, note:note||''
@@ -2752,10 +2769,78 @@ function updatePeriodLabel(idx){
   if(lbl) lbl.textContent = step.label;
 }
 
+// Fix 232: zichtlijn (+cirkel) verbergen/tonen — bewust LOKAAL per toestel, niet gedeeld
+// via Firestore. Dit is een persoonlijke "opruimen op mijn scherm"-optie, geen verwijdering
+// en geen wijziging die andere vrijwilligers ook zouden zien.
+const HIDDEN_LINES_KEY = 'hornetapp_hidden_lines';
+let _hiddenLineIds = new Set();
+try { _hiddenLineIds = new Set(JSON.parse(localStorage.getItem(HIDDEN_LINES_KEY) || '[]')); } catch {}
+function _saveHiddenLineIds(){
+  try { localStorage.setItem(HIDDEN_LINES_KEY, JSON.stringify([..._hiddenLineIds])); } catch {}
+}
+function _toggleLineVisibility(line){
+  const id = line._meta?.id; if(!id) return;
+  if(_hiddenLineIds.has(id)) _hiddenLineIds.delete(id); else _hiddenLineIds.add(id);
+  _saveHiddenLineIds();
+  applyFilters();
+  _renderHiddenLinesPanel();
+}
+function _renderHiddenLinesPanel(){
+  const section = document.getElementById('hidden-lines-section');
+  const list = document.getElementById('hidden-lines-list');
+  if(!section || !list) return;
+  const hiddenLines = allLines.filter(l => _hiddenLineIds.has(l._meta?.id));
+  if(!hiddenLines.length){ section.style.display = 'none'; list.innerHTML = ''; return; }
+  section.style.display = 'block';
+  list.innerHTML = '';
+  hiddenLines.forEach(line => {
+    const m = line._meta || {};
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 7px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px';
+    row.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${m.color||'#ffcc00'};flex:0 0 auto"></span>
+      <span style="flex:1;font-size:12px;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.distance||0} m${m.note ? ' — ' + String(m.note).replace(/</g,'&lt;') : ''}</span>
+      <button style="flex:0 0 auto;padding:3px 8px;border-radius:5px;border:1px solid #cbd5e1;background:#fff;color:#0aa879;font-size:11px;cursor:pointer">👁️ Tonen</button>`;
+    row.querySelector('button').addEventListener('click', () => _toggleLineVisibility(line));
+    list.appendChild(row);
+  });
+}
+
+// Fix 233: opsporingsmodus — met 1 klik alleen zichtlijnen (+cirkels) tonen, alle
+// iconen verbergen. Lokaal per toestel (localStorage), beïnvloedt niemand anders.
+const TRACKING_MODE_KEY = 'hornetapp_tracking_mode';
+let _trackingMode = localStorage.getItem(TRACKING_MODE_KEY) === '1';
+function _setTrackingMode(on){
+  _trackingMode = !!on;
+  localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
+  applyFilters();
+  _updateTrackingModeButton();
+}
+function _updateTrackingModeButton(){
+  const btn = document.getElementById('btn-tracking-mode');
+  if(!btn) return;
+  btn.style.background = _trackingMode ? '#0aa879' : '#f8fafc';
+  btn.style.color = _trackingMode ? '#fff' : '#475569';
+  btn.style.borderColor = _trackingMode ? '#0aa879' : '#e2e8f0';
+  btn.querySelector('span:last-child').textContent = _trackingMode ? 'Opsporingsmodus AAN' : 'Opsporingsmodus';
+}
+
+// Fix 233: dikte van zichtlijnen instelbaar (0.5-1.5), lokaal per toestel.
+const LINE_WEIGHT_KEY = 'hornetapp_line_weight';
+function _getLineWeight(){
+  const v = parseFloat(localStorage.getItem(LINE_WEIGHT_KEY));
+  return (!isNaN(v) && v >= 0.5 && v <= 1.5) ? v : 1.0;
+}
+function _setLineWeight(v){
+  v = Math.min(1.5, Math.max(0.5, parseFloat(v) || 1.0));
+  localStorage.setItem(LINE_WEIGHT_KEY, String(v));
+  allLines.forEach(l => l.setStyle({ weight: v }));
+}
+
 function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
+    if(_trackingMode) show=false; // opsporingsmodus: alle iconen verborgen, alleen zichtlijnen
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -2778,7 +2863,10 @@ function applyFilters(){
   });
 
   allLines.forEach(line=>{
-    const meta=line._meta||{}; const should = visiblePotIds.has(meta.potId);
+    const meta=line._meta||{};
+    // In opsporingsmodus: alle zichtlijnen tonen (los van of het bijbehorende potje
+    // zichtbaar is — dat icoon is nu immers sowieso verborgen), behalve handmatig verborgen lijnen.
+    const should = (_trackingMode ? true : visiblePotIds.has(meta.potId)) && !_hiddenLineIds.has(meta.id);
     // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
@@ -2803,6 +2891,7 @@ function applyFilters(){
       if(dle) dle.style.visibility = showDist ? '' : 'hidden';
     }
   });
+  _renderHiddenLinesPanel();
 }
 // ======================= Cloud → kaart (realtime) =======================
 function upsertMarkerFromCloud(doc){
@@ -2908,7 +2997,7 @@ function upsertLineFromCloud(doc){
   let l = allLines.find(x=>x._meta?.id===doc.id);
   const latlngs = (doc.latlngs||[]).map(p=>L.latLng(p.lat,p.lng));
   if(!l){
-    l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:3}).addTo(linesGroup);
+    l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:_getLineWeight()}).addTo(linesGroup);
     l._meta = { ...doc };
     registerLine(l);
     const _ll = l.getLatLngs(); const _endPt = _ll[_ll.length-1];
@@ -4171,7 +4260,7 @@ function _swSaveGemerkt(photo) {
 
   const endLatLng = destinationPoint(potLatLng, dist, brg);
   const id = genId('flight');
-  const line = L.polyline([potLatLng, endLatLng], { color, weight: 3 }).addTo(linesGroup);
+  const line = L.polyline([potLatLng, endLatLng], { color, weight: _getLineWeight() }).addTo(linesGroup);
   line._meta = { id, type: 'flight', pot: potMeta, potId, distance: dist, color, bearing: brg, note: _sw.note || '' };
   if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
   registerLine(line);
