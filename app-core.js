@@ -1,4 +1,4 @@
-// app-core.js — Fix 241
+// app-core.js — Fix 242
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -875,7 +875,7 @@ function openLineContextMenu(line, x, y){
       if(ll.length>=2 && m.pot){
         const dist=Math.max(1,m.distance||50); const brg=((m.bearing||0)+360)%360;
         const rInner=Math.max(1,dist-25), rOuter=dist+25;
-        const sector=createSectorLayer({id:genId('sect'),pot:m.pot,distance:dist,color:m.color||'#ffcc00',bearing:brg,rInner,rOuter,angleLeft:45,angleRight:45,steps:36,flightId:m.id}).addTo(circlesGroup);
+        const sector=createSectorLayer({id:genId('sect'),pot:m.pot,distance:dist,color:m.color||'#ffcc00',bearing:brg,rInner,rOuter,angleLeft:30,angleRight:30,steps:36,flightId:m.id}).addTo(circlesGroup);
         registerSector(sector); line._sector=sector; sector._line=line;
         persistSector(sector);
       }
@@ -1738,14 +1738,14 @@ function _isSectorValid(meta) {
   return true;
 }
 
-function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=45, angleRight=45, steps=36, flightId}){
+function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=30, angleRight=30, steps=36, flightId}){
   // Saniteer waarden
   bearing   = ((parseFloat(bearing)  || 0) + 360) % 360;
   rInner    = Math.max(0, Math.min(parseFloat(rInner)  || 0, 49000));
   rOuter    = Math.max(1, Math.min(parseFloat(rOuter)  || 50, 50000));
   distance  = Math.max(1, parseFloat(distance) || 50);
-  angleLeft = Math.max(1, Math.min(parseFloat(angleLeft)  || 45, 175));
-  angleRight= Math.max(1, Math.min(parseFloat(angleRight) || 45, 175));
+  angleLeft = Math.max(1, Math.min(parseFloat(angleLeft)  || 30, 175));
+  angleRight= Math.max(1, Math.min(parseFloat(angleRight) || 30, 175));
   if (rInner >= rOuter) rInner = Math.max(0, rOuter - 25);
 
   const center = L.latLng(pot.lat, pot.lng);
@@ -1846,7 +1846,7 @@ function attachSightLineInteractivity(line){
     const sector=createSectorLayer({
       id: line._sector? line._sector._meta?.id : genId('sect'),
       pot: meta.pot, distance:dist, color:line._meta.color||'#ffcc00',
-      bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId: meta.id
+      bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId: meta.id
     }).addTo(circlesGroup);
     registerSector(sector); line._sector=sector; sector._line=line;
     persistLine(line); persistSector(sector);
@@ -1876,7 +1876,7 @@ function startSightLine(lokpotMarker){
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
       const sector = createSectorLayer({
         id:genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
-        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId:id
       }).addTo(circlesGroup);
       registerSector(sector); line._sector=sector; sector._line=line;
       attachSightLineInteractivity(line);
@@ -1906,7 +1906,7 @@ function startSightLine(lokpotMarker){
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
       const sector = createSectorLayer({
         id:genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
-        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId:id
       }).addTo(circlesGroup);
       registerSector(sector); line._sector=sector; sector._line=line;
       attachSightLineInteractivity(line);
@@ -2518,7 +2518,7 @@ function persistSector(sector){
   const m=sector._meta||{};
   const doc = { id:m.id, type:'sector', pot:m.pot||null, distance:m.distance||0,
     color:m.color||'#ffcc00', bearing:m.bearing||0, rInner:m.rInner||0, rOuter:m.rOuter||0,
-    angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null };
+    angleLeft:30, angleRight:30, steps:m.steps||36, flightId:m.flightId||null };
   if(_isDemoAccount()) doc.demo = true;
   saveSectorToCloud(doc);
 }
@@ -2545,7 +2545,7 @@ function movePotLines(potId, newLatLng) {
         distance: dist, color: sm.color || '#ffcc00',
         bearing: brg, rInner: sm.rInner || Math.max(1, dist-25),
         rOuter: sm.rOuter || dist+25,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45,
+        angleLeft: 30, angleRight: 30,
         steps: sm.steps || 36, flightId: m.id
       }).addTo(circlesGroup);
       registerSector(newSector);
@@ -2875,6 +2875,7 @@ function _setTrackingMode(on){
   _trackingMode = !!on;
   localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
   applyFilters();
+  refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
 }
 function _updateTrackingModeButton(){
@@ -2919,9 +2920,18 @@ function applyFilters(){
   const outlineOnly = !!$('f_poly_outline')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    layer.setStyle(outlineOnly
-      ? { fillOpacity: 0, weight: 4 }
-      : { fillColor: col, fillOpacity: 0.2, weight: 3 });
+    if(_trackingMode){
+      // Opsporingsmodus: polygonen ook verbergen, alleen zichtlijnen blijven over
+      layer.setStyle({ opacity: 0, fillOpacity: 0 });
+      if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
+    } else {
+      layer.setStyle(outlineOnly
+        ? { opacity: 1, fillOpacity: 0, weight: 4, color: col }
+        : { opacity: 1, fillColor: col, fillOpacity: 0.2, weight: 3, color: col });
+      // Label-zichtbaarheid bij het weer aanzetten bewust niet forceren — dat blijft aan
+      // refreshZoomVisibility() (zoomniveau-afhankelijk), om dubbele/conflicterende logica
+      // te voorkomen. Wordt vanzelf bijgewerkt zodra dat opnieuw draait (bv. na zoomend).
+    }
   });
 
   allLines.forEach(line=>{
@@ -3098,7 +3108,7 @@ function upsertSectorFromCloud(doc){
   if(line && line._sector){ circlesGroup.removeLayer(line._sector); }
   const sector = createSectorLayer({
     id: doc.id, pot: doc.pot, distance: doc.distance, color: doc.color, bearing: doc.bearing,
-    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft||45, angleRight: doc.angleRight||45, steps: doc.steps||36, flightId: doc.flightId
+    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: 30, angleRight: 30, steps: doc.steps||36, flightId: doc.flightId
   }).addTo(circlesGroup);
   sector._meta.demo = doc.demo === true;
   registerSector(sector);
@@ -3690,7 +3700,7 @@ function _swRenderNearbyMap(body) {
       createSectorLayer({
         id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
         bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+        angleLeft: 30, angleRight: 30, steps: sm.steps || 36
       }).addTo(nMap);
     }
   });
@@ -3890,7 +3900,7 @@ function _swRenderPotPick(body) {
         createSectorLayer({
           id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
           bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-          angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+          angleLeft: 30, angleRight: 30, steps: sm.steps || 36
         }).addTo(potMap);
       }
     });
@@ -4172,7 +4182,7 @@ function _swRenderPotFlights(body) {
       createSectorLayer({
         id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
         bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+        angleLeft: 30, angleRight: 30, steps: sm.steps || 36
       }).addTo(fMap);
     }
   });
@@ -4342,7 +4352,7 @@ function _swSaveGemerkt(photo) {
   const rInner = Math.max(1, dist - 25), rOuter = dist + 25;
   const sector = createSectorLayer({
     id: genId('sect'), pot: potMeta, distance: dist, color, bearing: brg,
-    rInner, rOuter, angleLeft: 45, angleRight: 45, steps: 36, flightId: id
+    rInner, rOuter, angleLeft: 30, angleRight: 30, steps: 36, flightId: id
   }).addTo(circlesGroup);
   registerSector(sector); line._sector = sector; sector._line = line;
   attachSightLineInteractivity(line);
