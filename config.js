@@ -1,3 +1,6 @@
+// Fix 245: Mapbox-token voor de Mapbox Streets-kaartlaag (gratis tier, 50.000 weergaves/maand)
+export const MAPBOX_TOKEN = "pk.eyJ1IjoiZGlnaWRhdmUiLCJhIjoiY21zczB2ZGsxMDV1aDJ6c2tvYTJscGw5MSJ9.godoDubKaVyXvAiDQn3K1g";
+
 // Fix 3 — authDomain terug naar origineel (Cloudflare hosting)
 export const firebaseConfig = {
   apiKey: "AIzaSyCgRWejn5vrpFB9znGxte7a_sFWRp-xeYk",

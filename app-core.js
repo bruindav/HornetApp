@@ -1,4 +1,4 @@
-// app-core.js — Fix 244
+// app-core.js — Fix 245
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -11,6 +11,7 @@
 import { auth, uploadActionPhoto, deleteActionPhoto } from './firebase.js';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, orderBy, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
+import { MAPBOX_TOKEN } from './config.js';
 const _db = getFirestore(app);
 
 // displayName van ingelogde gebruiker (opgehaald uit roles/{uid})
@@ -87,10 +88,11 @@ function initMap(){
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     maxZoom:19, attribution:'© Esri — satelliet'
   });
-  // Fix 244: CARTO Voyager — zelfde OSM-data, maar met veel beter leesbare, halo-omrande
-  // straatnamen die langs de weg meebuigen. Gratis raster-tegeldienst, geen API-sleutel nodig.
-  const voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
-    maxZoom:20, subdomains:'abcd', attribution:'© OpenStreetMap-bijdragers, © CARTO'
+  // Fix 245: Mapbox Streets i.p.v. CARTO Voyager — CARTO's basemaps zijn bewust ingetogen
+  // ("zachte" achtergrond voor datalagen), niet vergelijkbaar met een volwaardige,
+  // levendige navigatiekaart. Mapbox Streets geeft wél die Google-Maps-achtige uitstraling.
+  const mapboxLayer = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}{r}?access_token=' + MAPBOX_TOKEN, {
+    maxZoom:22, tileSize:256, attribution:'© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © OpenStreetMap-bijdragers'
   });
   osmLayer.addTo(map);
 
@@ -195,7 +197,7 @@ function initMap(){
   }
 
   // Kaartlaag-keuze — via kaart contextmenu, geen losse knop. Fix 244: nu 3 opties i.p.v. 2.
-  let _mapMode = 'osm'; // 'osm' | 'voyager' | 'sat'
+  let _mapMode = 'osm'; // 'osm' | 'mapbox' | 'sat'
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -220,17 +222,17 @@ function initMap(){
   map.pm.Toolbar.createCustomControl({
     name: 'toggleSat',
     block: 'custom',
-    title: 'Kaartstijl wisselen (OpenStreetMap / CARTO Voyager / Satelliet)',
+    title: 'Kaartstijl wisselen (OpenStreetMap / Mapbox Streets / Satelliet)',
     className: 'pm-icon-sat pm-icon-sat-osm',
     onClick: () => {
-      const layers = { osm: osmLayer, voyager: voyagerLayer, sat: satLayer };
-      const order = ['osm', 'voyager', 'sat'];
+      const layers = { osm: osmLayer, mapbox: mapboxLayer, sat: satLayer };
+      const order = ['osm', 'mapbox', 'sat'];
       map.removeLayer(layers[_mapMode]);
       _mapMode = order[(order.indexOf(_mapMode) + 1) % order.length];
       layers[_mapMode].addTo(map);
       const btn = document.querySelector('.pm-icon-sat');
       if (btn) {
-        btn.classList.remove('pm-icon-sat-osm', 'pm-icon-sat-voyager', 'pm-icon-sat-sat');
+        btn.classList.remove('pm-icon-sat-osm', 'pm-icon-sat-mapbox', 'pm-icon-sat-sat');
         btn.classList.add('pm-icon-sat-' + _mapMode);
       }
     },
