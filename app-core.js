@@ -1,4 +1,4 @@
-// app-core.js — Fix 239
+// app-core.js — Fix 240
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -562,7 +562,7 @@ const ZOOM_DOT   = 12;  // stip met letter
 const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 // Labels en zichtlijnen/sectoren alleen op straatniveau
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
-const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
+const ZOOM_LINES  = 11; // zichtlijnen + sectoren tonen >= dit niveau (was 13 — nog verder uitzoomen kan nu nog, handig voor screenshots)
 
 // Icoon afbeeldingen — base64 PNG gebaseerd op gebruikersiconen
 const IMG = {
@@ -1682,6 +1682,20 @@ function arcPoints(center,radius,startDeg,endDeg,steps=32){
   return pts;
 }
 function registerLine(line){ if(!allLines.includes(line)) allLines.push(line); }
+// Fix 240: klein balletje bij het startpunt (potje) van een zichtlijn — diameter is
+// max 2x de lijndikte, schaalt dus automatisch mee met de dikte-instelling.
+function _syncStartBall(line){
+  const meta = line._meta || {};
+  const ll = line.getLatLngs(); if(!ll || !ll.length) return;
+  const start = ll[0];
+  const color = meta.color || '#ffcc00';
+  const r = _getLineWeight(); // straal = lijndikte → doorsnee = 2x lijndikte
+  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
+  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}).addTo(linesGroup); }
+}
+function _removeStartBall(line){
+  if(line._startBall){ linesGroup.removeLayer(line._startBall); line._startBall=null; }
+}
 function registerSector(sector){ if(!allSectors.includes(sector)) allSectors.push(sector); }
 // Fix 239: handle-balletje schaalt mee met het zoomniveau (was altijd vast 12px)
 function makeHandleIcon(zoom){
@@ -1751,9 +1765,22 @@ function _cleanupOrphanSectors() {
   return toRemove.length;
 }
 
+// Fix 240: klein balletje bij het startpunt (potje) van elke zichtlijn — diameter is
+// exact 2x de lijndikte, dus schaalt automatisch mee met de dikte-instelling.
+function _syncLineStartBall(line){
+  const meta = line._meta || {};
+  const ll = line.getLatLngs(); if(!ll || !ll.length) return;
+  const start = ll[0];
+  const color = meta.color || '#ffcc00';
+  const w = _getLineWeight();
+  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:w, color, fillColor:color}); }
+  else { line._startBall = L.circleMarker(start, {radius:w, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
+}
+
 function setSightLineColor(line,color,save=false){
   line.setStyle({color});
   line._meta=line._meta||{}; line._meta.color=color;
+  _syncLineStartBall(line);
   if(line._sector){
     line._sector.setStyle({color, fillColor:color});
     line._sector._meta.color=color;
@@ -1767,6 +1794,7 @@ function deleteSightLine(line, fromMenu=false){
   if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
   if(line._sector){ const sid=line._sector._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(line._sector); line._sector=null; }
   if(line._distLabel){ try{ map.removeLayer(line._distLabel); }catch{} line._distLabel=null; }
+  if(line._startBall){ linesGroup.removeLayer(line._startBall); line._startBall=null; }
   if(line.getTooltip()) line.unbindTooltip();
   linesGroup.removeLayer(line); allLines = allLines.filter(l=>l!==line);
   if(fromMenu && id){ deleteLineFromCloud(id); }
@@ -1821,6 +1849,8 @@ function startSightLine(lokpotMarker){
       };
       if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
+      _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+      _syncStartBall(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
@@ -1849,6 +1879,8 @@ function startSightLine(lokpotMarker){
       };
       if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
+      _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+      _syncStartBall(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
@@ -2843,7 +2875,7 @@ function _getLineWeight(){
 function _setLineWeight(v){
   v = Math.min(1.5, Math.max(0.5, parseFloat(v) || 1.0));
   localStorage.setItem(LINE_WEIGHT_KEY, String(v));
-  allLines.forEach(l => l.setStyle({ weight: v }));
+  allLines.forEach(l => { l.setStyle({ weight: v }); _syncLineStartBall(l); });
 }
 
 function applyFilters(){
@@ -2886,6 +2918,12 @@ function applyFilters(){
       const inH = handlesGroup.hasLayer(line._handle);
       if(should && !inH) handlesGroup.addLayer(line._handle);
       if(!should && inH) handlesGroup.removeLayer(line._handle);
+    }
+    // Startballetje
+    if(line._startBall){
+      const inB = linesGroup.hasLayer(line._startBall);
+      if(should && !inB) linesGroup.addLayer(line._startBall);
+      if(!should && inB) linesGroup.removeLayer(line._startBall);
     }
     // Sector
     if(line._sector){
@@ -3010,6 +3048,8 @@ function upsertLineFromCloud(doc){
     l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:_getLineWeight()}).addTo(linesGroup);
     l._meta = { ...doc };
     registerLine(l);
+    _syncLineStartBall(l); linesGroup.addLayer(l._startBall);
+    _syncStartBall(l);
     const _ll = l.getLatLngs(); const _endPt = _ll[_ll.length-1];
     l._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
       .setContent(`${doc.distance||0} m`)
@@ -3020,6 +3060,7 @@ function upsertLineFromCloud(doc){
     l.setLatLngs(latlngs);
     l._meta = { ...l._meta, ...doc };
     if(l._distLabel){ const _ull=l.getLatLngs(); l._distLabel.setContent(`${doc.distance||0} m`).setLatLng(_ull[_ull.length-1]); }
+    _syncLineStartBall(l);
   }
   applyFilters();
 }
@@ -4274,6 +4315,8 @@ function _swSaveGemerkt(photo) {
   line._meta = { id, type: 'flight', pot: potMeta, potId, distance: dist, color, bearing: brg, note: _sw.note || '' };
   if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
   registerLine(line);
+  _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+  _syncStartBall(line);
   line._distLabel = L.tooltip({ permanent: true, direction: 'right', offset: [8, 0], className: 'line-label' })
     .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
 
