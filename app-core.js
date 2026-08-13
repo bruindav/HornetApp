@@ -1,4 +1,4 @@
-// app-core.js — Fix 233
+// app-core.js — Fix 239
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -253,6 +253,7 @@ function initMap(){
   map.on('zoomend', () => {
     refreshAllMarkerIcons();
     refreshZoomVisibility();
+    refreshAllHandleIcons();
   });
 
   // Eerste punt markeren bij starten polygoon tekenen
@@ -1682,7 +1683,16 @@ function arcPoints(center,radius,startDeg,endDeg,steps=32){
 }
 function registerLine(line){ if(!allLines.includes(line)) allLines.push(line); }
 function registerSector(sector){ if(!allSectors.includes(sector)) allSectors.push(sector); }
-function makeHandleIcon(){ return L.divIcon({className:'line-handle',html:'<div></div>',iconSize:[12,12],iconAnchor:[6,6]}); }
+// Fix 239: handle-balletje schaalt mee met het zoomniveau (was altijd vast 12px)
+function makeHandleIcon(zoom){
+  const z = zoom ?? (map?.getZoom() || 14);
+  const size = Math.round(Math.max(6, Math.min(26, 12 * Math.pow(2, z - 16))));
+  return L.divIcon({className:'line-handle', html:'<div></div>', iconSize:[size,size], iconAnchor:[size/2,size/2]});
+}
+function refreshAllHandleIcons(){
+  const z = map?.getZoom() || 14;
+  allLines.forEach(l => { if(l._handle) l._handle.setIcon(makeHandleIcon(z)); });
+}
 
 function _isSectorValid(meta) {
   if (!meta) return false;
