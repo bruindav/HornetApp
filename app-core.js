@@ -1,4 +1,4 @@
-// app-core.js — Fix 245
+// app-core.js — Fix 247
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1757,6 +1757,21 @@ function _isSectorValid(meta) {
   return true;
 }
 
+// Fix 247: bij een (bijna) witte kleur is de sector-outline nauwelijks zichtbaar tegen de
+// kaartondergrond — geef dan een grijze rand i.p.v. wit-op-wit. Andere kleuren blijven
+// gewoon hun eigen kleur als outline houden.
+function _isNearWhite(hex){
+  hex = (hex||'').replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  if(!/^[0-9a-fA-F]{6}$/.test(hex)) return false;
+  const num = parseInt(hex,16);
+  const r=(num>>16)&255, g=(num>>8)&255, b=num&255;
+  return r>235 && g>235 && b>235;
+}
+function _sectorOutlineColor(color){
+  return _isNearWhite(color) ? '#8a8a8a' : color;
+}
+
 function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=30, angleRight=30, steps=36, flightId}){
   // Saniteer waarden
   bearing   = ((parseFloat(bearing)  || 0) + 360) % 360;
@@ -1773,7 +1788,7 @@ function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner,
   const outer  = arcPoints(center, rOuter, start, end, steps);
   const inner  = arcPoints(center, rInner, end,   start, steps);
   const ring   = [...outer, ...inner];
-  const poly   = L.polygon(ring, {color, weight:1, dashArray:'6 6', fillColor:color, fillOpacity:_getSectorOpacity()});
+  const poly   = L.polygon(ring, {color:_sectorOutlineColor(color), weight:1, dashArray:'6 6', fillColor:color, fillOpacity:_getSectorOpacity()});
   poly._meta   = { id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
   return poly;
 }
@@ -1811,7 +1826,7 @@ function _syncLineStartBall(line){
   const start = ll[0];
   const color = meta.color || '#ffcc00';
   const w = _getLineWeight();
-  const r = w * 2; // straal = 2x dikte → doorsnee = 4x dikte
+  const r = w * 2 * 3; // straal = 2x dikte, x3 vergroot op verzoek → doorsnee = 12x dikte
   if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
   else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
 }
@@ -1821,7 +1836,7 @@ function setSightLineColor(line,color,save=false){
   line._meta=line._meta||{}; line._meta.color=color;
   _syncLineStartBall(line);
   if(line._sector){
-    line._sector.setStyle({color, fillColor:color});
+    line._sector.setStyle({color:_sectorOutlineColor(color), fillColor:color});
     line._sector._meta.color=color;
     if(save) persistSector(line._sector);
   }
