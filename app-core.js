@@ -1,4 +1,4 @@
-// app-core.js — Fix 233
+// app-core.js — Fix 248
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -11,6 +11,7 @@
 import { auth, uploadActionPhoto, deleteActionPhoto } from './firebase.js';
 import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, query, orderBy, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { app } from './firebase.js';
+import { MAPBOX_TOKEN } from './config.js';
 const _db = getFirestore(app);
 
 // displayName van ingelogde gebruiker (opgehaald uit roles/{uid})
@@ -86,6 +87,12 @@ function initMap(){
   });
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
     maxZoom:19, attribution:'© Esri — satelliet'
+  });
+  // Fix 245: Mapbox Streets i.p.v. CARTO Voyager — CARTO's basemaps zijn bewust ingetogen
+  // ("zachte" achtergrond voor datalagen), niet vergelijkbaar met een volwaardige,
+  // levendige navigatiekaart. Mapbox Streets geeft wél die Google-Maps-achtige uitstraling.
+  const mapboxLayer = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}{r}?access_token=' + MAPBOX_TOKEN, {
+    maxZoom:22, tileSize:256, attribution:'© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © OpenStreetMap-bijdragers'
   });
   osmLayer.addTo(map);
 
@@ -189,8 +196,8 @@ function initMap(){
     updateCompassSvg(heading);
   }
 
-  // Satelliet toggle — alleen via kaart contextmenu, geen losse knop
-  let _satMode = false;
+  // Kaartlaag-keuze — via kaart contextmenu, geen losse knop. Fix 244: nu 3 opties i.p.v. 2.
+  let _mapMode = 'osm'; // 'osm' | 'mapbox' | 'sat'
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -211,23 +218,23 @@ function initMap(){
     snapMiddle: true       // snap ook naar het midden van bestaande lijnstukken
   });
 
-  // Sateliet-knop als custom Geoman control in de toolbar (topleft)
+  // Kaartlaag-knop als custom Geoman control in de toolbar (topleft)
   map.pm.Toolbar.createCustomControl({
     name: 'toggleSat',
     block: 'custom',
-    title: 'Wissel kaart / satelliet',
-    className: 'pm-icon-sat',
+    title: 'Kaartstijl wisselen (OpenStreetMap / Mapbox Streets / Satelliet)',
+    className: 'pm-icon-sat pm-icon-sat-osm',
     onClick: () => {
-      _satMode = !_satMode;
-      if (_satMode) {
-        map.removeLayer(osmLayer); satLayer.addTo(map);
-        document.querySelector('.pm-icon-sat')?.classList.add('active-sat');
-      } else {
-        map.removeLayer(satLayer); osmLayer.addTo(map);
-        document.querySelector('.pm-icon-sat')?.classList.remove('active-sat');
+      const layers = { osm: osmLayer, mapbox: mapboxLayer, sat: satLayer };
+      const order = ['osm', 'mapbox', 'sat'];
+      map.removeLayer(layers[_mapMode]);
+      _mapMode = order[(order.indexOf(_mapMode) + 1) % order.length];
+      layers[_mapMode].addTo(map);
+      const btn = document.querySelector('.pm-icon-sat');
+      if (btn) {
+        btn.classList.remove('pm-icon-sat-osm', 'pm-icon-sat-mapbox', 'pm-icon-sat-sat');
+        btn.classList.add('pm-icon-sat-' + _mapMode);
       }
-      // Ook de losse toggle knop rechtsonder bijwerken
-      // (toggle knop staat alleen in contextmenu)
     },
     toggle: false,
   });
@@ -253,6 +260,7 @@ function initMap(){
   map.on('zoomend', () => {
     refreshAllMarkerIcons();
     refreshZoomVisibility();
+    refreshAllHandleIcons();
   });
 
   // Eerste punt markeren bij starten polygoon tekenen
@@ -390,6 +398,14 @@ function initUIBindings(){
     const willOpen = document.body.classList.contains('sidebar-collapsed');
     setSidebar(willOpen); // als dicht → open; als open → dicht
   });
+  // Fix 248: dubbeltik ergens op de zijbalk (buiten knoppen/velden om) sluit 'm ook —
+  // zelfde soort gemak als het dubbeltikken om polygoon-bewerken af te sluiten.
+  if(sidebarEl){
+    sidebarEl.addEventListener('dblclick', (ev) => {
+      if(ev.target.closest('button, input, select, textarea, a, label')) return; // niet als je op een besturingselement dubbeltikt
+      setSidebar(false);
+    });
+  }
   on(backdrop, 'click', ()=> setSidebar(false));
   // Init: op mobiel standaard dicht
   if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
@@ -467,6 +483,18 @@ function initUIBindings(){
       const v = parseFloat(lineWeightSlider.value);
       if (lineWeightVal) lineWeightVal.textContent = v.toFixed(1);
       _setLineWeight(v);
+    });
+  }
+  const sectorOpacitySlider = document.getElementById('sector-opacity-slider');
+  const sectorOpacityVal = document.getElementById('sector-opacity-val');
+  if (sectorOpacitySlider) {
+    const initO = _getSectorOpacity();
+    sectorOpacitySlider.value = initO;
+    if (sectorOpacityVal) sectorOpacityVal.textContent = initO.toFixed(2);
+    sectorOpacitySlider.addEventListener('input', () => {
+      const v = parseFloat(sectorOpacitySlider.value);
+      if (sectorOpacityVal) sectorOpacityVal.textContent = v.toFixed(2);
+      _setSectorOpacity(v);
     });
   }
   window.addEventListener('resize', _updateStatusbar, {passive:true});
@@ -561,7 +589,26 @@ const ZOOM_DOT   = 12;  // stip met letter
 const ZOOM_TINY  = 10;  // kleine stip zonder letter (< 10 = onzichtbaar)
 // Labels en zichtlijnen/sectoren alleen op straatniveau
 const ZOOM_LABELS = 15; // polygon labels tonen >= dit niveau
-const ZOOM_LINES  = 15; // zichtlijnen + sectoren tonen >= dit niveau
+const LINES_MAX_SCALE_M = 500; // zichtlijnen/sectoren verbergen zodra de schaalbalk dit (of meer) toont
+
+// Fix 241: exact dezelfde 'mooi afgeronde' berekening als Leaflet's eigen schaalbalk
+// (L.Control.Scale), zodat "verberg boven 500m" precies overeenkomt met wat je op de
+// schaalbalk zelf ziet staan, i.p.v. een los geschat zoomniveau.
+function _currentScaleMeters(){
+  if(!map) return 0;
+  const bounds = map.getBounds();
+  const centerLat = bounds.getCenter().lat;
+  const halfWorldMeters = 6378137 * Math.PI * Math.cos(centerLat * Math.PI / 180);
+  const dist = halfWorldMeters * (bounds.getNorthEast().lng - bounds.getSouthWest().lng) / 180;
+  const size = map.getSize();
+  const maxWidth = 100; // zelfde standaardbreedte als L.control.scale()
+  const maxMeters = size.x > 0 ? dist * (maxWidth / size.x) : 0;
+  if(maxMeters <= 0) return 0;
+  const pow10 = Math.pow(10, (Math.floor(maxMeters) + '').length - 1);
+  const d = maxMeters / pow10;
+  const niceD = d >= 10 ? 10 : d >= 5 ? 5 : d >= 3 ? 3 : d >= 2 ? 2 : 1;
+  return pow10 * niceD;
+}
 
 // Icoon afbeeldingen — base64 PNG gebaseerd op gebruikersiconen
 const IMG = {
@@ -703,7 +750,7 @@ function refreshAllMarkerIcons(){
 function refreshZoomVisibility(){
   const zoom = map?.getZoom() || 14;
   const showLabels = zoom >= ZOOM_LABELS;
-  const showLines  = zoom >= ZOOM_LINES;
+  const showLines  = _currentScaleMeters() < LINES_MAX_SCALE_M;
 
   // Polygon labels — via Leaflet add/remove (betrouwbaarder dan display:none op tooltip)
   polygonsGroup.getLayers().forEach(layer => {
@@ -727,7 +774,7 @@ function refreshZoomVisibility(){
   });
   // Sectoren
   circlesGroup.getLayers().forEach(s => {
-    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? 0.25 : 0 });
+    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
   });
 }
 // ======================= Contextmenu infra =======================
@@ -855,7 +902,7 @@ function openLineContextMenu(line, x, y){
       if(ll.length>=2 && m.pot){
         const dist=Math.max(1,m.distance||50); const brg=((m.bearing||0)+360)%360;
         const rInner=Math.max(1,dist-25), rOuter=dist+25;
-        const sector=createSectorLayer({id:genId('sect'),pot:m.pot,distance:dist,color:m.color||'#ffcc00',bearing:brg,rInner,rOuter,angleLeft:45,angleRight:45,steps:36,flightId:m.id}).addTo(circlesGroup);
+        const sector=createSectorLayer({id:genId('sect'),pot:m.pot,distance:dist,color:m.color||'#ffcc00',bearing:brg,rInner,rOuter,angleLeft:30,angleRight:30,steps:36,flightId:m.id}).addTo(circlesGroup);
         registerSector(sector); line._sector=sector; sector._line=line;
         persistSector(sector);
       }
@@ -1681,8 +1728,31 @@ function arcPoints(center,radius,startDeg,endDeg,steps=32){
   return pts;
 }
 function registerLine(line){ if(!allLines.includes(line)) allLines.push(line); }
+// Fix 240: klein balletje bij het startpunt (potje) van een zichtlijn — diameter is
+// max 2x de lijndikte, schaalt dus automatisch mee met de dikte-instelling.
+function _syncStartBall(line){
+  const meta = line._meta || {};
+  const ll = line.getLatLngs(); if(!ll || !ll.length) return;
+  const start = ll[0];
+  const color = meta.color || '#ffcc00';
+  const r = _getLineWeight(); // straal = lijndikte → doorsnee = 2x lijndikte
+  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
+  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}).addTo(linesGroup); }
+}
+function _removeStartBall(line){
+  if(line._startBall){ linesGroup.removeLayer(line._startBall); line._startBall=null; }
+}
 function registerSector(sector){ if(!allSectors.includes(sector)) allSectors.push(sector); }
-function makeHandleIcon(){ return L.divIcon({className:'line-handle',html:'<div></div>',iconSize:[12,12],iconAnchor:[6,6]}); }
+// Fix 239: handle-balletje schaalt mee met het zoomniveau (was altijd vast 12px)
+function makeHandleIcon(zoom){
+  const z = zoom ?? (map?.getZoom() || 14);
+  const size = Math.round(Math.max(6, Math.min(26, 12 * Math.pow(2, z - 16))));
+  return L.divIcon({className:'line-handle', html:'<div></div>', iconSize:[size,size], iconAnchor:[size/2,size/2]});
+}
+function refreshAllHandleIcons(){
+  const z = map?.getZoom() || 14;
+  allLines.forEach(l => { if(l._handle) l._handle.setIcon(makeHandleIcon(z)); });
+}
 
 function _isSectorValid(meta) {
   if (!meta) return false;
@@ -1695,14 +1765,29 @@ function _isSectorValid(meta) {
   return true;
 }
 
-function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=45, angleRight=45, steps=36, flightId}){
+// Fix 247: bij een (bijna) witte kleur is de sector-outline nauwelijks zichtbaar tegen de
+// kaartondergrond — geef dan een grijze rand i.p.v. wit-op-wit. Andere kleuren blijven
+// gewoon hun eigen kleur als outline houden.
+function _isNearWhite(hex){
+  hex = (hex||'').replace('#','');
+  if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+  if(!/^[0-9a-fA-F]{6}$/.test(hex)) return false;
+  const num = parseInt(hex,16);
+  const r=(num>>16)&255, g=(num>>8)&255, b=num&255;
+  return r>235 && g>235 && b>235;
+}
+function _sectorOutlineColor(color){
+  return _isNearWhite(color) ? '#8a8a8a' : color;
+}
+
+function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner, rOuter, angleLeft=30, angleRight=30, steps=36, flightId}){
   // Saniteer waarden
   bearing   = ((parseFloat(bearing)  || 0) + 360) % 360;
   rInner    = Math.max(0, Math.min(parseFloat(rInner)  || 0, 49000));
   rOuter    = Math.max(1, Math.min(parseFloat(rOuter)  || 50, 50000));
   distance  = Math.max(1, parseFloat(distance) || 50);
-  angleLeft = Math.max(1, Math.min(parseFloat(angleLeft)  || 45, 175));
-  angleRight= Math.max(1, Math.min(parseFloat(angleRight) || 45, 175));
+  angleLeft = Math.max(1, Math.min(parseFloat(angleLeft)  || 30, 175));
+  angleRight= Math.max(1, Math.min(parseFloat(angleRight) || 30, 175));
   if (rInner >= rOuter) rInner = Math.max(0, rOuter - 25);
 
   const center = L.latLng(pot.lat, pot.lng);
@@ -1711,7 +1796,7 @@ function createSectorLayer({id, pot, distance, color='#ffcc00', bearing, rInner,
   const outer  = arcPoints(center, rOuter, start, end, steps);
   const inner  = arcPoints(center, rInner, end,   start, steps);
   const ring   = [...outer, ...inner];
-  const poly   = L.polygon(ring, {color, weight:1, dashArray:'6 6', fillColor:color, fillOpacity:0.25});
+  const poly   = L.polygon(ring, {color:_sectorOutlineColor(color), weight:1, dashArray:'6 6', fillColor:color, fillOpacity:_getSectorOpacity()});
   poly._meta   = { id, type:'sector', pot, distance, color, bearing, rInner, rOuter, angleLeft, angleRight, steps, flightId };
   return poly;
 }
@@ -1741,11 +1826,25 @@ function _cleanupOrphanSectors() {
   return toRemove.length;
 }
 
+// Fix 240: klein balletje bij het startpunt (potje) van elke zichtlijn — diameter is
+// exact 2x de lijndikte, dus schaalt automatisch mee met de dikte-instelling.
+function _syncLineStartBall(line){
+  const meta = line._meta || {};
+  const ll = line.getLatLngs(); if(!ll || !ll.length) return;
+  const start = ll[0];
+  const color = meta.color || '#ffcc00';
+  const w = _getLineWeight();
+  const r = w * 2 * 3; // straal = 2x dikte, x3 vergroot op verzoek → doorsnee = 12x dikte
+  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
+  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
+}
+
 function setSightLineColor(line,color,save=false){
   line.setStyle({color});
   line._meta=line._meta||{}; line._meta.color=color;
+  _syncLineStartBall(line);
   if(line._sector){
-    line._sector.setStyle({color, fillColor:color});
+    line._sector.setStyle({color:_sectorOutlineColor(color), fillColor:color});
     line._sector._meta.color=color;
     if(save) persistSector(line._sector);
   }
@@ -1757,6 +1856,7 @@ function deleteSightLine(line, fromMenu=false){
   if(line._handle){ handlesGroup.removeLayer(line._handle); line._handle=null; }
   if(line._sector){ const sid=line._sector._meta?.id; if(sid){ deleteSectorFromCloud(sid); } circlesGroup.removeLayer(line._sector); line._sector=null; }
   if(line._distLabel){ try{ map.removeLayer(line._distLabel); }catch{} line._distLabel=null; }
+  if(line._startBall){ linesGroup.removeLayer(line._startBall); line._startBall=null; }
   if(line.getTooltip()) line.unbindTooltip();
   linesGroup.removeLayer(line); allLines = allLines.filter(l=>l!==line);
   if(fromMenu && id){ deleteLineFromCloud(id); }
@@ -1788,7 +1888,7 @@ function attachSightLineInteractivity(line){
     const sector=createSectorLayer({
       id: line._sector? line._sector._meta?.id : genId('sect'),
       pot: meta.pot, distance:dist, color:line._meta.color||'#ffcc00',
-      bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId: meta.id
+      bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId: meta.id
     }).addTo(circlesGroup);
     registerSector(sector); line._sector=sector; sector._line=line;
     persistLine(line); persistSector(sector);
@@ -1811,12 +1911,14 @@ function startSightLine(lokpotMarker){
       };
       if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
+      _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+      _syncStartBall(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
       const sector = createSectorLayer({
         id:genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
-        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId:id
       }).addTo(circlesGroup);
       registerSector(sector); line._sector=sector; sector._line=line;
       attachSightLineInteractivity(line);
@@ -1839,12 +1941,14 @@ function startSightLine(lokpotMarker){
       };
       if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
       registerLine(line);
+      _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+      _syncStartBall(line);
       line._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
         .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
       const rInner=Math.max(1,dist-25), rOuter=dist+25;
       const sector = createSectorLayer({
         id:genId('sect'), pot:{lat:potLatLng.lat,lng:potLatLng.lng,id:lokpotMarker._meta?.potId||null},
-        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:45, angleRight:45, steps:36, flightId:id
+        distance:dist, color:defaultColor, bearing:brg, rInner, rOuter, angleLeft:30, angleRight:30, steps:36, flightId:id
       }).addTo(circlesGroup);
       registerSector(sector); line._sector=sector; sector._line=line;
       attachSightLineInteractivity(line);
@@ -2456,7 +2560,7 @@ function persistSector(sector){
   const m=sector._meta||{};
   const doc = { id:m.id, type:'sector', pot:m.pot||null, distance:m.distance||0,
     color:m.color||'#ffcc00', bearing:m.bearing||0, rInner:m.rInner||0, rOuter:m.rOuter||0,
-    angleLeft:m.angleLeft||45, angleRight:m.angleRight||45, steps:m.steps||36, flightId:m.flightId||null };
+    angleLeft:30, angleRight:30, steps:m.steps||36, flightId:m.flightId||null };
   if(_isDemoAccount()) doc.demo = true;
   saveSectorToCloud(doc);
 }
@@ -2483,7 +2587,7 @@ function movePotLines(potId, newLatLng) {
         distance: dist, color: sm.color || '#ffcc00',
         bearing: brg, rInner: sm.rInner || Math.max(1, dist-25),
         rOuter: sm.rOuter || dist+25,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45,
+        angleLeft: 30, angleRight: 30,
         steps: sm.steps || 36, flightId: m.id
       }).addTo(circlesGroup);
       registerSector(newSector);
@@ -2813,6 +2917,7 @@ function _setTrackingMode(on){
   _trackingMode = !!on;
   localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
   applyFilters();
+  refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
 }
 function _updateTrackingModeButton(){
@@ -2833,7 +2938,19 @@ function _getLineWeight(){
 function _setLineWeight(v){
   v = Math.min(1.5, Math.max(0.5, parseFloat(v) || 1.0));
   localStorage.setItem(LINE_WEIGHT_KEY, String(v));
-  allLines.forEach(l => l.setStyle({ weight: v }));
+  allLines.forEach(l => { l.setStyle({ weight: v }); _syncLineStartBall(l); });
+}
+
+// Fix 243: transparantie van de sectoren/bogen instelbaar (0.1-0.8), lokaal per toestel.
+const SECTOR_OPACITY_KEY = 'hornetapp_sector_opacity';
+function _getSectorOpacity(){
+  const v = parseFloat(localStorage.getItem(SECTOR_OPACITY_KEY));
+  return (!isNaN(v) && v >= 0.1 && v <= 0.8) ? v : 0.25;
+}
+function _setSectorOpacity(v){
+  v = Math.min(0.8, Math.max(0.1, parseFloat(v) || 0.25));
+  localStorage.setItem(SECTOR_OPACITY_KEY, String(v));
+  refreshZoomVisibility(); // herberekent fillOpacity per sector, met respect voor de schaal-zichtbaarheid
 }
 
 function applyFilters(){
@@ -2857,9 +2974,18 @@ function applyFilters(){
   const outlineOnly = !!$('f_poly_outline')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    layer.setStyle(outlineOnly
-      ? { fillOpacity: 0, weight: 4 }
-      : { fillColor: col, fillOpacity: 0.2, weight: 3 });
+    if(_trackingMode){
+      // Opsporingsmodus: polygonen ook verbergen, alleen zichtlijnen blijven over
+      layer.setStyle({ opacity: 0, fillOpacity: 0 });
+      if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
+    } else {
+      layer.setStyle(outlineOnly
+        ? { opacity: 1, fillOpacity: 0, weight: 4, color: col }
+        : { opacity: 1, fillColor: col, fillOpacity: 0.2, weight: 3, color: col });
+      // Label-zichtbaarheid bij het weer aanzetten bewust niet forceren — dat blijft aan
+      // refreshZoomVisibility() (zoomniveau-afhankelijk), om dubbele/conflicterende logica
+      // te voorkomen. Wordt vanzelf bijgewerkt zodra dat opnieuw draait (bv. na zoomend).
+    }
   });
 
   allLines.forEach(line=>{
@@ -2877,6 +3003,12 @@ function applyFilters(){
       if(should && !inH) handlesGroup.addLayer(line._handle);
       if(!should && inH) handlesGroup.removeLayer(line._handle);
     }
+    // Startballetje
+    if(line._startBall){
+      const inB = linesGroup.hasLayer(line._startBall);
+      if(should && !inB) linesGroup.addLayer(line._startBall);
+      if(!should && inB) linesGroup.removeLayer(line._startBall);
+    }
     // Sector
     if(line._sector){
       const inS = circlesGroup.hasLayer(line._sector);
@@ -2885,8 +3017,7 @@ function applyFilters(){
     }
     // Afstandslabel
     if(line._distLabel){
-      const zoom = map?.getZoom() || 14;
-      const showDist = should && zoom >= ZOOM_LINES;
+      const showDist = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
       const dle = line._distLabel.getElement?.();
       if(dle) dle.style.visibility = showDist ? '' : 'hidden';
     }
@@ -3000,6 +3131,8 @@ function upsertLineFromCloud(doc){
     l = L.polyline(latlngs,{color:(doc.color||'#ffcc00'),weight:_getLineWeight()}).addTo(linesGroup);
     l._meta = { ...doc };
     registerLine(l);
+    _syncLineStartBall(l); linesGroup.addLayer(l._startBall);
+    _syncStartBall(l);
     const _ll = l.getLatLngs(); const _endPt = _ll[_ll.length-1];
     l._distLabel = L.tooltip({permanent:true,direction:'right',offset:[8,0],className:'line-label'})
       .setContent(`${doc.distance||0} m`)
@@ -3010,6 +3143,7 @@ function upsertLineFromCloud(doc){
     l.setLatLngs(latlngs);
     l._meta = { ...l._meta, ...doc };
     if(l._distLabel){ const _ull=l.getLatLngs(); l._distLabel.setContent(`${doc.distance||0} m`).setLatLng(_ull[_ull.length-1]); }
+    _syncLineStartBall(l);
   }
   applyFilters();
 }
@@ -3028,7 +3162,7 @@ function upsertSectorFromCloud(doc){
   if(line && line._sector){ circlesGroup.removeLayer(line._sector); }
   const sector = createSectorLayer({
     id: doc.id, pot: doc.pot, distance: doc.distance, color: doc.color, bearing: doc.bearing,
-    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: doc.angleLeft||45, angleRight: doc.angleRight||45, steps: doc.steps||36, flightId: doc.flightId
+    rInner: doc.rInner, rOuter: doc.rOuter, angleLeft: 30, angleRight: 30, steps: doc.steps||36, flightId: doc.flightId
   }).addTo(circlesGroup);
   sector._meta.demo = doc.demo === true;
   registerSector(sector);
@@ -3620,7 +3754,7 @@ function _swRenderNearbyMap(body) {
       createSectorLayer({
         id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
         bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+        angleLeft: 30, angleRight: 30, steps: sm.steps || 36
       }).addTo(nMap);
     }
   });
@@ -3820,7 +3954,7 @@ function _swRenderPotPick(body) {
         createSectorLayer({
           id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
           bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-          angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+          angleLeft: 30, angleRight: 30, steps: sm.steps || 36
         }).addTo(potMap);
       }
     });
@@ -4102,7 +4236,7 @@ function _swRenderPotFlights(body) {
       createSectorLayer({
         id: 'preview_' + sm.id, pot: sm.pot, distance: sm.distance, color: sm.color || l._meta?.color || '#ffcc00',
         bearing: sm.bearing, rInner: sm.rInner, rOuter: sm.rOuter,
-        angleLeft: sm.angleLeft || 45, angleRight: sm.angleRight || 45, steps: sm.steps || 36
+        angleLeft: 30, angleRight: 30, steps: sm.steps || 36
       }).addTo(fMap);
     }
   });
@@ -4264,13 +4398,15 @@ function _swSaveGemerkt(photo) {
   line._meta = { id, type: 'flight', pot: potMeta, potId, distance: dist, color, bearing: brg, note: _sw.note || '' };
   if (photo) { line._meta.photoUrl = photo.url; line._meta.photoPath = photo.path; }
   registerLine(line);
+  _syncLineStartBall(line); linesGroup.addLayer(line._startBall);
+  _syncStartBall(line);
   line._distLabel = L.tooltip({ permanent: true, direction: 'right', offset: [8, 0], className: 'line-label' })
     .setContent(`${dist} m`).setLatLng(endLatLng).addTo(map);
 
   const rInner = Math.max(1, dist - 25), rOuter = dist + 25;
   const sector = createSectorLayer({
     id: genId('sect'), pot: potMeta, distance: dist, color, bearing: brg,
-    rInner, rOuter, angleLeft: 45, angleRight: 45, steps: 36, flightId: id
+    rInner, rOuter, angleLeft: 30, angleRight: 30, steps: 36, flightId: id
   }).addTo(circlesGroup);
   registerSector(sector); line._sector = sector; sector._line = line;
   attachSightLineInteractivity(line);

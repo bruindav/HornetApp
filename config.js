@@ -1,3 +1,7 @@
+// Fix 245: Mapbox-token voor de Mapbox Streets-kaartlaag (gratis tier, 50.000 weergaves/maand)
+// Beveiligd met URL-restricties (alleen bruindav.github.io + raw.githack.com)
+export const MAPBOX_TOKEN = "pk.eyJ1IjoiZGlnaWRhdmUiLCJhIjoiY21zczIwOXB4MDZucjJ4cjFtcXRtNWhmdiJ9.VcJPNSy7EzPiNaDUyHAf-w";
+
 // Fix 3 — authDomain terug naar origineel (Cloudflare hosting)
 export const firebaseConfig = {
   apiKey: "AIzaSyCgRWejn5vrpFB9znGxte7a_sFWRp-xeYk",
