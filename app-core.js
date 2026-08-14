@@ -1,4 +1,4 @@
-// app-core.js — Fix 248
+// app-core.js — Fix 255
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -82,6 +82,13 @@ function initMap(){
     zoomDelta: 0.5,          // stapgrootte van de +/- knoppen
     wheelPxPerZoomLevel: 120 // scrollwiel/trackpad reageert geleidelijker i.p.v. in sprongen
   }).setView([52.1, 5.3], 8);
+  // Fix 253: eigen pane voor het startballetje van zichtlijnen, met een hogere z-index dan
+  // de standaard markerPane (600). Zonder dit zit het balletje (een SVG-vorm, normaliter in
+  // de lager gelegen overlayPane) verstopt achter grote potje-iconen — dat verklaart waarom
+  // het soms wel/niet zichtbaar leek, afhankelijk van icoongrootte/zoomniveau, in plaats van
+  // een probleem met de straal zelf.
+  map.createPane('startBallPane');
+  map.getPane('startBallPane').style.zIndex = 650;
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -398,14 +405,9 @@ function initUIBindings(){
     const willOpen = document.body.classList.contains('sidebar-collapsed');
     setSidebar(willOpen); // als dicht → open; als open → dicht
   });
-  // Fix 248: dubbeltik ergens op de zijbalk (buiten knoppen/velden om) sluit 'm ook —
-  // zelfde soort gemak als het dubbeltikken om polygoon-bewerken af te sluiten.
-  if(sidebarEl){
-    sidebarEl.addEventListener('dblclick', (ev) => {
-      if(ev.target.closest('button, input, select, textarea, a, label')) return; // niet als je op een besturingselement dubbeltikt
-      setSidebar(false);
-    });
-  }
+  // Fix 249: dubbeltik-om-te-sluiten (fix 248) weer verwijderd — werkte niet prettig.
+  // Vervangen door een klein pijl-knopje aan de rand van de zijbalk.
+  on(document.getElementById('sidebar-collapse-btn'), 'click', ()=> setSidebar(false));
   on(backdrop, 'click', ()=> setSidebar(false));
   // Init: op mobiel standaard dicht
   if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
@@ -471,8 +473,7 @@ function initUIBindings(){
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
   document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
   document.getElementById('btn-simple-mode')?.addEventListener('click', () => _swShowFromSidebar());
-  document.getElementById('btn-tracking-mode')?.addEventListener('click', () => _setTrackingMode(!_trackingMode));
-  _updateTrackingModeButton();
+  // Fix 251: opsporingsmodus-knop verhuisd naar het filtermenu, zie openFilterModal()
   const lineWeightSlider = document.getElementById('line-weight-slider');
   const lineWeightVal = document.getElementById('line-weight-val');
   if (lineWeightSlider) {
@@ -760,21 +761,29 @@ function refreshZoomVisibility(){
     else if(!showLabels && onMap) map.removeLayer(layer._labelTooltip);
   });
 
-  // Zichtlijnen: opacity via setStyle
-  linesGroup.getLayers().forEach(l => {
-    l.setStyle({ opacity: showLines ? 1 : 0 });
-    if(l._distLabel){
-      const dle = l._distLabel.getElement?.();
-      if(dle) dle.style.visibility = showLines ? '' : 'hidden';
+  // Fix 250: zichtlijnen + balletje + label + sector via allLines i.p.v. ruwe groepsleden.
+  // linesGroup bevat naast de lijn zelf ook het startballetje — die los itereren zorgde
+  // ervoor dat het balletje nooit correct herkend/verborgen werd bij deze schaal-check.
+  allLines.forEach(line => {
+    if(!linesGroup.hasLayer(line)) return; // al om andere reden verborgen (potje/hidden/opsporingsmodus) — hier niet aankomen
+    line.setStyle({ opacity: showLines ? 1 : 0 });
+    if(line._startBall){
+      const inB = linesGroup.hasLayer(line._startBall);
+      if(showLines && !inB) linesGroup.addLayer(line._startBall);
+      if(!showLines && inB) linesGroup.removeLayer(line._startBall);
     }
-    if(l._handle){
-      const he = l._handle.getElement?.();
+    if(line._distLabel){
+      const onMap = map.hasLayer(line._distLabel);
+      if(showLines && !onMap) line._distLabel.addTo(map);
+      if(!showLines && onMap) map.removeLayer(line._distLabel);
+    }
+    if(line._handle){
+      const he = line._handle.getElement?.();
       if(he) he.style.visibility = showLines ? '' : 'hidden';
     }
-  });
-  // Sectoren
-  circlesGroup.getLayers().forEach(s => {
-    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
+    if(line._sector){
+      line._sector.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
+    }
   });
 }
 // ======================= Contextmenu infra =======================
@@ -1207,6 +1216,17 @@ function openFilterModal(){
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_nest_geruimd" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAWCAYAAAAmaHdCAAAE5UlEQVR42l1UWWxUZRT+/v+/987cdkr31k6H1ZalQ+m000gFTBEkBqNFgyNr1Ig2Eh/whaAGvdaIRB80oj4UTcAgEdvIWkQMESpohS7IYl2ILQiF0pZC25m7zF2ODzBGOU/n5Mt3Tr6zMdxlpIEfQy1PxfO7C4g1N7upuPWlmiomOW9YDk4u+qRjc1MsJtg3aytnFahije3SnkEDp+q2dup3J66vj8qrVanKJ7xltkeTHQc7juZ27H3sWlQcKOp02d7nKlaNzxRfCIlhxPAsj+F3IuqxiekyZ64gNwtMzM7LUAr7R+0TlkPrT94wuxqau5OpIgwAXo2V5Ef9aoWqYJItMEFhTMhGcshRfdU2YyvH4kZdNrFBlqGWSoKXSUQ5nDGXSax/xHT2sfNlZYHgNVPk3OwZ+a+E9z54ca1sGyu5bURMm9rGksmmt9/Z99kdmG9bVzGutJ8eTjq4yPSqmRcEg9SbxhdMP362t/H1pbNNv2+H3ydKTcuB5biQOQByYep2l6rry1/ecuTCpWmVwWJf8hABQmzIz5+XpipzcxL2g5OXROyh3MDONEkqGtMt27Yd5jgu8zx4lu06Al5oVFGeeKEk1DNneGS7SFfKTcf9jgHASKS8cRyj+ptZCrZHi5AIqN44SeHEOZKWBcuywAEYgJftEX+6vQ95I0mMkLcl63T3OkYAZ4DXs+i+9slXRyuH8lTsqr1XJBQFiuPCZYAgQsJ1IcV1PNveZ98zZotLGUrLpBNnllAsJsSbAHI2Lq88V5a3wW9acknvTV48OMbOZstIcAYfEWxFhmJZWHXqCoIDOmufkcu/rA7Ja8qn76zYvlvnDCBb2KrfRdqhSBCd4QJWfMPAM2euI0sIGGk+CMPEivY+FA/oaCvJ5Aem5sNne1N6FD2bAcQAgIjYuxuX9kiymGQIeItP9/Ho+QFcG5+JPdEg6jqvInRlFJ3Tc7FvZqGrEvGxUb1r88dHqjUNnGtarcQYI+LisCQ4WDzp7Z+ej66ZhSga0lH//V8IDSXwSzgfB8KFUFyQJAmmqmrz7ZWp5RIw3wNaQZy/b3tUL3PGPUmio9PyWWn/GDLGLMTTZBwaH4BuWl5BepqIJ8zLGEp8SATGWKvLGxoaPE3T+GsNX/3p2d5uNSfAZdP0nmy7iIy4hcGAjEDcwerOfuRyQZbnMH04/nbD561mc3OMAyABAK3HWkHdMXEik30L5i5cffp6UejvW3QqV+FbpmahSJExrfeWXWp5vCMgPtq09eimjvqovOiVI86/B5jalV5M9AerMloU0MJfgwH6tFiFokhM8sneij+GefnlOOC6R9pcvmxOd/dwisdTzuHCWemF0ayDiiQtHFCltv3VITsULGA56enJTEXiu2bkn9TJ24UM/0OVCms5PqE8mwFeEyA4A7yfQjXqA0HaoypiQdyy9xf++Pg8ePx5z0qaVtJU9LjVYblyXfqZ31YkjGSTP025vzoPLR1ToplPAS62Taz1G5XlB2lulPRIeLeGWonotsyN6x6Z8db6xY/GYjEFACgWEzFA6JGyr2luFZlVM1s7otFMGJHyk1RTSUZFuLkRUZkARgDXNI3/7/cS2B2MaaiVjIpwM9VEyIiEz8GIhH9OVISPNSIqsztNThE1TeOaViulBpAaAgGsEVHZiIRbExXhH/4BTRw+aPkvjewAAAAASUVORK5CYII=" width="16" height="16" style="display:inline-block;vertical-align:middle"> Nest geruimd</label>
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_lokpot" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAl0lEQVR4nGNgGGyAEcbQ0tL6T64h165dY2SijnsYGAafQSwwxps3bygyaBB77dWrV4wMDAwM0/Zt2WJ+LkKZkMaTRivubuiYtIGBgYFh165dg9Brg88gFmyCrPE3uAjqvHwBhcuITc20fVu2EDIHFmMMDAwMu3btmoPVIAYGBgY3N7cUgq5CMghnGO3atWsOsYYwMDAwAABdNimIF3+3ngAAAABJRU5ErkJggg==" width="14" height="18" style="display:inline-block;vertical-align:middle"> Lokpot</label>
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_val" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAASCAYAAABSO15qAAAC3ElEQVR4nHWST29TRxTFz52Z98ch2A55L5JtssFEDVmwQYBaFrDBG7o1Cz5A/BGytPgcLFi1imJRtYuuiiKxK0WIFUGBqlESxxA3JnbyYvu9NzOXRZwE8+dKVxpp5h7d8ztDALBShVx4DemnpSdZST9Hhg0ASQAswJLALijpg+9dfruzulKFvN+AAQDFAFED5i9g8mIhquww0Em0CD0H/8cpQs+l1iDWN7O+vztM7wJYvfQfBDASwKjSGze42d/vR9q4B4Zx5Ah0E4MjV2FvIsX6pI/I4gjtdQDXALzEsQAzQIRf5m7iduUnMZXPgfp99EhAEtBjwBeEdjaP9fW1zO3fVtTLBw+AWg0AIE426HTe4bxSXJqeRikMMRsGKAYBZsMApSAQwbkJHLR3b3W73R9qtVpar9fFmAWtNRlmNzUGlhmW+eQKRAQYA22MxRcliIjr9bqampqKoqj3WEkJAdLE4JOGZSIwl8tz1wuFwnkAWFtbo1MLxWKRGo2GieOkCUdCu1JxxqGTtr4j2HPI9/1zvu8vVKtV2Wg07JgFALCuysidfb7USTa1hIeRDbbMKuPJbWuzTHSh3W4TAP5KwAiQ3Iv48rvB+74vMmSPH8FYRjZ1/ykgC0B/PjMmQEQMQRh60ok9cs4EwOQJBUnEAI1BHEPKLNl3CASQPYNIBJaarRyalGH5uwIiNd1BKYc4o1zBfBoZkyBvaJJgb9hTucmJO8+e2TGBxcVFDQC/v3j+qLXd7LESHttjhAyACaST1EwXZqavzC38+BBgZqavNviwv28ECe2xMB6T8TDq0dkRKrHGZK/Oz8+N/o8Yg3jV80RsTbBaNMHHj71ESUXHSTIkwcyEM776l5UWZ3PilD6ApaWlfnOnde/5xpu/O8okzeRw0NKHw5aO4s34YPDH0z9/3drceFUul7OnyeEbValU5oNcztdanxFPgO0PW3EuDDP5fH53eXm5BYA+AVS7YWviAbXLAAAAAElFTkSuQmCC" width="16" height="18" style="display:inline-block;vertical-align:middle"> Val</label>
+
+          <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:10px;display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_show_lines" checked/> 🧭 Zichtlijnen tonen</label>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_show_polygons" checked/> ▭ Polygonen tonen</label>
+          </div>
+
+          <button id="fm_tracking_mode_btn" type="button" style="margin-top:6px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <span>🎯</span><span>Opsporingsmodus (alleen zichtlijnen)</span>
+          </button>
+          <div style="font-size:10px;color:#94a3b8;margin-top:-2px">Verbergt alle iconen én polygonen, toont alleen zichtlijnen. Alleen bij jou (lokaal).</div>
+
           <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
               <span style="font-size:13px;color:#475569">Periode</span>
@@ -1233,7 +1253,8 @@ function openFilterModal(){
     sl.addEventListener('input', ()=>{ lb.textContent = (PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; });
     // Reset
     modal.querySelector('#fm_reset').addEventListener('click', ()=>{
-      ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
+      if(_trackingMode) _setTrackingMode(false); // eerst opsporingsmodus uit (herstelt oude stand)
+      ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val','fm_show_lines','fm_show_polygons'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
       sl.value='0'; lb.textContent='Alles';
       modal.querySelector('#fm_poly_outline').checked = false;
       modal.querySelector('#fm_show_gbif').checked = false; // uit = GBIF zichtbaar
@@ -1241,7 +1262,8 @@ function openFilterModal(){
     // Apply
     modal.querySelector('#fm_apply').addEventListener('click', ()=>{
       [['fm_hoornaar','f_type_hoornaar'],['fm_nest','f_type_nest'],['fm_nest_geruimd','f_type_nest_geruimd'],
-       ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val']].forEach(([src,dst])=>{
+       ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val'],
+       ['fm_show_lines','f_show_lines'],['fm_show_polygons','f_show_polygons']].forEach(([src,dst])=>{
         const srcEl=modal.querySelector('#'+src); const dstEl=$(dst);
         if(srcEl && dstEl) dstEl.checked=srcEl.checked;
       });
@@ -1249,14 +1271,18 @@ function openFilterModal(){
       const dstOutline=$('f_poly_outline'); if(dstOutline) dstOutline.checked=modal.querySelector('#fm_poly_outline').checked;
       const dstGbif=$('f_show_gbif'); if(dstGbif) dstGbif.checked=modal.querySelector('#fm_show_gbif').checked;
       applyFilters();
+      refreshZoomVisibility();
       _closeFilterModal();
       _updateFilterBadge();
     });
+    // Opsporingsmodus — Fix 251: verhuisd van de zijbalk naar hier, het is feitelijk een filter
+    modal.querySelector('#fm_tracking_mode_btn').addEventListener('click', () => _setTrackingMode(!_trackingMode));
     modal.addEventListener('click', e=>{ if(e.target===modal) _closeFilterModal(); });
   }
   // Sync huidige staat naar modal
   [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
-   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val']].forEach(([src,dst])=>{
+   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val'],
+   ['f_show_lines','fm_show_lines'],['f_show_polygons','fm_show_polygons']].forEach(([src,dst])=>{
     const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
     if(srcEl && dstEl) dstEl.checked=srcEl.checked;
   });
@@ -1266,6 +1292,7 @@ function openFilterModal(){
   if(fo && fmFo) fmFo.checked=fo.checked;
   const fmGbif=modal.querySelector('#fm_show_gbif'); const dstGbifEl=$('f_show_gbif');
   if(fmGbif && dstGbifEl) fmGbif.checked=dstGbifEl.checked;
+  _updateTrackingModeButton(); // knop-uiterlijk in het (net gemaakte of hergebruikte) modal bijwerken
   modal.style.display='flex';
 }
 function _closeFilterModal(){ const m=document.getElementById('filter-modal'); if(m) m.style.display='none'; }
@@ -1273,7 +1300,9 @@ function _updateFilterBadge(){
   const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
   const period = +($('f_period_slider')?.value||0);
   const gbifOn = !!$('f_show_gbif')?.checked;
-  const active = !allTypes || period>0 || gbifOn;
+  const linesOff = $('f_show_lines')?.checked===false;
+  const polygonsOff = $('f_show_polygons')?.checked===false;
+  const active = !allTypes || period>0 || gbifOn || linesOff || polygonsOff || _trackingMode;
   const wrapper = document.querySelector('.pm-icon-filter');
   if(wrapper) wrapper.classList.toggle('filter-active', active);
   const svgPath = document.querySelector('.pm-icon-filter path');
@@ -1835,8 +1864,24 @@ function _syncLineStartBall(line){
   const color = meta.color || '#ffcc00';
   const w = _getLineWeight();
   const r = w * 2 * 3; // straal = 2x dikte, x3 vergroot op verzoek → doorsnee = 12x dikte
-  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
-  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
+  if(line._startBall){
+    line._startBall.setLatLng(start);
+    line._startBall.setStyle({radius:r, color, fillColor:color});
+  } else {
+    const ball = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false, pane:'startBallPane'});
+    line._startBall = ball;
+    // Fix 254: concrete aanwijzing was dat het "bestaat al"-pad hierboven het balletje WEL
+    // herstelt — en dat pad roept, anders dan de aanmaak hieronder, ook expliciet
+    // setLatLng() aan (niet alleen setStyle()). Die stond bij het aanmaken nog niet.
+    // In plaats van te blijven gokken over de exacte timing: dwing dezelfde correctie
+    // (positie + straal) een paar keer af, op meerdere momenten na aanmaken, zodat het
+    // hoe dan ook een keer ná de volledige toevoeging aan de kaart valt.
+    const reapply = () => { ball.setLatLng(start); ball.setStyle({radius:r, color, fillColor:color}); };
+    reapply();
+    requestAnimationFrame(reapply);
+    setTimeout(reapply, 60);
+    setTimeout(reapply, 300);
+  }
 }
 
 function setSightLineColor(line,color,save=false){
@@ -2910,23 +2955,59 @@ function _renderHiddenLinesPanel(){
 }
 
 // Fix 233: opsporingsmodus — met 1 klik alleen zichtlijnen (+cirkels) tonen, alle
-// iconen verbergen. Lokaal per toestel (localStorage), beïnvloedt niemand anders.
-const TRACKING_MODE_KEY = 'hornetapp_tracking_mode';
-let _trackingMode = localStorage.getItem(TRACKING_MODE_KEY) === '1';
+// iconen verbergen.
+// Fix 255: bewust NIET meer persisteren tussen sessies — anders kan opsporingsmodus
+// 'AAN' blijven staan (uit localStorage) terwijl de filter-vinkjes zelf gewoon terug naar
+// hun standaardstand (alles aan) herladen, en die twee lopen dan niet meer synchroon.
+// Start dus altijd op UIT; alleen actief als je 'm deze sessie zelf aanzet.
+const TRACKING_MODE_BACKUP_KEY = 'hornetapp_tracking_mode_backup';
+let _trackingMode = false;
+// Fix 252: opsporingsmodus is een "groepsfilter" — zet bij aanzetten alle andere filters
+// expliciet uit en 'zichtlijnen tonen' aan, en herstelt bij uitzetten de vorige stand.
+// Zo blijven de vinkjes in het filtermenu altijd de waarheid weerspiegelen, i.p.v. dat
+// opsporingsmodus er als onzichtbare overrule los bovenop zit.
+const TRACKING_MODE_IDS = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_show_polygons'];
 function _setTrackingMode(on){
   _trackingMode = !!on;
-  localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
+  if(_trackingMode){
+    // Huidige stand bewaren, dan alles uit behalve zichtlijnen
+    const backup = {};
+    TRACKING_MODE_IDS.forEach(id => { const el=$(id); backup[id] = el ? el.checked : true; });
+    localStorage.setItem(TRACKING_MODE_BACKUP_KEY, JSON.stringify(backup));
+    TRACKING_MODE_IDS.forEach(id => { const el=$(id); if(el) el.checked=false; });
+    const linesEl=$('f_show_lines'); if(linesEl) linesEl.checked=true;
+  } else {
+    // Vorige stand herstellen
+    try {
+      const backup = JSON.parse(localStorage.getItem(TRACKING_MODE_BACKUP_KEY) || '{}');
+      TRACKING_MODE_IDS.forEach(id => { const el=$(id); if(el && id in backup) el.checked = backup[id]; });
+    } catch {}
+  }
+  _syncFilterModalFromState(); // filtermenu-vinkjes meteen bijwerken als dat open/aangemaakt is
   applyFilters();
   refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
+  _updateFilterBadge();
+}
+// Kopieert de echte filter-status (f_...) naar de zichtbare vinkjes in het filtermenu,
+// zodat handmatige wijzigingen door opsporingsmodus (of resets) meteen zichtbaar zijn.
+function _syncFilterModalFromState(){
+  const modal = document.getElementById('filter-modal');
+  if(!modal) return;
+  [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
+   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val'],
+   ['f_show_lines','fm_show_lines'],['f_show_polygons','fm_show_polygons']].forEach(([src,dst])=>{
+    const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
+    if(srcEl && dstEl) dstEl.checked = srcEl.checked;
+  });
 }
 function _updateTrackingModeButton(){
-  const btn = document.getElementById('btn-tracking-mode');
-  if(!btn) return;
+  const btn = document.getElementById('fm_tracking_mode_btn');
+  if(!btn) return; // filtermenu nog niet geopend geweest — komt goed bij openFilterModal()
   btn.style.background = _trackingMode ? '#0aa879' : '#f8fafc';
   btn.style.color = _trackingMode ? '#fff' : '#475569';
   btn.style.borderColor = _trackingMode ? '#0aa879' : '#e2e8f0';
-  btn.querySelector('span:last-child').textContent = _trackingMode ? 'Opsporingsmodus AAN' : 'Opsporingsmodus';
+  btn.querySelector('span:last-child').textContent = _trackingMode ? 'Opsporingsmodus AAN' : 'Opsporingsmodus (alleen zichtlijnen)';
 }
 
 // Fix 233: dikte van zichtlijnen instelbaar (0.5-1.5), lokaal per toestel.
@@ -2957,7 +3038,8 @@ function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
-    if(_trackingMode) show=false; // opsporingsmodus: alle iconen verborgen, alleen zichtlijnen
+    // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
+    // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -2970,12 +3052,14 @@ function applyFilters(){
   });
   const visiblePotIds=new Set();
   allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
-  // Polygoon omtrek-only
+  // Polygoon omtrek-only + Fix 251: aparte 'polygonen tonen'-filter
   const outlineOnly = !!$('f_poly_outline')?.checked;
+  const showPolygonsFilter = !!$('f_show_polygons')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    if(_trackingMode){
-      // Opsporingsmodus: polygonen ook verbergen, alleen zichtlijnen blijven over
+    if(!showPolygonsFilter){
+      // Fix 252: opsporingsmodus zet f_show_polygons zelf al uit — geen losse
+      // _trackingMode-check meer nodig hier.
       layer.setStyle({ opacity: 0, fillOpacity: 0 });
       if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
     } else {
@@ -2988,11 +3072,15 @@ function applyFilters(){
     }
   });
 
+  // Fix 251/252: aparte 'zichtlijnen tonen'-filter. Zichtlijnen zijn normaliter gekoppeld
+  // aan de zichtbaarheid van hun eigen lokpot-icoon (visiblePotIds) — logisch bij normaal
+  // filteren (bv. op datum), maar in opsporingsmodus is het lokpot-icoon zelf juist bewust
+  // verborgen (via f_type_lokpot=false) terwijl de zichtlijn wél zichtbaar moet blijven.
+  // Vandaar deze ene, welbewuste uitzondering: bij opsporingsmodus telt de potje-koppeling niet mee.
+  const showLinesFilter = !!$('f_show_lines')?.checked;
   allLines.forEach(line=>{
     const meta=line._meta||{};
-    // In opsporingsmodus: alle zichtlijnen tonen (los van of het bijbehorende potje
-    // zichtbaar is — dat icoon is nu immers sowieso verborgen), behalve handmatig verborgen lijnen.
-    const should = (_trackingMode ? true : visiblePotIds.has(meta.potId)) && !_hiddenLineIds.has(meta.id);
+    const should = (_trackingMode ? showLinesFilter : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
     // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
@@ -3003,11 +3091,13 @@ function applyFilters(){
       if(should && !inH) handlesGroup.addLayer(line._handle);
       if(!should && inH) handlesGroup.removeLayer(line._handle);
     }
-    // Startballetje
+    // Startballetje — ook rekening houden met de schaal (niet alleen potje-zichtbaarheid),
+    // anders blijft het balletje zichtbaar boven de 500m-grens terwijl de lijn zelf al weg is.
     if(line._startBall){
+      const wantBall = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
       const inB = linesGroup.hasLayer(line._startBall);
-      if(should && !inB) linesGroup.addLayer(line._startBall);
-      if(!should && inB) linesGroup.removeLayer(line._startBall);
+      if(wantBall && !inB) linesGroup.addLayer(line._startBall);
+      if(!wantBall && inB) linesGroup.removeLayer(line._startBall);
     }
     // Sector
     if(line._sector){
@@ -3018,8 +3108,9 @@ function applyFilters(){
     // Afstandslabel
     if(line._distLabel){
       const showDist = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
-      const dle = line._distLabel.getElement?.();
-      if(dle) dle.style.visibility = showDist ? '' : 'hidden';
+      const onMapL = map.hasLayer(line._distLabel);
+      if(showDist && !onMapL) line._distLabel.addTo(map);
+      if(!showDist && onMapL) map.removeLayer(line._distLabel);
     }
   });
   _renderHiddenLinesPanel();
@@ -4427,6 +4518,7 @@ async function boot(){
   initMap();
   initUIBindings();
   initWakeLock();
+  _updateFilterBadge(); // Fix 251: badge meteen correct tonen als opsporingsmodus al aan stond
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
   // Jaar dropdown vullen: 2020 t/m huidig jaar (nieuwste bovenaan)
