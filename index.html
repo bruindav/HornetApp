@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- index.html — Fix 249 -->
+<!-- index.html — Fix 251 -->
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
@@ -268,10 +268,8 @@
             <button id="apply-scope">Toepassen</button>
           </div>
 
-          <button id="btn-tracking-mode" style="width:100%;margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-            <span>🎯</span><span>Opsporingsmodus</span>
-          </button>
-          <div style="font-size:10px;color:#94a3b8;margin-top:3px;text-align:center">Toont alleen zichtlijnen, verbergt alle iconen (alleen bij jou)</div>
+          <!-- Fix 251: opsporingsmodus-knop verhuisd naar het filtermenu (🔽), want het is
+               feitelijk een filter -->
 
           <div style="margin-top:12px">
             <label style="font-size:12px;font-weight:600;color:#475569;display:flex;justify-content:space-between">
@@ -295,6 +293,8 @@
             <input type="checkbox" id="f_type_nest_geruimd" checked/>
             <input type="checkbox" id="f_type_lokpot" checked/>
             <input type="checkbox" id="f_type_val" checked/>
+            <input type="checkbox" id="f_show_lines" checked/>
+            <input type="checkbox" id="f_show_polygons" checked/>
             <input type="range" id="f_period_slider" min="0" max="7" value="0"/>
             <span id="f_period_label">Alles</span>
             <input type="checkbox" id="f_poly_outline"/>
@@ -632,6 +632,14 @@
               <div class="help-row">
                 <div class="help-icon">🌍</div>
                 <div><strong>GBIF</strong> — Vink <em>Verberg GBIF</em> aan om alleen eigen waarnemingen te zien.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🧭</div>
+                <div><strong>Zichtlijnen / Polygonen tonen</strong> — apart uit te zetten, los van de type-filters hierboven.</div>
+              </div>
+              <div class="help-row">
+                <div class="help-icon">🎯</div>
+                <div><strong>Opsporingsmodus</strong> — verbergt met 1 klik alle iconen én polygonen, en toont alleen de zichtlijnen. Handig tijdens het opsporen van een nest. Alleen bij jou zichtbaar (lokaal per toestel), beïnvloedt niemand anders.</div>
               </div>
             </div>
 

@@ -1,4 +1,4 @@
-// app-core.js — Fix 250
+// app-core.js — Fix 251
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -466,8 +466,7 @@ function initUIBindings(){
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
   document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
   document.getElementById('btn-simple-mode')?.addEventListener('click', () => _swShowFromSidebar());
-  document.getElementById('btn-tracking-mode')?.addEventListener('click', () => _setTrackingMode(!_trackingMode));
-  _updateTrackingModeButton();
+  // Fix 251: opsporingsmodus-knop verhuisd naar het filtermenu, zie openFilterModal()
   const lineWeightSlider = document.getElementById('line-weight-slider');
   const lineWeightVal = document.getElementById('line-weight-val');
   if (lineWeightSlider) {
@@ -1210,6 +1209,17 @@ function openFilterModal(){
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_nest_geruimd" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABEAAAAWCAYAAAAmaHdCAAAE5UlEQVR42l1UWWxUZRT+/v+/987cdkr31k6H1ZalQ+m000gFTBEkBqNFgyNr1Ig2Eh/whaAGvdaIRB80oj4UTcAgEdvIWkQMESpohS7IYl2ILQiF0pZC25m7zF2ODzBGOU/n5Mt3Tr6zMdxlpIEfQy1PxfO7C4g1N7upuPWlmiomOW9YDk4u+qRjc1MsJtg3aytnFahije3SnkEDp+q2dup3J66vj8qrVanKJ7xltkeTHQc7juZ27H3sWlQcKOp02d7nKlaNzxRfCIlhxPAsj+F3IuqxiekyZ64gNwtMzM7LUAr7R+0TlkPrT94wuxqau5OpIgwAXo2V5Ef9aoWqYJItMEFhTMhGcshRfdU2YyvH4kZdNrFBlqGWSoKXSUQ5nDGXSax/xHT2sfNlZYHgNVPk3OwZ+a+E9z54ca1sGyu5bURMm9rGksmmt9/Z99kdmG9bVzGutJ8eTjq4yPSqmRcEg9SbxhdMP362t/H1pbNNv2+H3ydKTcuB5biQOQByYep2l6rry1/ecuTCpWmVwWJf8hABQmzIz5+XpipzcxL2g5OXROyh3MDONEkqGtMt27Yd5jgu8zx4lu06Al5oVFGeeKEk1DNneGS7SFfKTcf9jgHASKS8cRyj+ptZCrZHi5AIqN44SeHEOZKWBcuywAEYgJftEX+6vQ95I0mMkLcl63T3OkYAZ4DXs+i+9slXRyuH8lTsqr1XJBQFiuPCZYAgQsJ1IcV1PNveZ98zZotLGUrLpBNnllAsJsSbAHI2Lq88V5a3wW9acknvTV48OMbOZstIcAYfEWxFhmJZWHXqCoIDOmufkcu/rA7Ja8qn76zYvlvnDCBb2KrfRdqhSBCd4QJWfMPAM2euI0sIGGk+CMPEivY+FA/oaCvJ5Aem5sNne1N6FD2bAcQAgIjYuxuX9kiymGQIeItP9/Ho+QFcG5+JPdEg6jqvInRlFJ3Tc7FvZqGrEvGxUb1r88dHqjUNnGtarcQYI+LisCQ4WDzp7Z+ej66ZhSga0lH//V8IDSXwSzgfB8KFUFyQJAmmqmrz7ZWp5RIw3wNaQZy/b3tUL3PGPUmio9PyWWn/GDLGLMTTZBwaH4BuWl5BepqIJ8zLGEp8SATGWKvLGxoaPE3T+GsNX/3p2d5uNSfAZdP0nmy7iIy4hcGAjEDcwerOfuRyQZbnMH04/nbD561mc3OMAyABAK3HWkHdMXEik30L5i5cffp6UejvW3QqV+FbpmahSJExrfeWXWp5vCMgPtq09eimjvqovOiVI86/B5jalV5M9AerMloU0MJfgwH6tFiFokhM8sneij+GefnlOOC6R9pcvmxOd/dwisdTzuHCWemF0ayDiiQtHFCltv3VITsULGA56enJTEXiu2bkn9TJ24UM/0OVCms5PqE8mwFeEyA4A7yfQjXqA0HaoypiQdyy9xf++Pg8ePx5z0qaVtJU9LjVYblyXfqZ31YkjGSTP025vzoPLR1ToplPAS62Taz1G5XlB2lulPRIeLeGWonotsyN6x6Z8db6xY/GYjEFACgWEzFA6JGyr2luFZlVM1s7otFMGJHyk1RTSUZFuLkRUZkARgDXNI3/7/cS2B2MaaiVjIpwM9VEyIiEz8GIhH9OVISPNSIqsztNThE1TeOaViulBpAaAgGsEVHZiIRbExXhH/4BTRw+aPkvjewAAAAASUVORK5CYII=" width="16" height="16" style="display:inline-block;vertical-align:middle"> Nest geruimd</label>
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_lokpot" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABIAAAASCAYAAABWzo5XAAAAl0lEQVR4nGNgGGyAEcbQ0tL6T64h165dY2SijnsYGAafQSwwxps3bygyaBB77dWrV4wMDAwM0/Zt2WJ+LkKZkMaTRivubuiYtIGBgYFh165dg9Brg88gFmyCrPE3uAjqvHwBhcuITc20fVu2EDIHFmMMDAwMu3btmoPVIAYGBgY3N7cUgq5CMghnGO3atWsOsYYwMDAwAABdNimIF3+3ngAAAABJRU5ErkJggg==" width="14" height="18" style="display:inline-block;vertical-align:middle"> Lokpot</label>
           <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_val" checked/> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAASCAYAAABSO15qAAAC3ElEQVR4nHWST29TRxTFz52Z98ch2A55L5JtssFEDVmwQYBaFrDBG7o1Cz5A/BGytPgcLFi1imJRtYuuiiKxK0WIFUGBqlESxxA3JnbyYvu9NzOXRZwE8+dKVxpp5h7d8ztDALBShVx4DemnpSdZST9Hhg0ASQAswJLALijpg+9dfruzulKFvN+AAQDFAFED5i9g8mIhquww0Em0CD0H/8cpQs+l1iDWN7O+vztM7wJYvfQfBDASwKjSGze42d/vR9q4B4Zx5Ah0E4MjV2FvIsX6pI/I4gjtdQDXALzEsQAzQIRf5m7iduUnMZXPgfp99EhAEtBjwBeEdjaP9fW1zO3fVtTLBw+AWg0AIE426HTe4bxSXJqeRikMMRsGKAYBZsMApSAQwbkJHLR3b3W73R9qtVpar9fFmAWtNRlmNzUGlhmW+eQKRAQYA22MxRcliIjr9bqampqKoqj3WEkJAdLE4JOGZSIwl8tz1wuFwnkAWFtbo1MLxWKRGo2GieOkCUdCu1JxxqGTtr4j2HPI9/1zvu8vVKtV2Wg07JgFALCuysidfb7USTa1hIeRDbbMKuPJbWuzTHSh3W4TAP5KwAiQ3Iv48rvB+74vMmSPH8FYRjZ1/ykgC0B/PjMmQEQMQRh60ok9cs4EwOQJBUnEAI1BHEPKLNl3CASQPYNIBJaarRyalGH5uwIiNd1BKYc4o1zBfBoZkyBvaJJgb9hTucmJO8+e2TGBxcVFDQC/v3j+qLXd7LESHttjhAyACaST1EwXZqavzC38+BBgZqavNviwv28ECe2xMB6T8TDq0dkRKrHGZK/Oz8+N/o8Yg3jV80RsTbBaNMHHj71ESUXHSTIkwcyEM776l5UWZ3PilD6ApaWlfnOnde/5xpu/O8okzeRw0NKHw5aO4s34YPDH0z9/3drceFUul7OnyeEbValU5oNcztdanxFPgO0PW3EuDDP5fH53eXm5BYA+AVS7YWviAbXLAAAAAElFTkSuQmCC" width="16" height="18" style="display:inline-block;vertical-align:middle"> Val</label>
+
+          <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:10px;display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_show_lines" checked/> 🧭 Zichtlijnen tonen</label>
+            <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="fm_show_polygons" checked/> ▭ Polygonen tonen</label>
+          </div>
+
+          <button id="fm_tracking_mode_btn" type="button" style="margin-top:6px;width:100%;padding:9px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <span>🎯</span><span>Opsporingsmodus (alleen zichtlijnen)</span>
+          </button>
+          <div style="font-size:10px;color:#94a3b8;margin-top:-2px">Verbergt alle iconen én polygonen, toont alleen zichtlijnen. Alleen bij jou (lokaal).</div>
+
           <div style="border-top:1px solid #e2e8f0;margin-top:4px;padding-top:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
               <span style="font-size:13px;color:#475569">Periode</span>
@@ -1236,15 +1246,17 @@ function openFilterModal(){
     sl.addEventListener('input', ()=>{ lb.textContent = (PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; });
     // Reset
     modal.querySelector('#fm_reset').addEventListener('click', ()=>{
-      ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
+      ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val','fm_show_lines','fm_show_polygons'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
       sl.value='0'; lb.textContent='Alles';
       modal.querySelector('#fm_poly_outline').checked = false;
       modal.querySelector('#fm_show_gbif').checked = false; // uit = GBIF zichtbaar
+      if(_trackingMode) _setTrackingMode(false); // opsporingsmodus ook resetten
     });
     // Apply
     modal.querySelector('#fm_apply').addEventListener('click', ()=>{
       [['fm_hoornaar','f_type_hoornaar'],['fm_nest','f_type_nest'],['fm_nest_geruimd','f_type_nest_geruimd'],
-       ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val']].forEach(([src,dst])=>{
+       ['fm_lokpot','f_type_lokpot'],['fm_val','f_type_val'],
+       ['fm_show_lines','f_show_lines'],['fm_show_polygons','f_show_polygons']].forEach(([src,dst])=>{
         const srcEl=modal.querySelector('#'+src); const dstEl=$(dst);
         if(srcEl && dstEl) dstEl.checked=srcEl.checked;
       });
@@ -1252,14 +1264,18 @@ function openFilterModal(){
       const dstOutline=$('f_poly_outline'); if(dstOutline) dstOutline.checked=modal.querySelector('#fm_poly_outline').checked;
       const dstGbif=$('f_show_gbif'); if(dstGbif) dstGbif.checked=modal.querySelector('#fm_show_gbif').checked;
       applyFilters();
+      refreshZoomVisibility();
       _closeFilterModal();
       _updateFilterBadge();
     });
+    // Opsporingsmodus — Fix 251: verhuisd van de zijbalk naar hier, het is feitelijk een filter
+    modal.querySelector('#fm_tracking_mode_btn').addEventListener('click', () => _setTrackingMode(!_trackingMode));
     modal.addEventListener('click', e=>{ if(e.target===modal) _closeFilterModal(); });
   }
   // Sync huidige staat naar modal
   [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
-   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val']].forEach(([src,dst])=>{
+   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val'],
+   ['f_show_lines','fm_show_lines'],['f_show_polygons','fm_show_polygons']].forEach(([src,dst])=>{
     const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
     if(srcEl && dstEl) dstEl.checked=srcEl.checked;
   });
@@ -1269,6 +1285,7 @@ function openFilterModal(){
   if(fo && fmFo) fmFo.checked=fo.checked;
   const fmGbif=modal.querySelector('#fm_show_gbif'); const dstGbifEl=$('f_show_gbif');
   if(fmGbif && dstGbifEl) fmGbif.checked=dstGbifEl.checked;
+  _updateTrackingModeButton(); // knop-uiterlijk in het (net gemaakte of hergebruikte) modal bijwerken
   modal.style.display='flex';
 }
 function _closeFilterModal(){ const m=document.getElementById('filter-modal'); if(m) m.style.display='none'; }
@@ -1276,7 +1293,9 @@ function _updateFilterBadge(){
   const allTypes = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val'].every(id=>$(id)?.checked!==false);
   const period = +($('f_period_slider')?.value||0);
   const gbifOn = !!$('f_show_gbif')?.checked;
-  const active = !allTypes || period>0 || gbifOn;
+  const linesOff = $('f_show_lines')?.checked===false;
+  const polygonsOff = $('f_show_polygons')?.checked===false;
+  const active = !allTypes || period>0 || gbifOn || linesOff || polygonsOff || _trackingMode;
   const wrapper = document.querySelector('.pm-icon-filter');
   if(wrapper) wrapper.classList.toggle('filter-active', active);
   const svgPath = document.querySelector('.pm-icon-filter path');
@@ -2922,14 +2941,15 @@ function _setTrackingMode(on){
   applyFilters();
   refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
+  _updateFilterBadge();
 }
 function _updateTrackingModeButton(){
-  const btn = document.getElementById('btn-tracking-mode');
-  if(!btn) return;
+  const btn = document.getElementById('fm_tracking_mode_btn');
+  if(!btn) return; // filtermenu nog niet geopend geweest — komt goed bij openFilterModal()
   btn.style.background = _trackingMode ? '#0aa879' : '#f8fafc';
   btn.style.color = _trackingMode ? '#fff' : '#475569';
   btn.style.borderColor = _trackingMode ? '#0aa879' : '#e2e8f0';
-  btn.querySelector('span:last-child').textContent = _trackingMode ? 'Opsporingsmodus AAN' : 'Opsporingsmodus';
+  btn.querySelector('span:last-child').textContent = _trackingMode ? 'Opsporingsmodus AAN' : 'Opsporingsmodus (alleen zichtlijnen)';
 }
 
 // Fix 233: dikte van zichtlijnen instelbaar (0.5-1.5), lokaal per toestel.
@@ -2973,12 +2993,13 @@ function applyFilters(){
   });
   const visiblePotIds=new Set();
   allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
-  // Polygoon omtrek-only
+  // Polygoon omtrek-only + Fix 251: aparte 'polygonen tonen'-filter
   const outlineOnly = !!$('f_poly_outline')?.checked;
+  const showPolygonsFilter = !!$('f_show_polygons')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    if(_trackingMode){
-      // Opsporingsmodus: polygonen ook verbergen, alleen zichtlijnen blijven over
+    if(_trackingMode || !showPolygonsFilter){
+      // Opsporingsmodus, of polygonen expliciet uitgevinkt: verbergen
       layer.setStyle({ opacity: 0, fillOpacity: 0 });
       if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
     } else {
@@ -2991,11 +3012,15 @@ function applyFilters(){
     }
   });
 
+  // Fix 251: aparte 'zichtlijnen tonen'-filter — opsporingsmodus overruled dit altijd (dat
+  // is immers precies bedoeld om zichtlijnen te tónen), maar buiten opsporingsmodus bepaalt
+  // deze checkbox mee of zichtlijnen sowieso zichtbaar mogen zijn.
+  const showLinesFilter = !!$('f_show_lines')?.checked;
   allLines.forEach(line=>{
     const meta=line._meta||{};
     // In opsporingsmodus: alle zichtlijnen tonen (los van of het bijbehorende potje
     // zichtbaar is — dat icoon is nu immers sowieso verborgen), behalve handmatig verborgen lijnen.
-    const should = (_trackingMode ? true : visiblePotIds.has(meta.potId)) && !_hiddenLineIds.has(meta.id);
+    const should = (_trackingMode ? true : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
     // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
@@ -4433,6 +4458,7 @@ async function boot(){
   initMap();
   initUIBindings();
   initWakeLock();
+  _updateFilterBadge(); // Fix 251: badge meteen correct tonen als opsporingsmodus al aan stond
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
   // Jaar dropdown vullen: 2020 t/m huidig jaar (nieuwste bovenaan)
