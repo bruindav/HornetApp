@@ -1,4 +1,4 @@
-// app-core.js — Fix 257
+// app-core.js — Fix 258
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3373,8 +3373,14 @@ function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
 // Wordt alleen bij het ALLEREERSTE laden van de app gebruikt — wissel je daarna handmatig
 // van gebied/jaar, dan zoomt de app gewoon naar het nieuw gekozen gebied, zoals verwacht.
 const LAST_VIEW_KEY = 'hornetapp_last_view';
+// Fix 258: cruciale correctie — pas pas beginnen met opslaan NADAT het hele opstartproces
+// (incl. eventuele automatische zooms naar het gebied-middelpunt) voorbij is. Zonder deze
+// vlag sloeg elke automatische boot-zoom zichzelf meteen op als 'laatste positie', wat de
+// net herstelde, echte laatste positie van de gebruiker weer overschreef — een kringloop
+// die zichzelf in stand hield en waardoor de opgeslagen positie nooit standhield.
+let _bootViewSettled = false;
 function _saveLastView(){
-  if(!map) return;
+  if(!map || !_bootViewSettled) return;
   try {
     const c = map.getCenter();
     localStorage.setItem(LAST_VIEW_KEY, JSON.stringify({ lat:c.lat, lng:c.lng, zoom: map.getZoom() }));
@@ -3395,9 +3401,13 @@ function _applySavedViewOnce(){
   try {
     const saved = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
     if(saved && typeof saved.lat === 'number' && typeof saved.lng === 'number' && typeof saved.zoom === 'number'){
-      map.setView([saved.lat, saved.lng], saved.zoom);
+      map.setView([saved.lat, saved.lng], saved.zoom, { animate:false }); // direct, geen animatie die nog kan overlappen met een lopende flyTo
     }
   } catch {}
+  // Fix 258: pas ná deze (eventueel nog net lopende) laatste correctie het opslaan
+  // activeren — met een kleine marge zodat een eerder gestarte flyTo-animatie (1s) zeker
+  // is uitgedoofd en zijn eigen 'moveend' niet alsnog deze instelling overschrijft.
+  setTimeout(() => { _bootViewSettled = true; }, 1200);
 }
 const ROL_LABEL = {
   admin:     '🔑 Admin',
