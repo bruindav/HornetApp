@@ -1,4 +1,4 @@
-// app-core.js — Fix 249
+// app-core.js — Fix 250
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -755,21 +755,29 @@ function refreshZoomVisibility(){
     else if(!showLabels && onMap) map.removeLayer(layer._labelTooltip);
   });
 
-  // Zichtlijnen: opacity via setStyle
-  linesGroup.getLayers().forEach(l => {
-    l.setStyle({ opacity: showLines ? 1 : 0 });
-    if(l._distLabel){
-      const dle = l._distLabel.getElement?.();
-      if(dle) dle.style.visibility = showLines ? '' : 'hidden';
+  // Fix 250: zichtlijnen + balletje + label + sector via allLines i.p.v. ruwe groepsleden.
+  // linesGroup bevat naast de lijn zelf ook het startballetje — die los itereren zorgde
+  // ervoor dat het balletje nooit correct herkend/verborgen werd bij deze schaal-check.
+  allLines.forEach(line => {
+    if(!linesGroup.hasLayer(line)) return; // al om andere reden verborgen (potje/hidden/opsporingsmodus) — hier niet aankomen
+    line.setStyle({ opacity: showLines ? 1 : 0 });
+    if(line._startBall){
+      const inB = linesGroup.hasLayer(line._startBall);
+      if(showLines && !inB) linesGroup.addLayer(line._startBall);
+      if(!showLines && inB) linesGroup.removeLayer(line._startBall);
     }
-    if(l._handle){
-      const he = l._handle.getElement?.();
+    if(line._distLabel){
+      const onMap = map.hasLayer(line._distLabel);
+      if(showLines && !onMap) line._distLabel.addTo(map);
+      if(!showLines && onMap) map.removeLayer(line._distLabel);
+    }
+    if(line._handle){
+      const he = line._handle.getElement?.();
       if(he) he.style.visibility = showLines ? '' : 'hidden';
     }
-  });
-  // Sectoren
-  circlesGroup.getLayers().forEach(s => {
-    s.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
+    if(line._sector){
+      line._sector.setStyle({ opacity: showLines ? 1 : 0, fillOpacity: showLines ? _getSectorOpacity() : 0 });
+    }
   });
 }
 // ======================= Contextmenu infra =======================
@@ -2998,11 +3006,13 @@ function applyFilters(){
       if(should && !inH) handlesGroup.addLayer(line._handle);
       if(!should && inH) handlesGroup.removeLayer(line._handle);
     }
-    // Startballetje
+    // Startballetje — ook rekening houden met de schaal (niet alleen potje-zichtbaarheid),
+    // anders blijft het balletje zichtbaar boven de 500m-grens terwijl de lijn zelf al weg is.
     if(line._startBall){
+      const wantBall = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
       const inB = linesGroup.hasLayer(line._startBall);
-      if(should && !inB) linesGroup.addLayer(line._startBall);
-      if(!should && inB) linesGroup.removeLayer(line._startBall);
+      if(wantBall && !inB) linesGroup.addLayer(line._startBall);
+      if(!wantBall && inB) linesGroup.removeLayer(line._startBall);
     }
     // Sector
     if(line._sector){
@@ -3013,8 +3023,9 @@ function applyFilters(){
     // Afstandslabel
     if(line._distLabel){
       const showDist = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
-      const dle = line._distLabel.getElement?.();
-      if(dle) dle.style.visibility = showDist ? '' : 'hidden';
+      const onMapL = map.hasLayer(line._distLabel);
+      if(showDist && !onMapL) line._distLabel.addTo(map);
+      if(!showDist && onMapL) map.removeLayer(line._distLabel);
     }
   });
   _renderHiddenLinesPanel();
