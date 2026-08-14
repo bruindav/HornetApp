@@ -1,4 +1,4 @@
-// app-core.js — Fix 251
+// app-core.js — Fix 252
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1246,11 +1246,11 @@ function openFilterModal(){
     sl.addEventListener('input', ()=>{ lb.textContent = (PERIOD_STEPS[+sl.value]||PERIOD_STEPS[0]).label; });
     // Reset
     modal.querySelector('#fm_reset').addEventListener('click', ()=>{
+      if(_trackingMode) _setTrackingMode(false); // eerst opsporingsmodus uit (herstelt oude stand)
       ['fm_hoornaar','fm_nest','fm_nest_geruimd','fm_lokpot','fm_val','fm_show_lines','fm_show_polygons'].forEach(id=>{ const el=modal.querySelector('#'+id); if(el) el.checked=true; });
       sl.value='0'; lb.textContent='Alles';
       modal.querySelector('#fm_poly_outline').checked = false;
       modal.querySelector('#fm_show_gbif').checked = false; // uit = GBIF zichtbaar
-      if(_trackingMode) _setTrackingMode(false); // opsporingsmodus ook resetten
     });
     // Apply
     modal.querySelector('#fm_apply').addEventListener('click', ()=>{
@@ -1857,8 +1857,17 @@ function _syncLineStartBall(line){
   const color = meta.color || '#ffcc00';
   const w = _getLineWeight();
   const r = w * 2 * 3; // straal = 2x dikte, x3 vergroot op verzoek → doorsnee = 12x dikte
-  if(line._startBall){ line._startBall.setLatLng(start); line._startBall.setStyle({radius:r, color, fillColor:color}); }
-  else { line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false}); }
+  if(line._startBall){
+    line._startBall.setLatLng(start);
+    line._startBall.setStyle({radius:r, color, fillColor:color});
+  } else {
+    line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false});
+    // Fix 252: bij het AANMAKEN werd de straal-optie soms niet meteen correct toegepast door
+    // Leaflet (bekende eigenaardigheid) — pas daarom ook hier expliciet setStyle() toe, i.p.v.
+    // te vertrouwen op de constructor-optie alleen. Verklaart waarom het pas goed leek na het
+    // bewegen van de dikte-slider (die roept setStyle() wél aan, via de tak hierboven).
+    line._startBall.setStyle({radius:r, color, fillColor:color});
+  }
 }
 
 function setSightLineColor(line,color,save=false){
@@ -2934,14 +2943,47 @@ function _renderHiddenLinesPanel(){
 // Fix 233: opsporingsmodus — met 1 klik alleen zichtlijnen (+cirkels) tonen, alle
 // iconen verbergen. Lokaal per toestel (localStorage), beïnvloedt niemand anders.
 const TRACKING_MODE_KEY = 'hornetapp_tracking_mode';
+const TRACKING_MODE_BACKUP_KEY = 'hornetapp_tracking_mode_backup';
 let _trackingMode = localStorage.getItem(TRACKING_MODE_KEY) === '1';
+// Fix 252: opsporingsmodus is een "groepsfilter" — zet bij aanzetten alle andere filters
+// expliciet uit en 'zichtlijnen tonen' aan, en herstelt bij uitzetten de vorige stand.
+// Zo blijven de vinkjes in het filtermenu altijd de waarheid weerspiegelen, i.p.v. dat
+// opsporingsmodus er als onzichtbare overrule los bovenop zit.
+const TRACKING_MODE_IDS = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_show_polygons'];
 function _setTrackingMode(on){
   _trackingMode = !!on;
   localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
+  if(_trackingMode){
+    // Huidige stand bewaren, dan alles uit behalve zichtlijnen
+    const backup = {};
+    TRACKING_MODE_IDS.forEach(id => { const el=$(id); backup[id] = el ? el.checked : true; });
+    localStorage.setItem(TRACKING_MODE_BACKUP_KEY, JSON.stringify(backup));
+    TRACKING_MODE_IDS.forEach(id => { const el=$(id); if(el) el.checked=false; });
+    const linesEl=$('f_show_lines'); if(linesEl) linesEl.checked=true;
+  } else {
+    // Vorige stand herstellen
+    try {
+      const backup = JSON.parse(localStorage.getItem(TRACKING_MODE_BACKUP_KEY) || '{}');
+      TRACKING_MODE_IDS.forEach(id => { const el=$(id); if(el && id in backup) el.checked = backup[id]; });
+    } catch {}
+  }
+  _syncFilterModalFromState(); // filtermenu-vinkjes meteen bijwerken als dat open/aangemaakt is
   applyFilters();
   refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
   _updateFilterBadge();
+}
+// Kopieert de echte filter-status (f_...) naar de zichtbare vinkjes in het filtermenu,
+// zodat handmatige wijzigingen door opsporingsmodus (of resets) meteen zichtbaar zijn.
+function _syncFilterModalFromState(){
+  const modal = document.getElementById('filter-modal');
+  if(!modal) return;
+  [['f_type_hoornaar','fm_hoornaar'],['f_type_nest','fm_nest'],['f_type_nest_geruimd','fm_nest_geruimd'],
+   ['f_type_lokpot','fm_lokpot'],['f_type_val','fm_val'],
+   ['f_show_lines','fm_show_lines'],['f_show_polygons','fm_show_polygons']].forEach(([src,dst])=>{
+    const srcEl=$(src); const dstEl=modal.querySelector('#'+dst);
+    if(srcEl && dstEl) dstEl.checked = srcEl.checked;
+  });
 }
 function _updateTrackingModeButton(){
   const btn = document.getElementById('fm_tracking_mode_btn');
@@ -2980,7 +3022,8 @@ function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
-    if(_trackingMode) show=false; // opsporingsmodus: alle iconen verborgen, alleen zichtlijnen
+    // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
+    // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -2998,8 +3041,9 @@ function applyFilters(){
   const showPolygonsFilter = !!$('f_show_polygons')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    if(_trackingMode || !showPolygonsFilter){
-      // Opsporingsmodus, of polygonen expliciet uitgevinkt: verbergen
+    if(!showPolygonsFilter){
+      // Fix 252: opsporingsmodus zet f_show_polygons zelf al uit — geen losse
+      // _trackingMode-check meer nodig hier.
       layer.setStyle({ opacity: 0, fillOpacity: 0 });
       if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
     } else {
@@ -3012,15 +3056,15 @@ function applyFilters(){
     }
   });
 
-  // Fix 251: aparte 'zichtlijnen tonen'-filter — opsporingsmodus overruled dit altijd (dat
-  // is immers precies bedoeld om zichtlijnen te tónen), maar buiten opsporingsmodus bepaalt
-  // deze checkbox mee of zichtlijnen sowieso zichtbaar mogen zijn.
+  // Fix 251/252: aparte 'zichtlijnen tonen'-filter. Zichtlijnen zijn normaliter gekoppeld
+  // aan de zichtbaarheid van hun eigen lokpot-icoon (visiblePotIds) — logisch bij normaal
+  // filteren (bv. op datum), maar in opsporingsmodus is het lokpot-icoon zelf juist bewust
+  // verborgen (via f_type_lokpot=false) terwijl de zichtlijn wél zichtbaar moet blijven.
+  // Vandaar deze ene, welbewuste uitzondering: bij opsporingsmodus telt de potje-koppeling niet mee.
   const showLinesFilter = !!$('f_show_lines')?.checked;
   allLines.forEach(line=>{
     const meta=line._meta||{};
-    // In opsporingsmodus: alle zichtlijnen tonen (los van of het bijbehorende potje
-    // zichtbaar is — dat icoon is nu immers sowieso verborgen), behalve handmatig verborgen lijnen.
-    const should = (_trackingMode ? true : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
+    const should = (_trackingMode ? showLinesFilter : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
     // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
