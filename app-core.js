@@ -1,4 +1,4 @@
-// app-core.js — Fix 255
+// app-core.js — Fix 258
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -269,6 +269,7 @@ function initMap(){
     refreshZoomVisibility();
     refreshAllHandleIcons();
   });
+  map.on('moveend zoomend', _saveLastView); // Fix 256: laatste positie/zoom onthouden
 
   // Eerste punt markeren bij starten polygoon tekenen
   map.on('pm:drawstart', ({ workingLayer }) => {
@@ -3114,6 +3115,33 @@ function applyFilters(){
     }
   });
   _renderHiddenLinesPanel();
+  _saveFilterState(); // Fix 256: filterstand onthouden voor de volgende sessie
+}
+
+// Fix 256: laatst ingestelde filters onthouden tussen sessies (lokaal per toestel).
+const FILTER_STATE_KEY = 'hornetapp_filter_state';
+const FILTER_STATE_IDS = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot',
+  'f_type_val','f_show_lines','f_show_polygons','f_poly_outline','f_show_gbif'];
+function _saveFilterState(){
+  try {
+    const state = {};
+    FILTER_STATE_IDS.forEach(id => { const el=$(id); if(el) state[id]=el.checked; });
+    state.f_period_slider = $('f_period_slider')?.value ?? '0';
+    localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+function _restoreFilterState(){
+  try {
+    const raw = localStorage.getItem(FILTER_STATE_KEY);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    FILTER_STATE_IDS.forEach(id => { const el=$(id); if(el && id in state) el.checked = !!state[id]; });
+    const slider = $('f_period_slider');
+    if(slider && state.f_period_slider != null){
+      slider.value = state.f_period_slider;
+      updatePeriodLabel(+state.f_period_slider);
+    }
+  } catch {}
 }
 // ======================= Cloud → kaart (realtime) =======================
 function upsertMarkerFromCloud(doc){
@@ -3340,10 +3368,46 @@ async function _loadZonesFromFirestore() {
   }
 }
 function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
+// Fix 256: laatst bekeken kaartpositie + zoomniveau onthouden (lokaal per toestel), zodat
+// je bij een nieuwe sessie niet steeds terug naar het standaard gebied-middelpunt springt.
+// Wordt alleen bij het ALLEREERSTE laden van de app gebruikt — wissel je daarna handmatig
+// van gebied/jaar, dan zoomt de app gewoon naar het nieuw gekozen gebied, zoals verwacht.
+const LAST_VIEW_KEY = 'hornetapp_last_view';
+// Fix 258: cruciale correctie — pas pas beginnen met opslaan NADAT het hele opstartproces
+// (incl. eventuele automatische zooms naar het gebied-middelpunt) voorbij is. Zonder deze
+// vlag sloeg elke automatische boot-zoom zichzelf meteen op als 'laatste positie', wat de
+// net herstelde, echte laatste positie van de gebruiker weer overschreef — een kringloop
+// die zichzelf in stand hield en waardoor de opgeslagen positie nooit standhield.
+let _bootViewSettled = false;
+function _saveLastView(){
+  if(!map || !_bootViewSettled) return;
+  try {
+    const c = map.getCenter();
+    localStorage.setItem(LAST_VIEW_KEY, JSON.stringify({ lat:c.lat, lng:c.lng, zoom: map.getZoom() }));
+  } catch {}
+}
 function zoomToZone(zone) {
   const z = normalizeZone(zone);
   const meta = ZONE_META[z];
   if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
+}
+// Fix 257: activateScope()/zoomToZone() worden tijdens het opstarten MEERDERE keren
+// aangeroepen (eerst met de laatst-gebruikte gebied/jaar-instelling, daarna nog een keer
+// zodra de echte toegewezen gebieden van de gebruiker geladen zijn) — de opgeslagen
+// weergave hierboven in zoomToZone() zelf toepassen betekende dat de tweede aanroep 'm
+// meteen weer overschreef. Nu: één keer, expliciet, pas ná het HELE opstartproces.
+function _applySavedViewOnce(){
+  if(!map) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
+    if(saved && typeof saved.lat === 'number' && typeof saved.lng === 'number' && typeof saved.zoom === 'number'){
+      map.setView([saved.lat, saved.lng], saved.zoom, { animate:false }); // direct, geen animatie die nog kan overlappen met een lopende flyTo
+    }
+  } catch {}
+  // Fix 258: pas ná deze (eventueel nog net lopende) laatste correctie het opslaan
+  // activeren — met een kleine marge zodat een eerder gestarte flyTo-animatie (1s) zeker
+  // is uitgedoofd en zijn eigen 'moveend' niet alsnog deze instelling overschrijft.
+  setTimeout(() => { _bootViewSettled = true; }, 1200);
 }
 const ROL_LABEL = {
   admin:     '🔑 Admin',
@@ -4518,6 +4582,7 @@ async function boot(){
   initMap();
   initUIBindings();
   initWakeLock();
+  _restoreFilterState(); // Fix 256: laatst ingestelde filters terugzetten, vóór de eerste applyFilters()-aanroep
   _updateFilterBadge(); // Fix 251: badge meteen correct tonen als opsporingsmodus al aan stond
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
@@ -4837,6 +4902,11 @@ async function _initUserRole() {
       _loadFlightSettings(activeZone); // laad vliegtijd voor actief gebied
       activateScope(year, activeZone, /*reload=*/true);
     }
+
+    // Fix 257: nu pas de opgeslagen weergave toepassen — activateScope() kan hierboven
+    // en/of eerder tijdens initUIBindings() al gedraaid hebben, dit is het eerste moment
+    // waarop we zeker weten dat er geen verdere automatische scope-wissel meer aankomt.
+    _applySavedViewOnce();
 
     // Fix 209: eenvoudige modus (wizard) tonen indien dit voor deze gebruiker geldt
     _swApplyMode();
