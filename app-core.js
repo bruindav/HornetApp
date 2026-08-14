@@ -1,4 +1,4 @@
-// app-core.js — Fix 253
+// app-core.js — Fix 254
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1868,14 +1868,19 @@ function _syncLineStartBall(line){
     line._startBall.setLatLng(start);
     line._startBall.setStyle({radius:r, color, fillColor:color});
   } else {
-    line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false, pane:'startBallPane'});
-    // Fix 253: setStyle() vóórdat de laag aan de kaart is toegevoegd heeft geen zichtbaar
-    // effect (Leaflet's Path.setStyle doet niets zolang this._map niet gezet is — dat
-    // gebeurt pas bij addLayer(), wat overal ná deze functie-aanroep gebeurt). Vandaar
-    // dat fix 252 dit nog niet oploste. Nu: wacht 1 animatieframe (dus tot ná het
-    // toevoegen aan de kaart) en stel de straal dán nogmaals in.
-    const ball = line._startBall;
-    requestAnimationFrame(() => { if(ball._map) ball.setStyle({radius:r, color, fillColor:color}); });
+    const ball = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false, pane:'startBallPane'});
+    line._startBall = ball;
+    // Fix 254: concrete aanwijzing was dat het "bestaat al"-pad hierboven het balletje WEL
+    // herstelt — en dat pad roept, anders dan de aanmaak hieronder, ook expliciet
+    // setLatLng() aan (niet alleen setStyle()). Die stond bij het aanmaken nog niet.
+    // In plaats van te blijven gokken over de exacte timing: dwing dezelfde correctie
+    // (positie + straal) een paar keer af, op meerdere momenten na aanmaken, zodat het
+    // hoe dan ook een keer ná de volledige toevoeging aan de kaart valt.
+    const reapply = () => { ball.setLatLng(start); ball.setStyle({radius:r, color, fillColor:color}); };
+    reapply();
+    requestAnimationFrame(reapply);
+    setTimeout(reapply, 60);
+    setTimeout(reapply, 300);
   }
 }
 
