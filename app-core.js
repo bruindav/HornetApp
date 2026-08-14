@@ -1,4 +1,4 @@
-// app-core.js — Fix 252
+// app-core.js — Fix 253
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -82,6 +82,13 @@ function initMap(){
     zoomDelta: 0.5,          // stapgrootte van de +/- knoppen
     wheelPxPerZoomLevel: 120 // scrollwiel/trackpad reageert geleidelijker i.p.v. in sprongen
   }).setView([52.1, 5.3], 8);
+  // Fix 253: eigen pane voor het startballetje van zichtlijnen, met een hogere z-index dan
+  // de standaard markerPane (600). Zonder dit zit het balletje (een SVG-vorm, normaliter in
+  // de lager gelegen overlayPane) verstopt achter grote potje-iconen — dat verklaart waarom
+  // het soms wel/niet zichtbaar leek, afhankelijk van icoongrootte/zoomniveau, in plaats van
+  // een probleem met de straal zelf.
+  map.createPane('startBallPane');
+  map.getPane('startBallPane').style.zIndex = 650;
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -1861,12 +1868,14 @@ function _syncLineStartBall(line){
     line._startBall.setLatLng(start);
     line._startBall.setStyle({radius:r, color, fillColor:color});
   } else {
-    line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false});
-    // Fix 252: bij het AANMAKEN werd de straal-optie soms niet meteen correct toegepast door
-    // Leaflet (bekende eigenaardigheid) — pas daarom ook hier expliciet setStyle() toe, i.p.v.
-    // te vertrouwen op de constructor-optie alleen. Verklaart waarom het pas goed leek na het
-    // bewegen van de dikte-slider (die roept setStyle() wél aan, via de tak hierboven).
-    line._startBall.setStyle({radius:r, color, fillColor:color});
+    line._startBall = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false, pane:'startBallPane'});
+    // Fix 253: setStyle() vóórdat de laag aan de kaart is toegevoegd heeft geen zichtbaar
+    // effect (Leaflet's Path.setStyle doet niets zolang this._map niet gezet is — dat
+    // gebeurt pas bij addLayer(), wat overal ná deze functie-aanroep gebeurt). Vandaar
+    // dat fix 252 dit nog niet oploste. Nu: wacht 1 animatieframe (dus tot ná het
+    // toevoegen aan de kaart) en stel de straal dán nogmaals in.
+    const ball = line._startBall;
+    requestAnimationFrame(() => { if(ball._map) ball.setStyle({radius:r, color, fillColor:color}); });
   }
 }
 
