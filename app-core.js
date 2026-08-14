@@ -1,4 +1,4 @@
-// app-core.js — Fix 248
+// app-core.js — Fix 249
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -398,14 +398,9 @@ function initUIBindings(){
     const willOpen = document.body.classList.contains('sidebar-collapsed');
     setSidebar(willOpen); // als dicht → open; als open → dicht
   });
-  // Fix 248: dubbeltik ergens op de zijbalk (buiten knoppen/velden om) sluit 'm ook —
-  // zelfde soort gemak als het dubbeltikken om polygoon-bewerken af te sluiten.
-  if(sidebarEl){
-    sidebarEl.addEventListener('dblclick', (ev) => {
-      if(ev.target.closest('button, input, select, textarea, a, label')) return; // niet als je op een besturingselement dubbeltikt
-      setSidebar(false);
-    });
-  }
+  // Fix 249: dubbeltik-om-te-sluiten (fix 248) weer verwijderd — werkte niet prettig.
+  // Vervangen door een klein pijl-knopje aan de rand van de zijbalk.
+  on(document.getElementById('sidebar-collapse-btn'), 'click', ()=> setSidebar(false));
   on(backdrop, 'click', ()=> setSidebar(false));
   // Init: op mobiel standaard dicht
   if (window.matchMedia('(max-width: 900px)').matches) setSidebar(false);
