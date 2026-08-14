@@ -1,4 +1,4 @@
-// app-core.js — Fix 254
+// app-core.js — Fix 255
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2955,10 +2955,13 @@ function _renderHiddenLinesPanel(){
 }
 
 // Fix 233: opsporingsmodus — met 1 klik alleen zichtlijnen (+cirkels) tonen, alle
-// iconen verbergen. Lokaal per toestel (localStorage), beïnvloedt niemand anders.
-const TRACKING_MODE_KEY = 'hornetapp_tracking_mode';
+// iconen verbergen.
+// Fix 255: bewust NIET meer persisteren tussen sessies — anders kan opsporingsmodus
+// 'AAN' blijven staan (uit localStorage) terwijl de filter-vinkjes zelf gewoon terug naar
+// hun standaardstand (alles aan) herladen, en die twee lopen dan niet meer synchroon.
+// Start dus altijd op UIT; alleen actief als je 'm deze sessie zelf aanzet.
 const TRACKING_MODE_BACKUP_KEY = 'hornetapp_tracking_mode_backup';
-let _trackingMode = localStorage.getItem(TRACKING_MODE_KEY) === '1';
+let _trackingMode = false;
 // Fix 252: opsporingsmodus is een "groepsfilter" — zet bij aanzetten alle andere filters
 // expliciet uit en 'zichtlijnen tonen' aan, en herstelt bij uitzetten de vorige stand.
 // Zo blijven de vinkjes in het filtermenu altijd de waarheid weerspiegelen, i.p.v. dat
@@ -2966,7 +2969,6 @@ let _trackingMode = localStorage.getItem(TRACKING_MODE_KEY) === '1';
 const TRACKING_MODE_IDS = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot','f_type_val','f_show_polygons'];
 function _setTrackingMode(on){
   _trackingMode = !!on;
-  localStorage.setItem(TRACKING_MODE_KEY, _trackingMode ? '1' : '0');
   if(_trackingMode){
     // Huidige stand bewaren, dan alles uit behalve zichtlijnen
     const backup = {};
