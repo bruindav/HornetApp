@@ -1,4 +1,4 @@
-// app-core.js — Fix 255
+// app-core.js — Fix 256
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -269,6 +269,7 @@ function initMap(){
     refreshZoomVisibility();
     refreshAllHandleIcons();
   });
+  map.on('moveend zoomend', _saveLastView); // Fix 256: laatste positie/zoom onthouden
 
   // Eerste punt markeren bij starten polygoon tekenen
   map.on('pm:drawstart', ({ workingLayer }) => {
@@ -3114,6 +3115,33 @@ function applyFilters(){
     }
   });
   _renderHiddenLinesPanel();
+  _saveFilterState(); // Fix 256: filterstand onthouden voor de volgende sessie
+}
+
+// Fix 256: laatst ingestelde filters onthouden tussen sessies (lokaal per toestel).
+const FILTER_STATE_KEY = 'hornetapp_filter_state';
+const FILTER_STATE_IDS = ['f_type_hoornaar','f_type_nest','f_type_nest_geruimd','f_type_lokpot',
+  'f_type_val','f_show_lines','f_show_polygons','f_poly_outline','f_show_gbif'];
+function _saveFilterState(){
+  try {
+    const state = {};
+    FILTER_STATE_IDS.forEach(id => { const el=$(id); if(el) state[id]=el.checked; });
+    state.f_period_slider = $('f_period_slider')?.value ?? '0';
+    localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(state));
+  } catch {}
+}
+function _restoreFilterState(){
+  try {
+    const raw = localStorage.getItem(FILTER_STATE_KEY);
+    if(!raw) return;
+    const state = JSON.parse(raw);
+    FILTER_STATE_IDS.forEach(id => { const el=$(id); if(el && id in state) el.checked = !!state[id]; });
+    const slider = $('f_period_slider');
+    if(slider && state.f_period_slider != null){
+      slider.value = state.f_period_slider;
+      updatePeriodLabel(+state.f_period_slider);
+    }
+  } catch {}
 }
 // ======================= Cloud → kaart (realtime) =======================
 function upsertMarkerFromCloud(doc){
@@ -3340,7 +3368,30 @@ async function _loadZonesFromFirestore() {
   }
 }
 function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
+// Fix 256: laatst bekeken kaartpositie + zoomniveau onthouden (lokaal per toestel), zodat
+// je bij een nieuwe sessie niet steeds terug naar het standaard gebied-middelpunt springt.
+// Wordt alleen bij het ALLEREERSTE laden van de app gebruikt — wissel je daarna handmatig
+// van gebied/jaar, dan zoomt de app gewoon naar het nieuw gekozen gebied, zoals verwacht.
+const LAST_VIEW_KEY = 'hornetapp_last_view';
+let _usedSavedView = false;
+function _saveLastView(){
+  if(!map) return;
+  try {
+    const c = map.getCenter();
+    localStorage.setItem(LAST_VIEW_KEY, JSON.stringify({ lat:c.lat, lng:c.lng, zoom: map.getZoom() }));
+  } catch {}
+}
 function zoomToZone(zone) {
+  if(!_usedSavedView){
+    _usedSavedView = true;
+    try {
+      const saved = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
+      if(saved && typeof saved.lat === 'number' && typeof saved.lng === 'number' && typeof saved.zoom === 'number'){
+        map.setView([saved.lat, saved.lng], saved.zoom);
+        return;
+      }
+    } catch {}
+  }
   const z = normalizeZone(zone);
   const meta = ZONE_META[z];
   if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
@@ -4518,6 +4569,7 @@ async function boot(){
   initMap();
   initUIBindings();
   initWakeLock();
+  _restoreFilterState(); // Fix 256: laatst ingestelde filters terugzetten, vóór de eerste applyFilters()-aanroep
   _updateFilterBadge(); // Fix 251: badge meteen correct tonen als opsporingsmodus al aan stond
   const selYear = $('sel-year');
   const saved = readScope() || { year: DEFAULT_YEAR, group: DEFAULT_GROUP };
