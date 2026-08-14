@@ -1,4 +1,4 @@
-// app-core.js — Fix 256
+// app-core.js — Fix 257
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3373,7 +3373,6 @@ function normalizeZone(z) { return ZONE_ALIAS[z] || z; }
 // Wordt alleen bij het ALLEREERSTE laden van de app gebruikt — wissel je daarna handmatig
 // van gebied/jaar, dan zoomt de app gewoon naar het nieuw gekozen gebied, zoals verwacht.
 const LAST_VIEW_KEY = 'hornetapp_last_view';
-let _usedSavedView = false;
 function _saveLastView(){
   if(!map) return;
   try {
@@ -3382,19 +3381,23 @@ function _saveLastView(){
   } catch {}
 }
 function zoomToZone(zone) {
-  if(!_usedSavedView){
-    _usedSavedView = true;
-    try {
-      const saved = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
-      if(saved && typeof saved.lat === 'number' && typeof saved.lng === 'number' && typeof saved.zoom === 'number'){
-        map.setView([saved.lat, saved.lng], saved.zoom);
-        return;
-      }
-    } catch {}
-  }
   const z = normalizeZone(zone);
   const meta = ZONE_META[z];
   if (meta && map) map.flyTo([meta.lat, meta.lon], meta.zoom, { duration: 1 });
+}
+// Fix 257: activateScope()/zoomToZone() worden tijdens het opstarten MEERDERE keren
+// aangeroepen (eerst met de laatst-gebruikte gebied/jaar-instelling, daarna nog een keer
+// zodra de echte toegewezen gebieden van de gebruiker geladen zijn) — de opgeslagen
+// weergave hierboven in zoomToZone() zelf toepassen betekende dat de tweede aanroep 'm
+// meteen weer overschreef. Nu: één keer, expliciet, pas ná het HELE opstartproces.
+function _applySavedViewOnce(){
+  if(!map) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(LAST_VIEW_KEY) || 'null');
+    if(saved && typeof saved.lat === 'number' && typeof saved.lng === 'number' && typeof saved.zoom === 'number'){
+      map.setView([saved.lat, saved.lng], saved.zoom);
+    }
+  } catch {}
 }
 const ROL_LABEL = {
   admin:     '🔑 Admin',
@@ -4889,6 +4892,11 @@ async function _initUserRole() {
       _loadFlightSettings(activeZone); // laad vliegtijd voor actief gebied
       activateScope(year, activeZone, /*reload=*/true);
     }
+
+    // Fix 257: nu pas de opgeslagen weergave toepassen — activateScope() kan hierboven
+    // en/of eerder tijdens initUIBindings() al gedraaid hebben, dit is het eerste moment
+    // waarop we zeker weten dat er geen verdere automatische scope-wissel meer aankomt.
+    _applySavedViewOnce();
 
     // Fix 209: eenvoudige modus (wizard) tonen indien dit voor deze gebruiker geldt
     _swApplyMode();
