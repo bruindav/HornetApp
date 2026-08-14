@@ -1,4 +1,4 @@
-// app-core.js — Fix 258
+// app-core.js — Fix 259
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -101,7 +101,15 @@ function initMap(){
   const mapboxLayer = L.tileLayer('https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/256/{z}/{x}/{y}{r}?access_token=' + MAPBOX_TOKEN, {
     maxZoom:22, tileSize:256, attribution:'© <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © OpenStreetMap-bijdragers'
   });
-  osmLayer.addTo(map);
+  // Fix 259: laatst gekozen kaartlaag onthouden (lokaal per toestel) en meteen toepassen.
+  const MAP_MODE_KEY = 'hornetapp_map_mode';
+  const _layersByMode = { osm: osmLayer, mapbox: mapboxLayer, sat: satLayer };
+  let _mapMode = 'osm';
+  try {
+    const savedMode = localStorage.getItem(MAP_MODE_KEY);
+    if (savedMode && _layersByMode[savedMode]) _mapMode = savedMode;
+  } catch {}
+  _layersByMode[_mapMode].addTo(map);
 
   // ── Schaal onderaan de kaart ──────────────────────────────────────────────
   L.control.scale({ position: 'bottomleft', imperial: false }).addTo(map);
@@ -203,8 +211,8 @@ function initMap(){
     updateCompassSvg(heading);
   }
 
-  // Kaartlaag-keuze — via kaart contextmenu, geen losse knop. Fix 244: nu 3 opties i.p.v. 2.
-  let _mapMode = 'osm'; // 'osm' | 'mapbox' | 'sat'
+  // Kaartlaag-keuze — via kaart contextmenu, geen losse knop. Fix 244: 3 opties. Fix 259:
+  // _mapMode + _layersByMode zijn al hierboven gedefinieerd bij het laden van de lagen.
   markersGroup.addTo(map);
   linesGroup.addTo(map);
   circlesGroup.addTo(map);
@@ -230,13 +238,14 @@ function initMap(){
     name: 'toggleSat',
     block: 'custom',
     title: 'Kaartstijl wisselen (OpenStreetMap / Mapbox Streets / Satelliet)',
-    className: 'pm-icon-sat pm-icon-sat-osm',
+    className: 'pm-icon-sat pm-icon-sat-' + _mapMode,
     onClick: () => {
       const layers = { osm: osmLayer, mapbox: mapboxLayer, sat: satLayer };
       const order = ['osm', 'mapbox', 'sat'];
       map.removeLayer(layers[_mapMode]);
       _mapMode = order[(order.indexOf(_mapMode) + 1) % order.length];
       layers[_mapMode].addTo(map);
+      try { localStorage.setItem(MAP_MODE_KEY, _mapMode); } catch {}
       const btn = document.querySelector('.pm-icon-sat');
       if (btn) {
         btn.classList.remove('pm-icon-sat-osm', 'pm-icon-sat-mapbox', 'pm-icon-sat-sat');
