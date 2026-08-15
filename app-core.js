@@ -1,4 +1,4 @@
-// app-core.js — Fix 261
+// app-core.js — Fix 262
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -489,6 +489,11 @@ function initUIBindings(){
   if (zenderBtn && navigator.bluetooth) {
     zenderBtn.style.display = 'flex';
     zenderBtn.addEventListener('click', () => _openZenderVolgenModal());
+  }
+  const bleScanBtn = document.getElementById('btn-ble-scanner');
+  if (bleScanBtn && navigator.bluetooth) {
+    bleScanBtn.style.display = 'flex';
+    bleScanBtn.addEventListener('click', () => _openBleScannerModal());
   }
   // Fix 251: opsporingsmodus-knop verhuisd naar het filtermenu, zie openFilterModal()
   const lineWeightSlider = document.getElementById('line-weight-slider');
@@ -2285,10 +2290,9 @@ function _openZenderVolgenModal() {
     if (!navigator.bluetooth) { statusEl.textContent = '⚠️ Web Bluetooth niet beschikbaar in deze browser.'; return; }
     try {
       statusEl.textContent = '🔄 Apparaat kiezen…';
-      // Fix 261: filters:[{namePrefix:''}] i.p.v. acceptAllDevices — dat sluit apparaten
-      // zonder uitgezonden naam uit van de kiezerlijst (bv. wanneer de zender uit staat,
-      // zie je dan alleen nog apparaten die wél een naam meesturen).
-      const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: '' }] });
+      // Fix 262: terug naar acceptAllDevices — bevestigd dat de Robor VespaFinder-zender
+      // GEEN naam uitzendt, dus het naam-filter uit fix 261 sloot 'm juist per ongeluk uit.
+      const dev = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
       await startWatching(dev, /*remember=*/true);
     } catch (e) {
       if (e.name === 'NotFoundError') { statusEl.textContent = 'Geen (met naam) apparaat gevonden.'; }
@@ -2326,6 +2330,85 @@ function _openZenderVolgenModal() {
 
   function cleanup() { doDisconnect(); modal.remove(); }
   modal.querySelector('#zv-close').addEventListener('click', cleanup);
+  modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
+}
+
+// Fix 262: BLE-diagnosescanner — toont ALLE ruwe advertentievelden van een gekozen
+// apparaat (naam, service-UUID's, fabrikant-data, service-data, tx-power, RSSI), zodat je
+// zelf een herkenbaar kenmerk van de zender kan vinden (die zelf geen naam uitzendt).
+// Bewust acceptAllDevices, want een naam-filter zou de zender juist uitsluiten.
+function _bufToHex(dv) {
+  if (!dv) return '';
+  const bytes = new Uint8Array(dv.buffer || dv);
+  return [...bytes].map(b => b.toString(16).padStart(2, '0')).join(' ');
+}
+function _openBleScannerModal() {
+  const existing = document.getElementById('ble-scan-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'ble-scan-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:22px 20px;width:380px;max-width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 6px;font-size:16px;color:#0f172a">🔬 BLE-scanner (diagnose)</h3>
+      <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.5">
+        Toont alle ruwe gegevens die een gekozen Bluetooth-apparaat uitzendt — handig om een
+        herkenbaar kenmerk (bv. een service-ID of fabrikant-code) van de zender te vinden,
+        ook al zendt die zelf geen naam uit. Zet de zender aan/uit tussen twee pogingen om
+        te zien welk gegeven verandert.
+      </p>
+      <button id="bs-connect" style="width:100%;padding:11px;border-radius:10px;border:none;background:#0aa879;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🔵 Kies een apparaat</button>
+      <div id="bs-output" style="margin-top:14px;font-size:12px;color:#334155;font-family:monospace;white-space:pre-wrap;word-break:break-all;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px;min-height:30px">Nog geen apparaat gekozen.</div>
+      <button id="bs-close" style="width:100%;margin-top:12px;padding:9px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Sluiten</button>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const outputEl = modal.querySelector('#bs-output');
+  let device = null;
+  const onAdv = (event) => {
+    if (event.device !== device) return;
+    const lines = [];
+    lines.push('Naam: ' + (event.name || device.name || '(geen naam)'));
+    lines.push('Apparaat-ID: ' + device.id);
+    lines.push('RSSI: ' + (event.rssi != null ? event.rssi + ' dBm' : '–'));
+    lines.push('TX-power: ' + (event.txPower != null ? event.txPower : '–'));
+    lines.push('Appearance: ' + (event.appearance != null ? event.appearance : '–'));
+    const uuids = event.uuids && event.uuids.length ? event.uuids.join('\n  ') : '(geen)';
+    lines.push('Service-UUID\'s:\n  ' + uuids);
+    let mfg = '(geen)';
+    if (event.manufacturerData && event.manufacturerData.size) {
+      mfg = [...event.manufacturerData.entries()].map(([id, dv]) => `0x${id.toString(16).padStart(4,'0')}: ${_bufToHex(dv)}`).join('\n  ');
+    }
+    lines.push('Fabrikant-data:\n  ' + mfg);
+    let svc = '(geen)';
+    if (event.serviceData && event.serviceData.size) {
+      svc = [...event.serviceData.entries()].map(([uuid, dv]) => `${uuid}: ${_bufToHex(dv)}`).join('\n  ');
+    }
+    lines.push('Service-data:\n  ' + svc);
+    outputEl.textContent = lines.join('\n');
+  };
+
+  modal.querySelector('#bs-connect').addEventListener('click', async () => {
+    if (!navigator.bluetooth) { outputEl.textContent = '⚠️ Web Bluetooth niet beschikbaar.'; return; }
+    try {
+      outputEl.textContent = '🔄 Apparaat kiezen…';
+      if (device) { try { navigator.bluetooth.removeEventListener('advertisementreceived', onAdv); device.forgetWatchedAdvertisements?.(); } catch {} }
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+      navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
+      await device.watchAdvertisements();
+      outputEl.textContent = '⏳ Wachten op eerste advertentie van ' + (device.name || device.id) + '…';
+    } catch (e) {
+      if (e.name === 'NotFoundError') { outputEl.textContent = 'Geen apparaat gekozen.'; }
+      else { outputEl.textContent = '⚠️ Mislukt: ' + e.message; }
+    }
+  });
+
+  function cleanup() {
+    try { navigator.bluetooth?.removeEventListener('advertisementreceived', onAdv); device?.forgetWatchedAdvertisements?.(); } catch {}
+    modal.remove();
+  }
+  modal.querySelector('#bs-close').addEventListener('click', cleanup);
   modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
 }
 
