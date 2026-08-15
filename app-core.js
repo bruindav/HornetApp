@@ -1,4 +1,4 @@
-// app-core.js — Fix 259
+// app-core.js — Fix 260
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -483,6 +483,13 @@ function initUIBindings(){
   window.addEventListener('resize', updateHeaderHeightVar, {passive:true});
   document.getElementById('btn-changelog')?.addEventListener('click', openChangelog);
   document.getElementById('btn-simple-mode')?.addEventListener('click', () => _swShowFromSidebar());
+  // Fix 260: zender-volgen-knop alleen tonen als de browser dit daadwerkelijk ondersteunt
+  // (Web Bluetooth — werkt alleen op Chrome/Android, niet op Safari/iPhone)
+  const zenderBtn = document.getElementById('btn-zender-volgen');
+  if (zenderBtn && navigator.bluetooth) {
+    zenderBtn.style.display = 'flex';
+    zenderBtn.addEventListener('click', () => _openZenderVolgenModal());
+  }
   // Fix 251: opsporingsmodus-knop verhuisd naar het filtermenu, zie openFilterModal()
   const lineWeightSlider = document.getElementById('line-weight-slider');
   const lineWeightVal = document.getElementById('line-weight-val');
@@ -2207,6 +2214,91 @@ function openCompassCalibModal(onApplied) {
     cleanup();
     onApplied?.();
   });
+  modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
+}
+
+// Fix 260: zendersignaal volgen (experimenteel) — laat een BLE-apparaat (zoals een
+// Vespa Finder-zender) koppelen en toont de signaalsterkte (RSSI) live. Geeft GEEN
+// richting (dat vereist gerichte antenne-hardware zoals het richtpistool), maar wel
+// bruikbaar als 'warmer/kouder'-indicatie tijdens het lopen. Alleen Chrome/Android.
+function _openZenderVolgenModal() {
+  const existing = document.getElementById('zender-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'zender-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:22px 20px;width:340px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 6px;font-size:16px;color:#0f172a">📡 Zender volgen</h3>
+      <p style="font-size:12px;color:#64748b;margin:0 0 14px;line-height:1.5">
+        Experimenteel. Toont alleen <strong>signaalsterkte</strong>, geen richting — sterker
+        signaal = dichterbij. Werkt alleen op Chrome/Android, niet op iPhone. Je moet het
+        BLE-apparaat van de zender zelf herkennen in de lijst die zo verschijnt (bv. door
+        de zender aan/uit te zetten en te kijken welk apparaat komt/verdwijnt).
+      </p>
+      <div id="zv-status" style="font-size:13px;color:#475569;text-align:center;margin-bottom:10px">Nog niet gekoppeld</div>
+      <div id="zv-signal-wrap" style="display:none;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;color:#94a3b8;margin-bottom:3px">
+          <span>Zwak</span><span id="zv-rssi-val">–</span><span>Sterk</span>
+        </div>
+        <div style="background:#f1f5f9;border-radius:8px;height:22px;overflow:hidden;border:1px solid #e2e8f0">
+          <div id="zv-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#dc2626,#f59e0b,#0aa879);transition:width .3s ease"></div>
+        </div>
+      </div>
+      <button id="zv-connect" style="width:100%;padding:11px;border-radius:10px;border:none;background:#0aa879;color:#fff;font-size:14px;font-weight:700;cursor:pointer">🔵 Zender koppelen</button>
+      <button id="zv-disconnect" style="display:none;width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Loskoppelen</button>
+      <button id="zv-close" style="width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Sluiten</button>
+    </div>`;
+  document.body.appendChild(modal);
+
+  const statusEl = modal.querySelector('#zv-status');
+  const wrapEl = modal.querySelector('#zv-signal-wrap');
+  const barEl = modal.querySelector('#zv-bar');
+  const rssiEl = modal.querySelector('#zv-rssi-val');
+  const connectBtn = modal.querySelector('#zv-connect');
+  const disconnectBtn = modal.querySelector('#zv-disconnect');
+
+  let device = null;
+  const onAdvertisement = (event) => {
+    if (event.device !== device) return; // meerdere gekoppelde apparaten kunnen events sturen
+    const rssi = event.rssi; // meestal -30 (heel dichtbij) tot -100 (ver weg)
+    if (rssi == null) return;
+    const pct = Math.max(0, Math.min(100, Math.round(((rssi + 100) / 70) * 100)));
+    barEl.style.width = pct + '%';
+    rssiEl.textContent = rssi + ' dBm';
+  };
+
+  connectBtn.addEventListener('click', async () => {
+    if (!navigator.bluetooth) { statusEl.textContent = '⚠️ Web Bluetooth niet beschikbaar in deze browser.'; return; }
+    try {
+      statusEl.textContent = '🔄 Apparaat kiezen…';
+      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+      statusEl.textContent = `📡 Gekoppeld: ${device.name || device.id}`;
+      wrapEl.style.display = 'block';
+      connectBtn.style.display = 'none';
+      disconnectBtn.style.display = 'block';
+      navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
+      await device.watchAdvertisements();
+    } catch (e) {
+      if (e.name === 'NotFoundError') { statusEl.textContent = 'Geen apparaat gekozen.'; }
+      else { statusEl.textContent = '⚠️ Koppelen mislukt: ' + e.message; }
+    }
+  });
+
+  function doDisconnect() {
+    try { device?.forgetWatchedAdvertisements?.(); } catch {}
+    navigator.bluetooth?.removeEventListener('advertisementreceived', onAdvertisement);
+    device = null;
+    statusEl.textContent = 'Nog niet gekoppeld';
+    wrapEl.style.display = 'none';
+    connectBtn.style.display = 'block';
+    disconnectBtn.style.display = 'none';
+  }
+  disconnectBtn.addEventListener('click', doDisconnect);
+
+  function cleanup() { doDisconnect(); modal.remove(); }
+  modal.querySelector('#zv-close').addEventListener('click', cleanup);
   modal.addEventListener('click', e => { if (e.target === modal) cleanup(); });
 }
 
