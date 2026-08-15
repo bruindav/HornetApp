@@ -1,4 +1,4 @@
-// app-core.js — Fix 262
+// app-core.js — Fix 263
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2226,6 +2226,12 @@ function openCompassCalibModal(onApplied) {
 // Vespa Finder-zender) koppelen en toont de signaalsterkte (RSSI) live. Geeft GEEN
 // richting (dat vereist gerichte antenne-hardware zoals het richtpistool), maar wel
 // bruikbaar als 'warmer/kouder'-indicatie tijdens het lopen. Alleen Chrome/Android.
+// Fix 263: watchAdvertisements() (en getDevices()) blijken ook achter een experimentele
+// Chrome-instelling te zitten, niet standaard beschikbaar — vandaar deze duidelijke uitleg
+// i.p.v. de cryptische 'watchAdvertisements is not a function'-foutmelding.
+function _watchAdvertisementsHelpText(){
+  return `⚠️ Deze functie vereist een instelling in Chrome: ga naar chrome://flags/#enable-experimental-web-platform-features, zet 'm op "Enabled", en herstart Chrome. Probeer daarna opnieuw.`;
+}
 function _openZenderVolgenModal() {
   const existing = document.getElementById('zender-modal');
   if (existing) existing.remove();
@@ -2276,6 +2282,10 @@ function _openZenderVolgenModal() {
   };
 
   async function startWatching(dev, remember) {
+    if (typeof dev.watchAdvertisements !== 'function') {
+      statusEl.textContent = _watchAdvertisementsHelpText();
+      return;
+    }
     device = dev;
     statusEl.textContent = `📡 Gekoppeld: ${device.name || device.id}`;
     wrapEl.style.display = 'block';
@@ -2395,6 +2405,7 @@ function _openBleScannerModal() {
       outputEl.textContent = '🔄 Apparaat kiezen…';
       if (device) { try { navigator.bluetooth.removeEventListener('advertisementreceived', onAdv); device.forgetWatchedAdvertisements?.(); } catch {} }
       device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
+      if (typeof device.watchAdvertisements !== 'function') { outputEl.textContent = _watchAdvertisementsHelpText(); return; }
       navigator.bluetooth.addEventListener('advertisementreceived', onAdv);
       await device.watchAdvertisements();
       outputEl.textContent = '⏳ Wachten op eerste advertentie van ' + (device.name || device.id) + '…';
