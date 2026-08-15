@@ -1,4 +1,4 @@
-// app-core.js — Fix 260
+// app-core.js — Fix 261
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -2258,6 +2258,7 @@ function _openZenderVolgenModal() {
   const rssiEl = modal.querySelector('#zv-rssi-val');
   const connectBtn = modal.querySelector('#zv-connect');
   const disconnectBtn = modal.querySelector('#zv-disconnect');
+  const ZENDER_ID_KEY = 'hornetapp_zender_device_id';
 
   let device = null;
   const onAdvertisement = (event) => {
@@ -2269,22 +2270,48 @@ function _openZenderVolgenModal() {
     rssiEl.textContent = rssi + ' dBm';
   };
 
+  async function startWatching(dev, remember) {
+    device = dev;
+    statusEl.textContent = `📡 Gekoppeld: ${device.name || device.id}`;
+    wrapEl.style.display = 'block';
+    connectBtn.style.display = 'none';
+    disconnectBtn.style.display = 'block';
+    navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
+    await device.watchAdvertisements();
+    if (remember) { try { localStorage.setItem(ZENDER_ID_KEY, device.id); } catch {} }
+  }
+
   connectBtn.addEventListener('click', async () => {
     if (!navigator.bluetooth) { statusEl.textContent = '⚠️ Web Bluetooth niet beschikbaar in deze browser.'; return; }
     try {
       statusEl.textContent = '🔄 Apparaat kiezen…';
-      device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true });
-      statusEl.textContent = `📡 Gekoppeld: ${device.name || device.id}`;
-      wrapEl.style.display = 'block';
-      connectBtn.style.display = 'none';
-      disconnectBtn.style.display = 'block';
-      navigator.bluetooth.addEventListener('advertisementreceived', onAdvertisement);
-      await device.watchAdvertisements();
+      // Fix 261: filters:[{namePrefix:''}] i.p.v. acceptAllDevices — dat sluit apparaten
+      // zonder uitgezonden naam uit van de kiezerlijst (bv. wanneer de zender uit staat,
+      // zie je dan alleen nog apparaten die wél een naam meesturen).
+      const dev = await navigator.bluetooth.requestDevice({ filters: [{ namePrefix: '' }] });
+      await startWatching(dev, /*remember=*/true);
     } catch (e) {
-      if (e.name === 'NotFoundError') { statusEl.textContent = 'Geen apparaat gekozen.'; }
+      if (e.name === 'NotFoundError') { statusEl.textContent = 'Geen (met naam) apparaat gevonden.'; }
       else { statusEl.textContent = '⚠️ Koppelen mislukt: ' + e.message; }
     }
   });
+
+  // Fix 261: eerder gekoppeld apparaat automatisch proberen te hervinden, zodat je niet
+  // elke keer opnieuw de kiezer hoeft te doorlopen.
+  (async () => {
+    if (!navigator.bluetooth?.getDevices) return; // niet elke browser ondersteunt dit al
+    let savedId;
+    try { savedId = localStorage.getItem(ZENDER_ID_KEY); } catch {}
+    if (!savedId) return;
+    try {
+      const known = await navigator.bluetooth.getDevices();
+      const match = known.find(d => d.id === savedId);
+      if (match) {
+        statusEl.textContent = '🔄 Eerder gekoppeld apparaat hervinden…';
+        await startWatching(match, /*remember=*/false);
+      }
+    } catch { /* stil negeren, gewoon knop 'Zender koppelen' laten staan */ }
+  })();
 
   function doDisconnect() {
     try { device?.forgetWatchedAdvertisements?.(); } catch {}
