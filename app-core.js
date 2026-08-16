@@ -1,4 +1,4 @@
-// app-core.js — Fix 270
+// app-core.js — Fix 271
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3255,10 +3255,14 @@ function applyFilters(){
       if(should && !inH) handlesGroup.addLayer(line._handle);
       if(!should && inH) handlesGroup.removeLayer(line._handle);
     }
-    // Startballetje — ook rekening houden met de schaal (niet alleen potje-zichtbaarheid),
-    // anders blijft het balletje zichtbaar boven de 500m-grens terwijl de lijn zelf al weg is.
+    // Startballetje — Fix 271: mag alleen zichtbaar zijn als het bijbehorende potje-icoon
+    // zelf NIET zichtbaar is (bv. gefilterd weg, of verborgen tijdens opsporingsmodus/
+    // potfocus). Zo staan balletje en icoon nooit tegelijk op de kaart, dus is er ook
+    // nooit een stapelingsconflict mogelijk bij het aanklikken — veel robuuster dan
+    // proberen de exacte z-index/pointer-events precies goed te krijgen (fix 253-270).
     if(line._startBall){
-      const wantBall = should && _currentScaleMeters() < LINES_MAX_SCALE_M;
+      const potIconVisible = visiblePotIds.has(meta.potId);
+      const wantBall = should && !potIconVisible && _currentScaleMeters() < LINES_MAX_SCALE_M;
       const inB = linesGroup.hasLayer(line._startBall);
       if(wantBall && !inB) linesGroup.addLayer(line._startBall);
       if(!wantBall && inB) linesGroup.removeLayer(line._startBall);
