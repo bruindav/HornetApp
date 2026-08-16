@@ -1,4 +1,4 @@
-// app-core.js — Fix 269
+// app-core.js — Fix 270
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -114,11 +114,16 @@ function initMap(){
   }).setView([52.1, 5.3], 8);
   // Fix 253: eigen pane voor het startballetje van zichtlijnen.
   // Fix 266: teruggedraaid naar ONDER de standaard markerPane (600) — het balletje bleek
-  // anders klikken/tikken op het potje-icoon zelf te blokkeren (het balletje ving de tik
-  // af voordat die het icoon eronder kon bereiken). Blijft wel boven de gewone overlayPane
-  // (~400), dus nog altijd zichtbaar naast/rondom het icoon, alleen niet meer erbovenop.
+  // anders klikken/tikken op het potje-icoon zelf te blokkeren.
+  // Fix 270: bleek zelfs zo nog klikken te blokkeren (én zichtbaar over het icoon te staan) —
+  // ondanks interactive:false + expliciete pointer-events op het individuele balletje
+  // (fix 269, bleek onbetrouwbaar, vermoedelijk door timing van getElement()). Nu
+  // definitief opgelost: pointer-events:none op de HELE pane in één keer, zodat NIETS
+  // in deze laag ooit nog een klik/tik kan onderscheppen, ongeacht individuele elementen.
   map.createPane('startBallPane');
-  map.getPane('startBallPane').style.zIndex = 550;
+  const startBallPaneEl = map.getPane('startBallPane');
+  startBallPaneEl.style.zIndex = 550;
+  startBallPaneEl.style.pointerEvents = 'none';
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
