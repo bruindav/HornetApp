@@ -1,4 +1,4 @@
-// app-core.js — Fix 266
+// app-core.js — Fix 267
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -74,6 +74,36 @@ const linesGroup = L.featureGroup();
 const circlesGroup = L.featureGroup();
 const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
+// Fix 267: vlaggetjes om zendersignaal te markeren tijdens opsporingsmodus — bewust
+// LOKAAL/sessie-gebonden (niet naar Firestore), want dit zijn tijdelijke veldnotities
+// tijdens één zoekactie, geen permanente waarnemingsdata.
+const flagsGroup = L.featureGroup();
+let _signalFlags = [];
+const FLAG_COLORS = { felgroen: '#00e600', lichtgroen: '#90ee90', oranje: '#ff8c00' };
+function _makeFlagIcon(color){
+  return L.divIcon({
+    className: '',
+    html: `<svg width="22" height="26" viewBox="0 0 22 26" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">
+      <line x1="2" y1="2" x2="2" y2="25" stroke="#333" stroke-width="2"/>
+      <path d="M2 2 L19 6 L2 12 Z" fill="${color}" stroke="#333" stroke-width="1"/>
+    </svg>`,
+    iconSize: [22, 26], iconAnchor: [2, 25]
+  });
+}
+function _addSignalFlag(latlng, colorKey){
+  const color = FLAG_COLORS[colorKey] || FLAG_COLORS.felgroen;
+  const id = genId('flag');
+  const marker = L.marker(latlng, { icon: _makeFlagIcon(color) }).addTo(flagsGroup);
+  marker.on('click', () => {
+    flagsGroup.removeLayer(marker);
+    _signalFlags = _signalFlags.filter(f => f.id !== id);
+  });
+  _signalFlags.push({ id, lat: latlng.lat, lng: latlng.lng, colorKey });
+}
+function _clearSignalFlags(){
+  flagsGroup.clearLayers();
+  _signalFlags = [];
+}
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
   map = L.map('map', {
@@ -218,6 +248,8 @@ function initMap(){
   circlesGroup.addTo(map);
   handlesGroup.addTo(map);
   polygonsGroup.addTo(map);
+  // flagsGroup wordt bewust NIET hier toegevoegd — die schakelt mee met opsporingsmodus,
+  // zie _setTrackingMode().
   // Geoman toolbar
   map.pm.addControls({
     position:'topleft',
@@ -830,6 +862,26 @@ function openMapContextMenu(latlng, x, y){
   closeContextMenu();
   const el=document.createElement('div');
   el.className='ctx-menu';
+  // Fix 267: tijdens opsporingsmodus tonen we ALLEEN de vlaggetjes-opties (om
+  // zendersignaal te markeren) i.p.v. de normale iconen — die zijn toch al verborgen.
+  if(_trackingMode){
+    el.innerHTML=`<h4>📡 Signaal markeren</h4>
+    <button data-flag="felgroen">🟢 Vlag: fel groen</button>
+    <button data-flag="lichtgroen">🟢 Vlag: licht groen</button>
+    <button data-flag="oranje">🟠 Vlag: oranje</button>
+    ${_signalFlags.length ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}`;
+    el.addEventListener('click', ev=>{
+      const b=ev.target.closest('button'); if(!b) return;
+      closeContextMenu();
+      const key = b.dataset.flag;
+      if(key==='clear') _clearSignalFlags();
+      else _addSignalFlag(latlng, key);
+    });
+    document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
+    document.addEventListener('keydown',escClose);
+    document.addEventListener('click',closeContextMenuOnce,true);
+    return;
+  }
   el.innerHTML=`<h4>Nieuw icoon</h4>
   <button data-act="mk" data-type="hoornaar">Waarneming</button>
   <button data-act="mk" data-type="nest">Nest gevonden</button>
@@ -3004,12 +3056,16 @@ function _setTrackingMode(on){
   _updateTrackingModeButton();
   _updateFilterBadge();
   _updateSimpleModeButtonVisibility();
+  // Fix 267: signaal-vlaggetjes alleen zichtbaar tijdens opsporingsmodus zelf
+  if(_trackingMode) flagsGroup.addTo(map); else map.removeLayer(flagsGroup);
 }
-// Fix 266: 'Eenvoudige modus'-knop verbergen tijdens opsporing (opsporingsmodus of
-// opsporing-bij-één-potje) — geen afleiding tijdens het actief zoeken naar een nest.
+// Fix 266/267: 'Eenvoudige modus'-knoppen verbergen tijdens opsporing (opsporingsmodus of
+// opsporing-bij-één-potje) — geen afleiding tijdens het actief zoeken naar een nest. Twee
+// aparte elementen: de knop in de zijbalk, én het losse drijvende FAB-knopje.
 function _updateSimpleModeButtonVisibility(){
   const btn = document.getElementById('btn-simple-mode');
   if(btn) btn.style.display = (_trackingMode || _potFocusId) ? 'none' : 'flex';
+  _swUpdateFab?.();
 }
 // Kopieert de echte filter-status (f_...) naar de zichtbare vinkjes in het filtermenu,
 // zodat handmatige wijzigingen door opsporingsmodus (of resets) meteen zichtbaar zijn.
@@ -3820,7 +3876,9 @@ function _swUpdateFab() {
   _swEnsureFab();
   const fab = document.getElementById('sw-return-fab');
   if (!fab) return;
-  fab.style.display = (_simpleModeDefault && !_swEffectiveSimple()) ? 'flex' : 'none';
+  // Fix 267: ook verbergen tijdens opsporing (dit is het losse, drijvende FAB-knopje —
+  // een ander element dan de knop in de zijbalk die al in fix 266 werd afgedekt).
+  fab.style.display = (_simpleModeDefault && !_swEffectiveSimple() && !_trackingMode && !_potFocusId) ? 'flex' : 'none';
 }
 
 function _swApplyMode() {
