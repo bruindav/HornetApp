@@ -1,4 +1,4 @@
-// app-core.js — Fix 267
+// app-core.js — Fix 268
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -862,9 +862,10 @@ function openMapContextMenu(latlng, x, y){
   closeContextMenu();
   const el=document.createElement('div');
   el.className='ctx-menu';
-  // Fix 267: tijdens opsporingsmodus tonen we ALLEEN de vlaggetjes-opties (om
-  // zendersignaal te markeren) i.p.v. de normale iconen — die zijn toch al verborgen.
-  if(_trackingMode){
+  // Fix 267/268: tijdens opsporingsmodus ÉN opsporing-bij-één-potje tonen we ALLEEN de
+  // vlaggetjes-opties (om zendersignaal te markeren) i.p.v. de normale iconen — die zijn
+  // toch al verborgen in beide gevallen.
+  if(_trackingMode || _potFocusId){
     el.innerHTML=`<h4>📡 Signaal markeren</h4>
     <button data-flag="felgroen">🟢 Vlag: fel groen</button>
     <button data-flag="lichtgroen">🟢 Vlag: licht groen</button>
@@ -3056,8 +3057,8 @@ function _setTrackingMode(on){
   _updateTrackingModeButton();
   _updateFilterBadge();
   _updateSimpleModeButtonVisibility();
-  // Fix 267: signaal-vlaggetjes alleen zichtbaar tijdens opsporingsmodus zelf
-  if(_trackingMode) flagsGroup.addTo(map); else map.removeLayer(flagsGroup);
+  // Fix 267/268: signaal-vlaggetjes zichtbaar tijdens opsporingsmodus ÉN potfocus
+  _updateFlagsGroupVisibility();
 }
 // Fix 266/267: 'Eenvoudige modus'-knoppen verbergen tijdens opsporing (opsporingsmodus of
 // opsporing-bij-één-potje) — geen afleiding tijdens het actief zoeken naar een nest. Twee
@@ -3145,6 +3146,12 @@ function _setPotFocus(potId){
   refreshZoomVisibility();
   _updatePotFocusBanner();
   _updateSimpleModeButtonVisibility();
+  _updateFlagsGroupVisibility();
+}
+// Fix 268: signaal-vlaggetjes-laag zichtbaar tijdens opsporingsmodus ÉN potfocus (beide
+// gebruiken dezelfde 'alleen focus op de zoektaak'-context).
+function _updateFlagsGroupVisibility(){
+  if(_trackingMode || _potFocusId) flagsGroup.addTo(map); else map.removeLayer(flagsGroup);
 }
 function _updatePotFocusBanner(){
   let banner = document.getElementById('pot-focus-banner');
@@ -3195,10 +3202,20 @@ function applyFilters(){
       // Fix 252/264: opsporingsmodus of potfocus zet polygonen uit.
       layer.setStyle({ opacity: 0, fillOpacity: 0 });
       if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
+      // Fix 268: onzichtbaar maken via opacity verandert niks aan de interactiviteit — de
+      // polygoon bleef gewoon reageren op klikken/lang-indrukken (en riep zelfs
+      // stopPropagation() aan), waardoor je bij een 'verborgen' polygoon nog steeds het
+      // polygoon-contextmenu kreeg i.p.v. het kaart-contextmenu (met de vlaggetjes) eronder.
+      layer.options.interactive = false;
+      const layerEl = layer.getElement?.();
+      if(layerEl) layerEl.style.pointerEvents = 'none';
     } else {
       layer.setStyle(outlineOnly
         ? { opacity: 1, fillOpacity: 0, weight: 4, color: col }
         : { opacity: 1, fillColor: col, fillOpacity: 0.2, weight: 3, color: col });
+      layer.options.interactive = true;
+      const layerEl = layer.getElement?.();
+      if(layerEl) layerEl.style.pointerEvents = '';
       // Label-zichtbaarheid bij het weer aanzetten bewust niet forceren — dat blijft aan
       // refreshZoomVisibility() (zoomniveau-afhankelijk), om dubbele/conflicterende logica
       // te voorkomen. Wordt vanzelf bijgewerkt zodra dat opnieuw draait (bv. na zoomend).
