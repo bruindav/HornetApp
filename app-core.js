@@ -1,4 +1,4 @@
-// app-core.js — Fix 265
+// app-core.js — Fix 266
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -82,13 +82,13 @@ function initMap(){
     zoomDelta: 0.5,          // stapgrootte van de +/- knoppen
     wheelPxPerZoomLevel: 120 // scrollwiel/trackpad reageert geleidelijker i.p.v. in sprongen
   }).setView([52.1, 5.3], 8);
-  // Fix 253: eigen pane voor het startballetje van zichtlijnen, met een hogere z-index dan
-  // de standaard markerPane (600). Zonder dit zit het balletje (een SVG-vorm, normaliter in
-  // de lager gelegen overlayPane) verstopt achter grote potje-iconen — dat verklaart waarom
-  // het soms wel/niet zichtbaar leek, afhankelijk van icoongrootte/zoomniveau, in plaats van
-  // een probleem met de straal zelf.
+  // Fix 253: eigen pane voor het startballetje van zichtlijnen.
+  // Fix 266: teruggedraaid naar ONDER de standaard markerPane (600) — het balletje bleek
+  // anders klikken/tikken op het potje-icoon zelf te blokkeren (het balletje ving de tik
+  // af voordat die het icoon eronder kon bereiken). Blijft wel boven de gewone overlayPane
+  // (~400), dus nog altijd zichtbaar naast/rondom het icoon, alleen niet meer erbovenop.
   map.createPane('startBallPane');
-  map.getPane('startBallPane').style.zIndex = 650;
+  map.getPane('startBallPane').style.zIndex = 550;
   const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
     maxZoom:19, attribution:'© OpenStreetMap-bijdragers'
   });
@@ -3003,6 +3003,13 @@ function _setTrackingMode(on){
   refreshZoomVisibility(); // herstelt polygon-labels correct op basis van huidig zoomniveau
   _updateTrackingModeButton();
   _updateFilterBadge();
+  _updateSimpleModeButtonVisibility();
+}
+// Fix 266: 'Eenvoudige modus'-knop verbergen tijdens opsporing (opsporingsmodus of
+// opsporing-bij-één-potje) — geen afleiding tijdens het actief zoeken naar een nest.
+function _updateSimpleModeButtonVisibility(){
+  const btn = document.getElementById('btn-simple-mode');
+  if(btn) btn.style.display = (_trackingMode || _potFocusId) ? 'none' : 'flex';
 }
 // Kopieert de echte filter-status (f_...) naar de zichtbare vinkjes in het filtermenu,
 // zodat handmatige wijzigingen door opsporingsmodus (of resets) meteen zichtbaar zijn.
@@ -3081,6 +3088,7 @@ function _setPotFocus(potId){
   applyFilters();
   refreshZoomVisibility();
   _updatePotFocusBanner();
+  _updateSimpleModeButtonVisibility();
 }
 function _updatePotFocusBanner(){
   let banner = document.getElementById('pot-focus-banner');
@@ -3107,7 +3115,9 @@ function applyFilters(){
     // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
     // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
     // Fix 264: potfocus overrulet alles — alleen het gefocuste potje zelf blijft zichtbaar.
-    if(_potFocusId){ show = (meta.type==='lokpot' && meta.potId===_potFocusId); }
+    // Fix 266: ook het gefocuste potje-icoon zelf verbergen — de startballetjes van de
+    // zichtlijnen (die op dezelfde plek staan) zijn genoeg als visuele referentie.
+    if(_potFocusId){ show = false; }
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -3555,7 +3565,7 @@ function activateScope(year, group, reload=false){
     });
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
     allLines.forEach(l=>{ if(l._distLabel){ try{map.removeLayer(l._distLabel);}catch{} } });
-    if(_potFocusId){ _potFocusId=null; document.getElementById('pot-focus-banner')?.remove(); } // Fix 264: focus is gebonden aan dit gebied/jaar
+    if(_potFocusId){ _potFocusId=null; document.getElementById('pot-focus-banner')?.remove(); _updateSimpleModeButtonVisibility(); } // Fix 264: focus is gebonden aan dit gebied/jaar
   allMarkers=[]; allLines=[]; allSectors=[];
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
