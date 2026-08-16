@@ -1,4 +1,4 @@
-// app-core.js — Fix 264
+// app-core.js — Fix 265
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -855,7 +855,7 @@ function openMapContextMenu(latlng, x, y){
 }
 function openMarkerContextMenu(marker, x, y){
   closeContextMenu(); const isLokpot=(marker._meta||{}).type==='lokpot';
-  const isFocused = isLokpot && _potFocusId === marker._meta?.id;
+  const isFocused = isLokpot && _potFocusId === marker._meta?.potId;
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Icoon</h4>
   ${canWrite()?'<button data-act="move">✋ Verplaatsen</button>':''}
@@ -890,7 +890,7 @@ function openMarkerContextMenu(marker, x, y){
       } else if(act==='new_line'){
         startSightLine(marker);
       } else if(act==='pot_focus'){
-        _setPotFocus(isFocused ? null : marker._meta?.id);
+        _setPotFocus(isFocused ? null : marker._meta?.potId);
       } else if(act==='delete'){
         deleteMarkerAndAssociations(marker);
         if(marker._meta?.id){ deleteMarkerFromCloud(marker._meta.id); }
@@ -1722,7 +1722,7 @@ function deleteMarkerAndAssociations(marker){
   const meta=marker._meta||{};
   if(meta.type==='lokpot' && meta.potId){ removePotAssociations(meta.potId); }
   if(meta.photoPath){ deleteActionPhoto(meta.photoPath); } // Fix 215: foto opruimen uit Storage
-  if(_potFocusId && meta.id===_potFocusId){ _setPotFocus(null); } // Fix 264: focus opheffen als het gefocuste potje weg is
+  if(_potFocusId && meta.potId===_potFocusId){ _setPotFocus(null); } // Fix 264: focus opheffen als het gefocuste potje weg is
   markersGroup.removeLayer(marker); allMarkers = allMarkers.filter(m=>m!==marker);
 }
 // Fix 221: demo-account-herkenning — hergebruikt om testdata van dit account apart te
@@ -3107,7 +3107,7 @@ function applyFilters(){
     // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
     // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
     // Fix 264: potfocus overrulet alles — alleen het gefocuste potje zelf blijft zichtbaar.
-    if(_potFocusId){ show = (meta.type==='lokpot' && meta.id===_potFocusId); }
+    if(_potFocusId){ show = (meta.type==='lokpot' && meta.potId===_potFocusId); }
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
