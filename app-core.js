@@ -1,4 +1,4 @@
-// app-core.js — Fix 268
+// app-core.js — Fix 269
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -1932,9 +1932,14 @@ function _syncLineStartBall(line){
   const color = meta.color || '#ffcc00';
   const w = _getLineWeight();
   const r = w * 2 * 3; // straal = 2x dikte, x3 vergroot op verzoek → doorsnee = 12x dikte
+  // Fix 269: interactive:false bleek onvoldoende om klikken/tikken écht te laten
+  // doorvallen naar het icoon eronder (zelfde probleem als bij verborgen polygonen in
+  // fix 268) — dwing daarom ook hier expliciet pointer-events:none af op het DOM-element.
+  const noPointerEvents = (b) => { const el = b?.getElement?.(); if(el) el.style.pointerEvents = 'none'; };
   if(line._startBall){
     line._startBall.setLatLng(start);
     line._startBall.setStyle({radius:r, color, fillColor:color});
+    noPointerEvents(line._startBall);
   } else {
     const ball = L.circleMarker(start, {radius:r, color, weight:0, fillColor:color, fillOpacity:1, interactive:false, pane:'startBallPane'});
     line._startBall = ball;
@@ -1944,7 +1949,7 @@ function _syncLineStartBall(line){
     // In plaats van te blijven gokken over de exacte timing: dwing dezelfde correctie
     // (positie + straal) een paar keer af, op meerdere momenten na aanmaken, zodat het
     // hoe dan ook een keer ná de volledige toevoeging aan de kaart valt.
-    const reapply = () => { ball.setLatLng(start); ball.setStyle({radius:r, color, fillColor:color}); };
+    const reapply = () => { ball.setLatLng(start); ball.setStyle({radius:r, color, fillColor:color}); noPointerEvents(ball); };
     reapply();
     requestAnimationFrame(reapply);
     setTimeout(reapply, 60);
