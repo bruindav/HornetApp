@@ -1,4 +1,4 @@
-// app-core.js — Fix 259
+// app-core.js — Fix 264
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -855,11 +855,13 @@ function openMapContextMenu(latlng, x, y){
 }
 function openMarkerContextMenu(marker, x, y){
   closeContextMenu(); const isLokpot=(marker._meta||{}).type==='lokpot';
+  const isFocused = isLokpot && _potFocusId === marker._meta?.id;
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Icoon</h4>
   ${canWrite()?'<button data-act="move">✋ Verplaatsen</button>':''}
   <button data-act="edit">✏️ Eigenschappen</button>
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
+  ${isLokpot?`<button data-act="pot_focus">${isFocused ? '🎯 Opsporing stoppen' : '🎯 Opsporing starten hier'}</button>`:''}
   ${canWrite()?'<button data-act="delete">🗑️ Verwijderen</button>':''}`;
   el.addEventListener('click',ev=>{
     const b=ev.target.closest('button'); if(!b) return; const act=b.dataset.act;
@@ -887,6 +889,8 @@ function openMarkerContextMenu(marker, x, y){
         openPropModal({ type: marker._meta.type, init: {...marker._meta, _latlng: marker.getLatLng()}, onSave:(vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }});
       } else if(act==='new_line'){
         startSightLine(marker);
+      } else if(act==='pot_focus'){
+        _setPotFocus(isFocused ? null : marker._meta?.id);
       } else if(act==='delete'){
         deleteMarkerAndAssociations(marker);
         if(marker._meta?.id){ deleteMarkerFromCloud(marker._meta.id); }
@@ -1718,6 +1722,7 @@ function deleteMarkerAndAssociations(marker){
   const meta=marker._meta||{};
   if(meta.type==='lokpot' && meta.potId){ removePotAssociations(meta.potId); }
   if(meta.photoPath){ deleteActionPhoto(meta.photoPath); } // Fix 215: foto opruimen uit Storage
+  if(_potFocusId && meta.id===_potFocusId){ _setPotFocus(null); } // Fix 264: focus opheffen als het gefocuste potje weg is
   markersGroup.removeLayer(marker); allMarkers = allMarkers.filter(m=>m!==marker);
 }
 // Fix 221: demo-account-herkenning — hergebruikt om testdata van dit account apart te
@@ -3044,12 +3049,65 @@ function _setSectorOpacity(v){
   refreshZoomVisibility(); // herberekent fillOpacity per sector, met respect voor de schaal-zichtbaarheid
 }
 
+// Fix 264: 'Opsporing starten hier' — focus op één specifiek lokpotje. Verbergt alles
+// behalve dat ene potje, zijn eigen zichtlijnen, én zichtlijnen van ANDERE potjes die een
+// van die eigen zichtlijnen kruisen (kruisingen helpen de locatie van het nest te duiden).
+let _potFocusId = null;
+function _ccw(A,B,C){ return (C.lng-A.lng)*(B.lat-A.lat) - (B.lng-A.lng)*(C.lat-A.lat); }
+function _segmentsIntersect(A,B,C,D){
+  const d1=_ccw(A,C,D), d2=_ccw(B,C,D), d3=_ccw(A,B,C), d4=_ccw(A,B,D);
+  return ((d1>0)!==(d2>0)) && ((d3>0)!==(d4>0));
+}
+// Geeft de set met line-id's terug die bij het focus-potje horen, óf een van diens eigen
+// zichtlijnen kruisen.
+function _computePotFocusLineIds(potId){
+  const ids = new Set();
+  const focusLines = allLines.filter(l => l._meta?.potId === potId);
+  focusLines.forEach(l => { if(l._meta?.id) ids.add(l._meta.id); });
+  const focusSegs = focusLines.map(l => l.getLatLngs()).filter(ll => ll.length>=2).map(ll => [ll[0], ll[ll.length-1]]);
+  allLines.forEach(l => {
+    const lid = l._meta?.id;
+    if(!lid || ids.has(lid)) return; // al meegenomen (of geen id)
+    const ll = l.getLatLngs(); if(ll.length<2) return;
+    const c = ll[0], d = ll[ll.length-1];
+    for(const [a,b] of focusSegs){
+      if(_segmentsIntersect(a,b,c,d)){ ids.add(lid); break; }
+    }
+  });
+  return ids;
+}
+function _setPotFocus(potId){
+  _potFocusId = potId;
+  applyFilters();
+  refreshZoomVisibility();
+  _updatePotFocusBanner();
+}
+function _updatePotFocusBanner(){
+  let banner = document.getElementById('pot-focus-banner');
+  if(!_potFocusId){
+    banner?.remove();
+    return;
+  }
+  if(!banner){
+    banner = document.createElement('div');
+    banner.id = 'pot-focus-banner';
+    banner.style.cssText = 'position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:900;'
+      + 'background:#0aa879;color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;'
+      + 'display:flex;align-items:center;gap:10px;box-shadow:0 3px 10px rgba(0,0,0,.25);white-space:nowrap';
+    banner.innerHTML = `<span>🎯 Opsporing actief</span><button id="pot-focus-stop" style="border:none;background:rgba(255,255,255,.25);color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer">Stoppen</button>`;
+    document.body.appendChild(banner);
+    banner.querySelector('#pot-focus-stop').addEventListener('click', () => _setPotFocus(null));
+  }
+}
+
 function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
     const meta=m._meta||{}; let show=!!f[meta.type];
     // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
     // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
+    // Fix 264: potfocus overrulet alles — alleen het gefocuste potje zelf blijft zichtbaar.
+    if(_potFocusId){ show = (meta.type==='lokpot' && meta.id===_potFocusId); }
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -3067,9 +3125,8 @@ function applyFilters(){
   const showPolygonsFilter = !!$('f_show_polygons')?.checked;
   polygonsGroup.getLayers().forEach(layer => {
     const col = layer._props?.color || '#0aa879';
-    if(!showPolygonsFilter){
-      // Fix 252: opsporingsmodus zet f_show_polygons zelf al uit — geen losse
-      // _trackingMode-check meer nodig hier.
+    if(!showPolygonsFilter || _potFocusId){
+      // Fix 252/264: opsporingsmodus of potfocus zet polygonen uit.
       layer.setStyle({ opacity: 0, fillOpacity: 0 });
       if(layer._labelTooltip){ const le = layer._labelTooltip.getElement?.(); if(le) le.style.visibility = 'hidden'; }
     } else {
@@ -3088,9 +3145,13 @@ function applyFilters(){
   // verborgen (via f_type_lokpot=false) terwijl de zichtlijn wél zichtbaar moet blijven.
   // Vandaar deze ene, welbewuste uitzondering: bij opsporingsmodus telt de potje-koppeling niet mee.
   const showLinesFilter = !!$('f_show_lines')?.checked;
+  // Fix 264: bij actieve potfocus, vooraf berekenen welke lijnen getoond mogen worden
+  // (eigen lijnen van het gefocuste potje + lijnen van andere potjes die er een kruisen).
+  const potFocusLineIds = _potFocusId ? _computePotFocusLineIds(_potFocusId) : null;
   allLines.forEach(line=>{
     const meta=line._meta||{};
-    const should = (_trackingMode ? showLinesFilter : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
+    let should = (_trackingMode ? showLinesFilter : (showLinesFilter && visiblePotIds.has(meta.potId))) && !_hiddenLineIds.has(meta.id);
+    if(potFocusLineIds){ should = potFocusLineIds.has(meta.id) && !_hiddenLineIds.has(meta.id); }
     // Lijn zelf
     const onMap = linesGroup.hasLayer(line);
     if(should && !onMap) linesGroup.addLayer(line);
@@ -3494,6 +3555,7 @@ function activateScope(year, group, reload=false){
     });
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
     allLines.forEach(l=>{ if(l._distLabel){ try{map.removeLayer(l._distLabel);}catch{} } });
+    if(_potFocusId){ _potFocusId=null; document.getElementById('pot-focus-banner')?.remove(); } // Fix 264: focus is gebonden aan dit gebied/jaar
   allMarkers=[]; allLines=[]; allSectors=[];
   }
   setStatus(statusSW, `Scope: ${base}`, 'ok');
