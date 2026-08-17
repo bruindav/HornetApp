@@ -1,4 +1,4 @@
-// app-core.js — Fix 277
+// app-core.js — Fix 278
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -133,11 +133,13 @@ function persistSearchCircle(circle){
 // worden. Meerdere event-namen gebonden voor robuustheid — niet alle Geoman-versies
 // vuren exact hetzelfde event bij het loslaten van een cirkel-handvat.
 function _enableSearchCircleEditing(circle){
+  if(circle._pmEditingBound) { try{ circle.pm.enable({ draggable:true }); }catch{} return; } // al eerder gebonden, alleen opnieuw aanzetten
   try {
     circle.pm.enable({ draggable: true });
     ['pm:markerdragend','pm:centerplaced','pm:edit','pm:update','pm:dragend'].forEach(evt=>{
       circle.on(evt, () => persistSearchCircle(circle));
     });
+    circle._pmEditingBound = true;
   } catch(e) { console.warn('[zoekcirkel] editing niet beschikbaar:', e); }
 }
 function _bindSearchCircleContextMenu(circle){
@@ -176,6 +178,9 @@ function _createSearchCircle(latlng){
     date: new Date().toISOString().slice(0,10)
   };
   allSearchCircles.push(circle);
+  // Fix 278: op het moment van HANDMATIG aanmaken staat de laag altijd al op de kaart
+  // (je kan de plaatsingsoptie alleen bereiken tijdens actieve opsporing), dus hier mag
+  // editing wel meteen aan.
   _enableSearchCircleEditing(circle);
   _bindSearchCircleContextMenu(circle);
   persistSearchCircle(circle);
@@ -188,8 +193,15 @@ function upsertSearchCircleFromCloud(doc){
     c = L.circle([doc.lat, doc.lng], { radius: doc.radius||150, color: doc.color||'#dc2626', weight:3, fillOpacity:0.08, dashArray:'6 6' }).addTo(searchCircleGroup);
     c._meta = { id: doc.id, color: doc.color||'#dc2626', by: doc.by||null, date: doc.date||null, demo: doc.demo===true };
     allSearchCircles.push(c);
-    _enableSearchCircleEditing(c);
     _bindSearchCircleContextMenu(c);
+    // Fix 278: editing NIET meteen hier inschakelen — bij het laden vanuit Firestore
+    // (bv. direct na het opstarten van de app) staat de cirkel-laag vaak nog niet op de
+    // kaart (opsporingsmodus/potfocus is dan nog niet actief). Geoman's .pm.enable() op
+    // een laag die nog niet echt op de kaart hangt, resulteert in kapotte/onwerkzame
+    // sleep-handvatten die ook later, als de laag wél zichtbaar wordt, niet meer goed
+    // gaan werken. Editing wordt daarom pas ingeschakeld door
+    // _updateSearchCircleGroupVisibility() hieronder, op het moment dat de laag
+    // daadwerkelijk aan de kaart wordt toegevoegd.
   } else {
     // Fix 277: alleen ECHT gewijzigde waarden toepassen. Zonder deze check werd de cirkel
     // ook bijgewerkt bij een 'echo' van je eigen zojuist opgeslagen wijziging (Firestore's
@@ -215,7 +227,15 @@ function deleteSearchCircleFromCloudLocal(id){
   if(c){ searchCircleGroup.removeLayer(c); allSearchCircles = allSearchCircles.filter(x=>x!==c); }
 }
 function _updateSearchCircleGroupVisibility(){
-  if(_trackingMode || _potFocusId) searchCircleGroup.addTo(map); else map.removeLayer(searchCircleGroup);
+  if(_trackingMode || _potFocusId){
+    searchCircleGroup.addTo(map);
+    // Fix 278: nu de laag zeker op de kaart staat, editing (opnieuw) inschakelen voor
+    // alle cirkels — ook degene die eerder (nog verborgen) vanuit Firestore geladen zijn.
+    allSearchCircles.forEach(c => _enableSearchCircleEditing(c));
+  } else {
+    allSearchCircles.forEach(c => { try{ c.pm?.disable(); }catch{} });
+    map.removeLayer(searchCircleGroup);
+  }
 }
 
 // Fix 274: klein invoervenster voor het nummer — voor het plaatsen van een NIEUWE
