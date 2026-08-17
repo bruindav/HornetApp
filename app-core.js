@@ -1,4 +1,4 @@
-// app-core.js — Fix 278
+// app-core.js — Fix 279
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -133,13 +133,18 @@ function persistSearchCircle(circle){
 // worden. Meerdere event-namen gebonden voor robuustheid — niet alle Geoman-versies
 // vuren exact hetzelfde event bij het loslaten van een cirkel-handvat.
 function _enableSearchCircleEditing(circle){
-  if(circle._pmEditingBound) { try{ circle.pm.enable({ draggable:true }); }catch{} return; } // al eerder gebonden, alleen opnieuw aanzetten
+  // Fix 279: 'soms blijft ie hangen' — een herhaalde enable() op een cirkel die al
+  // (eventueel kapot) enabled staat, bleek soms een no-op te zijn i.p.v. de handvatten
+  // schoon opnieuw op te bouwen. Nu altijd eerst expliciet disable(), dan pas enable().
+  try{ circle.pm?.disable(); }catch{}
   try {
     circle.pm.enable({ draggable: true });
-    ['pm:markerdragend','pm:centerplaced','pm:edit','pm:update','pm:dragend'].forEach(evt=>{
-      circle.on(evt, () => persistSearchCircle(circle));
-    });
-    circle._pmEditingBound = true;
+    if(!circle._pmEditingBound){
+      ['pm:markerdragend','pm:centerplaced','pm:edit','pm:update','pm:dragend'].forEach(evt=>{
+        circle.on(evt, () => persistSearchCircle(circle));
+      });
+      circle._pmEditingBound = true;
+    }
   } catch(e) { console.warn('[zoekcirkel] editing niet beschikbaar:', e); }
 }
 function _bindSearchCircleContextMenu(circle){
@@ -1074,18 +1079,37 @@ function openMapContextMenu(latlng, x, y){
   // toch al verborgen in beide gevallen.
   if(_trackingMode || _potFocusId){
     const hasFlags = allMarkers.some(m => m._meta?.type==='vlag');
+    // Fix 279: 'Dichtstbijzijnde cirkel verwijderen' toevoegen — direct op de cirkel zelf
+    // lang-indrukken botst vaak met Geoman's eigen sleep/vergroot-handvatten (elke kleine
+    // vingerbeweging tijdens het indrukken wordt dan als 'verslepen' geïnterpreteerd,
+    // waardoor het contextmenu op de cirkel zelf onbetrouwbaar is). Dit werkt wel altijd.
+    let nearestCircle = null, nearestDist = Infinity;
+    allSearchCircles.forEach(c => {
+      const d = latlng.distanceTo(c.getLatLng());
+      if(d < nearestDist){ nearestDist = d; nearestCircle = c; }
+    });
+    const circleDeleteBtn = nearestCircle
+      ? '<button data-act="delete_circle">🗑️ Dichtstbijzijnde zoekcirkel verwijderen</button>' : '';
     el.innerHTML=`<h4>📡 Signaal markeren</h4>
     <button data-flag="felgroen">🟢 Vlag: fel groen</button>
     <button data-flag="lichtgroen">🟢 Vlag: licht groen</button>
     <button data-flag="oranje">🟠 Vlag: oranje</button>
     ${hasFlags ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}
     <button data-act="vpin">📍 Vrijwilliger-pin plaatsen</button>
-    <button data-act="circle">⭕ Zoekcirkel plaatsen</button>`;
+    <button data-act="circle">⭕ Zoekcirkel plaatsen</button>
+    ${circleDeleteBtn}`;
     el.addEventListener('click', ev=>{
       const b=ev.target.closest('button'); if(!b) return;
       closeContextMenu();
       if(b.dataset.act==='vpin'){ _openVpinNumberModal(latlng); return; }
       if(b.dataset.act==='circle'){ _createSearchCircle(latlng); return; }
+      if(b.dataset.act==='delete_circle' && nearestCircle){
+        try{ nearestCircle.pm?.disable(); }catch{}
+        searchCircleGroup.removeLayer(nearestCircle);
+        allSearchCircles = allSearchCircles.filter(x=>x!==nearestCircle);
+        if(nearestCircle._meta?.id) deleteSearchCircleFromCloud(nearestCircle._meta.id);
+        return;
+      }
       const key = b.dataset.flag;
       if(key==='clear') _clearSignalFlags();
       else _addSignalFlag(latlng, key);
