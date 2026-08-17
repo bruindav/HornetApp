@@ -1,4 +1,4 @@
-// app-core.js — Fix 272
+// app-core.js — Fix 273
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3130,29 +3130,77 @@ function _setSectorOpacity(v){
 }
 
 // Fix 264: 'Opsporing starten hier' — focus op één specifiek lokpotje. Verbergt alles
-// behalve dat ene potje, zijn eigen zichtlijnen, én zichtlijnen van ANDERE potjes die een
-// van die eigen zichtlijnen kruisen (kruisingen helpen de locatie van het nest te duiden).
+// behalve dat ene potje, zijn eigen zichtlijnen, én zichtlijnen van ANDERE potjes die
+// er dichtbij komen, kruisen, of waarvan de boog overlapt (fix 273 — dit helpt allemaal
+// de locatie van het nest te duiden, niet alleen exacte kruisingen).
 let _potFocusId = null;
+const POT_FOCUS_MAX_DISTANCE_M = 100; // Fix 273: ook lijnen die tot op deze afstand passeren meenemen
 function _ccw(A,B,C){ return (C.lng-A.lng)*(B.lat-A.lat) - (B.lng-A.lng)*(C.lat-A.lat); }
 function _segmentsIntersect(A,B,C,D){
   const d1=_ccw(A,C,D), d2=_ccw(B,C,D), d3=_ccw(A,B,C), d4=_ccw(A,B,D);
   return ((d1>0)!==(d2>0)) && ((d3>0)!==(d4>0));
 }
+// Fix 273: dichtstbijzijnde punt op lijnstuk a-b bij punt p (platte benadering — prima
+// nauwkeurig genoeg over de korte afstanden waarop zichtlijnen typisch getekend worden).
+function _closestPointOnSegment(p, a, b){
+  const dx = b.lng - a.lng, dy = b.lat - a.lat;
+  const lenSq = dx*dx + dy*dy;
+  if(lenSq === 0) return a;
+  let t = ((p.lng-a.lng)*dx + (p.lat-a.lat)*dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return { lat: a.lat + t*dy, lng: a.lng + t*dx };
+}
+function _distMeters(p1, p2){ return L.latLng(p1.lat,p1.lng).distanceTo(L.latLng(p2.lat,p2.lng)); }
+// Kortste afstand (in meters) tussen twee lijnstukken — 0 als ze elkaar kruisen.
+function _segmentDistanceMeters(a,b,c,d){
+  if(_segmentsIntersect(a,b,c,d)) return 0;
+  return Math.min(
+    _distMeters(a, _closestPointOnSegment(a,c,d)),
+    _distMeters(b, _closestPointOnSegment(b,c,d)),
+    _distMeters(c, _closestPointOnSegment(c,a,b)),
+    _distMeters(d, _closestPointOnSegment(d,a,b))
+  );
+}
+// Fix 273: hebben twee sectoren (bogen) geometrisch overlap? Getest via alle randen van
+// de ene sector tegen alle randen van de andere — vangt vrijwel alle praktijkgevallen,
+// op de zeldzame uitzondering na dat de ene sector volledig binnen de andere zit zonder
+// enige randkruising (in de praktijk niet relevant bij vergelijkbaar-grote bogen).
+function _sectorsOverlap(sectorA, sectorB){
+  const ringA = sectorA.getLatLngs()[0]; const ringB = sectorB.getLatLngs()[0];
+  if(!ringA || !ringB) return false;
+  for(let i=0;i<ringA.length;i++){
+    const a1=ringA[i], a2=ringA[(i+1)%ringA.length];
+    for(let j=0;j<ringB.length;j++){
+      const b1=ringB[j], b2=ringB[(j+1)%ringB.length];
+      if(_segmentsIntersect(a1,a2,b1,b2)) return true;
+    }
+  }
+  return false;
+}
 // Geeft de set met line-id's terug die bij het focus-potje horen, óf een van diens eigen
-// zichtlijnen kruisen.
+// zichtlijnen kruisen/tot op 100m passeren, óf waarvan de boog overlap heeft met een
+// boog van het focus-potje.
 function _computePotFocusLineIds(potId){
   const ids = new Set();
   const focusLines = allLines.filter(l => l._meta?.potId === potId);
   focusLines.forEach(l => { if(l._meta?.id) ids.add(l._meta.id); });
   const focusSegs = focusLines.map(l => l.getLatLngs()).filter(ll => ll.length>=2).map(ll => [ll[0], ll[ll.length-1]]);
+  const focusSectors = focusLines.map(l => l._sector).filter(Boolean);
   allLines.forEach(l => {
     const lid = l._meta?.id;
     if(!lid || ids.has(lid)) return; // al meegenomen (of geen id)
     const ll = l.getLatLngs(); if(ll.length<2) return;
     const c = ll[0], d = ll[ll.length-1];
+    let include = false;
     for(const [a,b] of focusSegs){
-      if(_segmentsIntersect(a,b,c,d)){ ids.add(lid); break; }
+      if(_segmentDistanceMeters(a,b,c,d) <= POT_FOCUS_MAX_DISTANCE_M){ include = true; break; }
     }
+    if(!include && l._sector){
+      for(const fs of focusSectors){
+        if(_sectorsOverlap(fs, l._sector)){ include = true; break; }
+      }
+    }
+    if(include) ids.add(lid);
   });
   return ids;
 }
