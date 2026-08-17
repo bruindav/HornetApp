@@ -1,4 +1,4 @@
-// app-core.js — Fix 276
+// app-core.js — Fix 277
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -191,9 +191,18 @@ function upsertSearchCircleFromCloud(doc){
     _enableSearchCircleEditing(c);
     _bindSearchCircleContextMenu(c);
   } else {
-    // Niet overschrijven terwijl JIJ 'm actief aan het verslepen bent
-    if(!c.pm?.dragging?.()){
-      c.setLatLng([doc.lat, doc.lng]);
+    // Fix 277: alleen ECHT gewijzigde waarden toepassen. Zonder deze check werd de cirkel
+    // ook bijgewerkt bij een 'echo' van je eigen zojuist opgeslagen wijziging (Firestore's
+    // onSnapshot geeft ook je eigen schrijfacties terug) — setLatLng()/setRadius() dan
+    // opnieuw aanroepen, ook met identieke waarden, bleek Geoman's sleep/vergroot-
+    // handvatten in de war te brengen zodat de cirkel daarna niet meer aan te passen was.
+    const curLL = c.getLatLng();
+    const newLL = L.latLng(doc.lat, doc.lng);
+    const movedMeters = curLL.distanceTo(newLL);
+    const radiusDiff = Math.abs(c.getRadius() - (doc.radius||150));
+    const isActivelyDragging = !!c.pm?.dragging?.();
+    if(!isActivelyDragging && (movedMeters > 0.5 || radiusDiff > 0.5)){
+      c.setLatLng(newLL);
       c.setRadius(doc.radius||150);
     }
     c._meta.color = doc.color||'#dc2626';
