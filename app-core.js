@@ -1,4 +1,4 @@
-// app-core.js — Fix 273
+// app-core.js — Fix 274
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -103,6 +103,49 @@ function _addSignalFlag(latlng, colorKey){
 function _clearSignalFlags(){
   flagsGroup.clearLayers();
   _signalFlags = [];
+}
+// Fix 274: klein invoervenster voor het nummer — voor het plaatsen van een NIEUWE
+// vrijwilliger-pin (existingMarker leeg), of het wijzigen van een bestaande
+// (existingMarker meegegeven). Suggereert bij nieuw plaatsen automatisch het
+// eerstvolgende vrije nummer.
+function _openVpinNumberModal(latlng, existingMarker=null){
+  const existing = document.getElementById('vpin-modal');
+  if(existing) existing.remove();
+  const existingNums = allMarkers.filter(m=>m._meta?.type==='vpin' && m!==existingMarker).map(m=>m._meta.nummer).filter(n=>typeof n==='number');
+  const suggested = existingMarker ? (existingMarker._meta?.nummer ?? 1) : (existingNums.length ? Math.max(...existingNums)+1 : 1);
+  const modal = document.createElement('div');
+  modal.id = 'vpin-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:22px 20px;width:300px;max-width:100%;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+      <h3 style="margin:0 0 10px;font-size:16px;color:#0f172a">📍 Vrijwilliger-pin</h3>
+      <label style="font-size:13px;color:#475569;display:block;margin-bottom:6px">Nummer van de vrijwilliger:</label>
+      <input id="vpin-num-input" type="number" min="1" value="${suggested}" style="width:100%;padding:10px;border-radius:8px;border:1px solid #cbd5e1;font-size:16px;text-align:center;margin-bottom:14px;box-sizing:border-box"/>
+      <button id="vpin-place-btn" style="width:100%;padding:11px;border-radius:10px;border:none;background:#0aa879;color:#fff;font-size:14px;font-weight:700;cursor:pointer">${existingMarker?'Opslaan':'Plaatsen'}</button>
+      <button id="vpin-cancel-btn" style="width:100%;margin-top:8px;padding:9px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#64748b;font-size:13px;cursor:pointer">Annuleren</button>
+    </div>`;
+  document.body.appendChild(modal);
+  const input = modal.querySelector('#vpin-num-input');
+  input.focus(); input.select();
+  function cleanup(){ modal.remove(); }
+  modal.querySelector('#vpin-place-btn').addEventListener('click', () => {
+    const nummer = parseInt(input.value, 10) || suggested;
+    if(existingMarker){
+      applyPropsToMarker(existingMarker, { nummer });
+      persistMarker(existingMarker);
+    } else {
+      const marker = createMarkerWithPropsAt(latlng, 'vpin', {
+        nummer,
+        date: new Date().toISOString().slice(0,10),
+        by: auth.currentUser?.displayName || auth.currentUser?.email || null
+      });
+      persistMarker(marker);
+      _logAction?.('vpin', { nummer }, marker);
+    }
+    cleanup();
+  });
+  modal.querySelector('#vpin-cancel-btn').addEventListener('click', cleanup);
+  modal.addEventListener('click', e=>{ if(e.target===modal) cleanup(); });
 }
 let allMarkers=[], allLines=[], allSectors=[];
 function initMap(){
@@ -730,6 +773,18 @@ const ICONS = {
     sz==='full' ? IMG.val_full          : IMG.val_small,
     '','',sz),
   pending:(sz='full')=>makeDivIcon(sz==='full'?'\u23F3':'\u23F3','','',sz),
+  // Fix 274: genummerde vrijwilliger-pin — opstelplek voor iemand met richtpistool/Vespa
+  // Finder-app. Alleen zichtbaar tijdens opsporingsmodus/potfocus, zie applyFilters().
+  vpin:(nummer)=>L.divIcon({
+    className: '',
+    html: `<div style="position:relative;width:30px;height:38px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">
+      <svg width="30" height="38" viewBox="0 0 30 38">
+        <path d="M15 0C6.7 0 0 6.7 0 15c0 11 15 23 15 23s15-12 15-23C30 6.7 23.3 0 15 0Z" fill="#2563eb" stroke="#fff" stroke-width="1.5"/>
+      </svg>
+      <div style="position:absolute;top:5px;left:0;width:30px;text-align:center;color:#fff;font-weight:800;font-size:14px;line-height:1">${nummer!=null?nummer:'?'}</div>
+    </div>`,
+    iconSize: [30, 38], iconAnchor: [15, 38]
+  }),
 };
 
 // ── Inline icoon HTML voor gebruik buiten kaart (filter, acties, overzicht) ──
@@ -756,7 +811,11 @@ function getIconForMarker(meta){
   const zoom = map?.getZoom() || 14;
   const type = meta?.type || 'pending';
   let icon;
-  if(zoom >= ZOOM_FULL){
+  if(type==='vpin'){
+    // Fix 274: altijd hetzelfde, leesbare genummerde pinnetje — geen zoom-afhankelijke
+    // stip nodig, dit icoon wordt toch alleen tijdens opsporing (dus dichtbij) gebruikt.
+    icon = ICONS.vpin(meta.nummer);
+  } else if(zoom >= ZOOM_FULL){
     // Volledig icoon met emoji + label
     if(type==='hoornaar') icon = ICONS.hoornaar(meta.aantal,'full');
     else icon = ICONS[type]?.('full') || ICONS.pending('full');
@@ -881,10 +940,12 @@ function openMapContextMenu(latlng, x, y){
     <button data-flag="felgroen">🟢 Vlag: fel groen</button>
     <button data-flag="lichtgroen">🟢 Vlag: licht groen</button>
     <button data-flag="oranje">🟠 Vlag: oranje</button>
-    ${_signalFlags.length ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}`;
+    ${_signalFlags.length ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}
+    <button data-act="vpin">📍 Vrijwilliger-pin plaatsen</button>`;
     el.addEventListener('click', ev=>{
       const b=ev.target.closest('button'); if(!b) return;
       closeContextMenu();
+      if(b.dataset.act==='vpin'){ _openVpinNumberModal(latlng); return; }
       const key = b.dataset.flag;
       if(key==='clear') _clearSignalFlags();
       else _addSignalFlag(latlng, key);
@@ -919,11 +980,12 @@ function openMapContextMenu(latlng, x, y){
 }
 function openMarkerContextMenu(marker, x, y){
   closeContextMenu(); const isLokpot=(marker._meta||{}).type==='lokpot';
+  const isVpin=(marker._meta||{}).type==='vpin';
   const isFocused = isLokpot && _potFocusId === marker._meta?.potId;
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Icoon</h4>
   ${canWrite()?'<button data-act="move">✋ Verplaatsen</button>':''}
-  <button data-act="edit">✏️ Eigenschappen</button>
+  ${isVpin?'<button data-act="renumber">🔢 Nummer wijzigen</button>':'<button data-act="edit">✏️ Eigenschappen</button>'}
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
   ${isLokpot?`<button data-act="pot_focus">${isFocused ? '🎯 Opsporing stoppen' : '🎯 Opsporing starten hier'}</button>`:''}
   ${canWrite()?'<button data-act="delete">🗑️ Verwijderen</button>':''}`;
@@ -949,6 +1011,8 @@ function openMarkerContextMenu(marker, x, y){
             });
           }
         });
+      } else if(act==='renumber'){
+        _openVpinNumberModal(marker.getLatLng(), marker); // Fix 274: bestaande pin doorgeven i.p.v. een nieuwe aan te maken
       } else if(act==='edit'){
         openPropModal({ type: marker._meta.type, init: {...marker._meta, _latlng: marker.getLatLng()}, onSave:(vals)=>{ applyPropsToMarker(marker, vals); persistMarker(marker); }});
       } else if(act==='new_line'){
@@ -1441,8 +1505,8 @@ async function _persistAction(type, meta, markerId, latlng, memEntry) {
 }
 
 function _logAction(type, meta, marker){
-  const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon' };
-  const icons  = { hoornaar: iconHtml('hoornaar'), nest: iconHtml('nest'), nest_geruimd: iconHtml('nest_geruimd'), lokpot: iconHtml('lokpot'), val: iconHtml('val'), polygon:'⬡' };
+  const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon', vpin:'Vrijwilliger-pin' };
+  const icons  = { hoornaar: iconHtml('hoornaar'), nest: iconHtml('nest'), nest_geruimd: iconHtml('nest_geruimd'), lokpot: iconHtml('lokpot'), val: iconHtml('val'), polygon:'⬡', vpin:'📍' };
   const label  = labels[type] || type;
   const icon   = icons[type]  || '\u{1F4CD}';
   const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
@@ -1726,6 +1790,9 @@ function applyPropsToMarker(marker, vals){
     if(vals.valtype)           m.valtype=vals.valtype;         else delete m.valtype;
     if(vals.koninginnen!=null) m.koninginnen=vals.koninginnen; else delete m.koninginnen;
   }
+  if(m.type==='vpin'){
+    if(vals.nummer!=null) m.nummer=vals.nummer; else delete m.nummer;
+  }
   marker.setIcon(getIconForMarker(m));
   marker._meta=m; attachMarkerPopup(marker);
 }
@@ -1806,7 +1873,8 @@ function persistMarker(marker){
     nesttype:m.nesttype||null,
     ruimer:m.ruimer||null, methode:m.methode||null, succes:m.succes||null,
     valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null,
-    photoUrl:m.photoUrl||null, photoPath:m.photoPath||null
+    photoUrl:m.photoUrl||null, photoPath:m.photoPath||null,
+    nummer:m.nummer!=null?m.nummer:null
   };
   if(_isDemoAccount()) doc.demo = true;
   saveMarkerToCloud(doc);
@@ -3248,13 +3316,21 @@ function _computeVisiblePotIds(){
 function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
-    const meta=m._meta||{}; let show=!!f[meta.type];
-    // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
-    // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
-    // Fix 264: potfocus overrulet alles — alleen het gefocuste potje zelf blijft zichtbaar.
-    // Fix 266: ook het gefocuste potje-icoon zelf verbergen — de startballetjes van de
-    // zichtlijnen (die op dezelfde plek staan) zijn genoeg als visuele referentie.
-    if(_potFocusId){ show = false; }
+    const meta=m._meta||{};
+    let show;
+    if(meta.type==='vpin'){
+      // Fix 274: vrijwilliger-pin (opstelplek) is een uitzondering — die is juist ALLEEN
+      // zichtbaar tijdens opsporingsmodus/potfocus, omgekeerd aan alle andere iconen.
+      show = !!(_trackingMode || _potFocusId);
+    } else {
+      show=!!f[meta.type];
+      // Fix 252: geen losse _trackingMode-overrule meer nodig — opsporingsmodus zet de
+      // f_type_*-vinkjes zelf al uit, dus f[meta.type] is hierboven al correct false.
+      // Fix 264: potfocus overrulet alles — alleen het gefocuste potje zelf blijft zichtbaar.
+      // Fix 266: ook het gefocuste potje-icoon zelf verbergen — de startballetjes van de
+      // zichtlijnen (die op dezelfde plek staan) zijn genoeg als visuele referentie.
+      if(_potFocusId){ show = false; }
+    }
     // GBIF filter: verberg GBIF markers tenzij showGbif aan staat
     if(show && meta.source==='GBIF' && !f.showGbif) show=false;
     if(f.dateOnlyToday){
@@ -3387,6 +3463,7 @@ function upsertMarkerFromCloud(doc){
       ruimer: doc.ruimer||null, methode: doc.methode||null, succes: doc.succes||null,
       valtype: doc.valtype||null, koninginnen: doc.koninginnen!=null ? doc.koninginnen : null,
       photoUrl: doc.photoUrl||null, photoPath: doc.photoPath||null,
+      nummer: doc.nummer!=null ? doc.nummer : null,
       demo: doc.demo === true,
       // Bron metadata
       source: doc.source||null, externalId: doc.externalId||null,
@@ -3445,6 +3522,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.koninginnen = doc.koninginnen!=null ? doc.koninginnen : null;
     m._meta.photoUrl = doc.photoUrl||null;
     m._meta.photoPath = doc.photoPath||null;
+    m._meta.nummer = doc.nummer!=null ? doc.nummer : null;
     m._meta.demo = doc.demo === true;
     m._meta.source = doc.source||null;
     m._meta.externalId = doc.externalId||null;
