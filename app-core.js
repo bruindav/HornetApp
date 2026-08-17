@@ -1925,15 +1925,27 @@ function placeMarkerAt(latlng, type='pending'){
     if(shouldDebounce()) return;
     openMarkerContextMenu(marker, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
   });
-  marker.on('touchstart', e=>{
-    e.originalEvent?.preventDefault();
-    const t = e.originalEvent?.touches?.[0];
-    _mLpTimer = setTimeout(()=>{
+  if(alwaysDraggable){
+    // Fix 276: voor direct-sleepbare markers (vpin) NIET de touchstart-met-preventDefault-
+    // aanpak hieronder gebruiken — die bleek Leaflet's eigen sleepherkenning op mobiel te
+    // blokkeren (preventDefault() op touchstart voorkwam dat een vinger-sleepbeweging als
+    // drag werd opgepikt). In plaats daarvan: een gewone tik (zonder verschuiving, dus
+    // Leaflet's eigen click-onderdrukking-na-drag werkt hier in ons voordeel) opent het menu.
+    marker.on('click', e=>{
       if(shouldDebounce()) return;
-      openMarkerContextMenu(marker, t?.clientX||0, t?.clientY||0);
-    }, 600);
-  }, {passive: false});
-  marker.on('touchend touchmove', ()=>clearTimeout(_mLpTimer));
+      openMarkerContextMenu(marker, e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
+    });
+  } else {
+    marker.on('touchstart', e=>{
+      e.originalEvent?.preventDefault();
+      const t = e.originalEvent?.touches?.[0];
+      _mLpTimer = setTimeout(()=>{
+        if(shouldDebounce()) return;
+        openMarkerContextMenu(marker, t?.clientX||0, t?.clientY||0);
+      }, 600);
+    }, {passive: false});
+    marker.on('touchend touchmove', ()=>clearTimeout(_mLpTimer));
+  }
   // Verplaatsen via drag
   if(canWrite()){
     marker.on('drag', () => {
