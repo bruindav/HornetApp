@@ -1,4 +1,4 @@
-// app-core.js — Fix 275
+// app-core.js — Fix 276
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -3564,7 +3564,10 @@ function _restoreFilterState(){
 function upsertMarkerFromCloud(doc){
   let m = allMarkers.find(x=>x._meta?.id===doc.id);
   if(!m){
-    m = L.marker([doc.lat, doc.lng], { draggable: false });
+    // Fix 276: vrijwilliger-pin (vpin) is bewust direct sleepbaar ('als schaakstukken') —
+    // gold tot nu toe alleen voor de maker zelf (via placeMarkerAt), niet voor andere
+    // vrijwilligers die de pin via synchronisatie binnenkrijgen (dit codepad).
+    m = L.marker([doc.lat, doc.lng], { draggable: doc.type==='vpin' });
     m._meta = {
       id: doc.id, type: doc.type, potId: doc.potId||null,
       date: doc.date||null, by: doc.by||null,
