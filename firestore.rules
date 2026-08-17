@@ -65,6 +65,14 @@ service cloud.firestore {
       allow delete: if isAdmin() || canWriteZone(resource.data.zoneId);
     }
 
+    // Fix 275: gedeelde, aanpasbare zoekcirkel tijdens opsporing
+    match /maps/{year}/{group}/data/searchcircles/{docId} {
+      allow read: if true;
+      allow create: if isAdmin() || canWriteZone(request.resource.data.zoneId);
+      allow update: if isAdmin() || (canWriteZone(request.resource.data.zoneId) && canWriteZone(resource.data.zoneId));
+      allow delete: if isAdmin() || canWriteZone(resource.data.zoneId);
+    }
+
     match /roles/{uid} {
       // Iedereen die ingelogd is mag role/zones/displayName lezen (nodig voor beheerder-weergave)
       allow read: if isSignedIn();
