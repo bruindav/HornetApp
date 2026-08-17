@@ -1,4 +1,4 @@
-// app-core.js — Fix 274
+// app-core.js — Fix 275
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -35,7 +35,8 @@ import {
   saveMarkerToCloud, deleteMarkerFromCloud,
   saveLineToCloud, deleteLineFromCloud,
   saveSectorToCloud, deleteSectorFromCloud,
-  savePolygonToCloud, deletePolygonFromCloud
+  savePolygonToCloud, deletePolygonFromCloud,
+  saveSearchCircleToCloud, deleteSearchCircleFromCloud
 } from "./sync-engine.js";
 // ======================= Kleine helpers =======================
 function $(id) { return document.getElementById(id); }
@@ -74,13 +75,19 @@ const linesGroup = L.featureGroup();
 const circlesGroup = L.featureGroup();
 const handlesGroup = L.featureGroup();
 const polygonsGroup = L.featureGroup();
+// Fix 275: gedeelde, aanpasbare zoekcirkel(s) — alleen zichtbaar tijdens opsporingsmodus/
+// potfocus (zie applyFilters()/_setTrackingMode()/_setPotFocus()), net als de vpin/vlag.
+const searchCircleGroup = L.featureGroup();
+let allSearchCircles = [];
 // Fix 267: vlaggetjes om zendersignaal te markeren tijdens opsporingsmodus — bewust
 // LOKAAL/sessie-gebonden (niet naar Firestore), want dit zijn tijdelijke veldnotities
 // tijdens één zoekactie, geen permanente waarnemingsdata.
-const flagsGroup = L.featureGroup();
-let _signalFlags = [];
+// Fix 275: vlaggetjes zijn nu een 'echt' gedeeld icoontype (vlag) i.p.v. lokale
+// flagsGroup — ze gaan net als de vrijwilliger-pin (fix 274) mee via de bestaande
+// Firestore-synchronisatie, zodat alle vrijwilligers dezelfde signaal-meldingen zien.
 const FLAG_COLORS = { felgroen: '#00e600', lichtgroen: '#90ee90', oranje: '#ff8c00' };
-function _makeFlagIcon(color){
+function _makeFlagIcon(colorKey){
+  const color = FLAG_COLORS[colorKey] || FLAG_COLORS.felgroen;
   return L.divIcon({
     className: '',
     html: `<svg width="22" height="26" viewBox="0 0 22 26" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))">
@@ -91,19 +98,117 @@ function _makeFlagIcon(color){
   });
 }
 function _addSignalFlag(latlng, colorKey){
-  const color = FLAG_COLORS[colorKey] || FLAG_COLORS.felgroen;
-  const id = genId('flag');
-  const marker = L.marker(latlng, { icon: _makeFlagIcon(color) }).addTo(flagsGroup);
-  marker.on('click', () => {
-    flagsGroup.removeLayer(marker);
-    _signalFlags = _signalFlags.filter(f => f.id !== id);
+  const marker = createMarkerWithPropsAt(latlng, 'vlag', {
+    colorKey,
+    date: new Date().toISOString().slice(0,10),
+    by: auth.currentUser?.displayName || auth.currentUser?.email || null
   });
-  _signalFlags.push({ id, lat: latlng.lat, lng: latlng.lng, colorKey });
+  persistMarker(marker);
+  _logAction?.('vlag', { colorKey }, marker);
 }
 function _clearSignalFlags(){
-  flagsGroup.clearLayers();
-  _signalFlags = [];
+  // Fix 275: verwijdert alle momenteel geladen vlaggetjes voor iedereen (gedeeld) — niet
+  // meer alleen lokaal wissen.
+  allMarkers.filter(m => m._meta?.type==='vlag').slice().forEach(m => {
+    const id = m._meta?.id;
+    deleteMarkerAndAssociations(m);
+    if(id) deleteMarkerFromCloud(id);
+  });
 }
+
+// Fix 275: zoekcirkel — gedeeld, aanpasbaar (verslepen + vergroten/verkleinen via
+// Leaflet-Geoman, dezelfde bibliotheek die al voor polygonen gebruikt wordt), alleen
+// zichtbaar tijdens opsporingsmodus/potfocus.
+function persistSearchCircle(circle){
+  const m = circle._meta || {}; if(!m.id) m.id = genId('circle'); circle._meta = m;
+  const ll = circle.getLatLng();
+  const doc = {
+    id: m.id, lat: ll.lat, lng: ll.lng, radius: circle.getRadius(),
+    color: m.color || '#dc2626', by: m.by || null, date: m.date || null
+  };
+  if(_isDemoAccount()) doc.demo = true;
+  saveSearchCircleToCloud(doc);
+}
+// Schakelt versleep/vergroot-handvatten in (Geoman) en zorgt dat wijzigingen opgeslagen
+// worden. Meerdere event-namen gebonden voor robuustheid — niet alle Geoman-versies
+// vuren exact hetzelfde event bij het loslaten van een cirkel-handvat.
+function _enableSearchCircleEditing(circle){
+  try {
+    circle.pm.enable({ draggable: true });
+    ['pm:markerdragend','pm:centerplaced','pm:edit','pm:update','pm:dragend'].forEach(evt=>{
+      circle.on(evt, () => persistSearchCircle(circle));
+    });
+  } catch(e) { console.warn('[zoekcirkel] editing niet beschikbaar:', e); }
+}
+function _bindSearchCircleContextMenu(circle){
+  const showMenu = (x,y) => {
+    closeContextMenu();
+    const el=document.createElement('div'); el.className='ctx-menu';
+    el.innerHTML = `<h4>Zoekcirkel</h4><button data-act="delete">🗑️ Verwijderen</button>`;
+    el.addEventListener('click', ev=>{
+      const b=ev.target.closest('button'); if(!b) return;
+      closeContextMenu();
+      if(b.dataset.act==='delete'){
+        searchCircleGroup.removeLayer(circle);
+        allSearchCircles = allSearchCircles.filter(x=>x!==circle);
+        if(circle._meta?.id) deleteSearchCircleFromCloud(circle._meta.id);
+      }
+    });
+    document.body.appendChild(el); contextMenuEl=el; positionMenu(el,x,y);
+    document.addEventListener('keydown',escClose); document.addEventListener('click',closeContextMenuOnce,true);
+  };
+  circle.on('contextmenu', e=>{
+    e.originalEvent?.preventDefault(); e.originalEvent?.stopPropagation();
+    showMenu(e.originalEvent?.clientX||0, e.originalEvent?.clientY||0);
+  });
+  let lpTimer=null;
+  circle.on('touchstart', e=>{
+    const t=e.originalEvent?.touches?.[0];
+    lpTimer=setTimeout(()=>showMenu(t?.clientX||0,t?.clientY||0),600);
+  }, {passive:true});
+  circle.on('touchend touchmove', ()=>clearTimeout(lpTimer));
+}
+function _createSearchCircle(latlng){
+  const circle = L.circle(latlng, { radius:150, color:'#dc2626', weight:3, fillOpacity:0.08, dashArray:'6 6' }).addTo(searchCircleGroup);
+  circle._meta = {
+    id: genId('circle'), color:'#dc2626',
+    by: auth.currentUser?.displayName || auth.currentUser?.email || null,
+    date: new Date().toISOString().slice(0,10)
+  };
+  allSearchCircles.push(circle);
+  _enableSearchCircleEditing(circle);
+  _bindSearchCircleContextMenu(circle);
+  persistSearchCircle(circle);
+  _logAction?.('searchcircle', {}, null);
+  return circle;
+}
+function upsertSearchCircleFromCloud(doc){
+  let c = allSearchCircles.find(x => x._meta?.id === doc.id);
+  if(!c){
+    c = L.circle([doc.lat, doc.lng], { radius: doc.radius||150, color: doc.color||'#dc2626', weight:3, fillOpacity:0.08, dashArray:'6 6' }).addTo(searchCircleGroup);
+    c._meta = { id: doc.id, color: doc.color||'#dc2626', by: doc.by||null, date: doc.date||null, demo: doc.demo===true };
+    allSearchCircles.push(c);
+    _enableSearchCircleEditing(c);
+    _bindSearchCircleContextMenu(c);
+  } else {
+    // Niet overschrijven terwijl JIJ 'm actief aan het verslepen bent
+    if(!c.pm?.dragging?.()){
+      c.setLatLng([doc.lat, doc.lng]);
+      c.setRadius(doc.radius||150);
+    }
+    c._meta.color = doc.color||'#dc2626';
+    c._meta.demo = doc.demo===true;
+  }
+  _updateSearchCircleGroupVisibility();
+}
+function deleteSearchCircleFromCloudLocal(id){
+  const c = allSearchCircles.find(x=>x._meta?.id===id);
+  if(c){ searchCircleGroup.removeLayer(c); allSearchCircles = allSearchCircles.filter(x=>x!==c); }
+}
+function _updateSearchCircleGroupVisibility(){
+  if(_trackingMode || _potFocusId) searchCircleGroup.addTo(map); else map.removeLayer(searchCircleGroup);
+}
+
 // Fix 274: klein invoervenster voor het nummer — voor het plaatsen van een NIEUWE
 // vrijwilliger-pin (existingMarker leeg), of het wijzigen van een bestaande
 // (existingMarker meegegeven). Suggereert bij nieuw plaatsen automatisch het
@@ -296,8 +401,6 @@ function initMap(){
   circlesGroup.addTo(map);
   handlesGroup.addTo(map);
   polygonsGroup.addTo(map);
-  // flagsGroup wordt bewust NIET hier toegevoegd — die schakelt mee met opsporingsmodus,
-  // zie _setTrackingMode().
   // Geoman toolbar
   map.pm.addControls({
     position:'topleft',
@@ -785,6 +888,8 @@ const ICONS = {
     </div>`,
     iconSize: [30, 38], iconAnchor: [15, 38]
   }),
+  // Fix 275: signaal-vlaggetje — hergebruikt _makeFlagIcon() (zelfde vorm als voorheen).
+  vlag:(colorKey)=>_makeFlagIcon(colorKey),
 };
 
 // ── Inline icoon HTML voor gebruik buiten kaart (filter, acties, overzicht) ──
@@ -815,6 +920,9 @@ function getIconForMarker(meta){
     // Fix 274: altijd hetzelfde, leesbare genummerde pinnetje — geen zoom-afhankelijke
     // stip nodig, dit icoon wordt toch alleen tijdens opsporing (dus dichtbij) gebruikt.
     icon = ICONS.vpin(meta.nummer);
+  } else if(type==='vlag'){
+    // Fix 275: zelfde reden — altijd hetzelfde vlaggetje, geen zoom-afhankelijke variant.
+    icon = ICONS.vlag(meta.colorKey);
   } else if(zoom >= ZOOM_FULL){
     // Volledig icoon met emoji + label
     if(type==='hoornaar') icon = ICONS.hoornaar(meta.aantal,'full');
@@ -936,16 +1044,19 @@ function openMapContextMenu(latlng, x, y){
   // vlaggetjes-opties (om zendersignaal te markeren) i.p.v. de normale iconen — die zijn
   // toch al verborgen in beide gevallen.
   if(_trackingMode || _potFocusId){
+    const hasFlags = allMarkers.some(m => m._meta?.type==='vlag');
     el.innerHTML=`<h4>📡 Signaal markeren</h4>
     <button data-flag="felgroen">🟢 Vlag: fel groen</button>
     <button data-flag="lichtgroen">🟢 Vlag: licht groen</button>
     <button data-flag="oranje">🟠 Vlag: oranje</button>
-    ${_signalFlags.length ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}
-    <button data-act="vpin">📍 Vrijwilliger-pin plaatsen</button>`;
+    ${hasFlags ? '<button data-flag="clear">🗑️ Alle vlaggetjes wissen</button>' : ''}
+    <button data-act="vpin">📍 Vrijwilliger-pin plaatsen</button>
+    <button data-act="circle">⭕ Zoekcirkel plaatsen</button>`;
     el.addEventListener('click', ev=>{
       const b=ev.target.closest('button'); if(!b) return;
       closeContextMenu();
       if(b.dataset.act==='vpin'){ _openVpinNumberModal(latlng); return; }
+      if(b.dataset.act==='circle'){ _createSearchCircle(latlng); return; }
       const key = b.dataset.flag;
       if(key==='clear') _clearSignalFlags();
       else _addSignalFlag(latlng, key);
@@ -984,7 +1095,7 @@ function openMarkerContextMenu(marker, x, y){
   const isFocused = isLokpot && _potFocusId === marker._meta?.potId;
   const el=document.createElement('div'); el.className='ctx-menu';
   el.innerHTML=`<h4>Icoon</h4>
-  ${canWrite()?'<button data-act="move">✋ Verplaatsen</button>':''}
+  ${canWrite() && !isVpin?'<button data-act="move">✋ Verplaatsen</button>':''}
   ${isVpin?'<button data-act="renumber">🔢 Nummer wijzigen</button>':'<button data-act="edit">✏️ Eigenschappen</button>'}
   ${isLokpot?'<button data-act="new_line">📐 Zichtlijn toevoegen</button>':''}
   ${isLokpot?`<button data-act="pot_focus">${isFocused ? '🎯 Opsporing stoppen' : '🎯 Opsporing starten hier'}</button>`:''}
@@ -1505,8 +1616,8 @@ async function _persistAction(type, meta, markerId, latlng, memEntry) {
 }
 
 function _logAction(type, meta, marker){
-  const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon', vpin:'Vrijwilliger-pin' };
-  const icons  = { hoornaar: iconHtml('hoornaar'), nest: iconHtml('nest'), nest_geruimd: iconHtml('nest_geruimd'), lokpot: iconHtml('lokpot'), val: iconHtml('val'), polygon:'⬡', vpin:'📍' };
+  const labels = { hoornaar:'Waarneming', nest:'Nest', nest_geruimd:'Nest geruimd', lokpot:'Lokpot', val:'Val', polygon:'Polygoon', vpin:'Vrijwilliger-pin', vlag:'Signaal-vlaggetje', searchcircle:'Zoekcirkel' };
+  const icons  = { hoornaar: iconHtml('hoornaar'), nest: iconHtml('nest'), nest_geruimd: iconHtml('nest_geruimd'), lokpot: iconHtml('lokpot'), val: iconHtml('val'), polygon:'⬡', vpin:'📍', vlag:'🚩', searchcircle:'⭕' };
   const label  = labels[type] || type;
   const icon   = icons[type]  || '\u{1F4CD}';
   const time   = new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
@@ -1793,14 +1904,19 @@ function applyPropsToMarker(marker, vals){
   if(m.type==='vpin'){
     if(vals.nummer!=null) m.nummer=vals.nummer; else delete m.nummer;
   }
+  if(m.type==='vlag'){
+    if(vals.colorKey) m.colorKey=vals.colorKey; else delete m.colorKey;
+  }
   marker.setIcon(getIconForMarker(m));
   marker._meta=m; attachMarkerPopup(marker);
 }
 function placeMarkerAt(latlng, type='pending'){
   const id = genId('mk'); let marker;
-  // Markers zijn NIET meer vrij draggable — verplaatsen gaat via contextmenu
+  // Fix 275: vrijwilliger-pin is WEL direct sleepbaar (als schaakstukken) — alle andere
+  // markers blijven bewust niet vrij draggable, verplaatsen gaat daar via het contextmenu.
+  const alwaysDraggable = (type==='vpin');
   if(type==='lokpot'){ const potId=genId('pot'); marker=L.marker(latlng,{draggable:false}); marker._meta={id,type,potId}; }
-  else { marker=L.marker(latlng,{draggable:false}); marker._meta={id,type:(type||'pending')}; }
+  else { marker=L.marker(latlng,{draggable:alwaysDraggable}); marker._meta={id,type:(type||'pending')}; }
   marker.setIcon(getIconForMarker(marker._meta));
   // Mobiel: long-press opent contextmenu (preventDefault stopt browser download-dialoog)
   let _mLpTimer = null;
@@ -1874,7 +1990,7 @@ function persistMarker(marker){
     ruimer:m.ruimer||null, methode:m.methode||null, succes:m.succes||null,
     valtype:m.valtype||null, koninginnen:m.koninginnen!=null?m.koninginnen:null,
     photoUrl:m.photoUrl||null, photoPath:m.photoPath||null,
-    nummer:m.nummer!=null?m.nummer:null
+    nummer:m.nummer!=null?m.nummer:null, colorKey:m.colorKey||null
   };
   if(_isDemoAccount()) doc.demo = true;
   saveMarkerToCloud(doc);
@@ -3141,8 +3257,7 @@ function _setTrackingMode(on){
   _updateTrackingModeButton();
   _updateFilterBadge();
   _updateSimpleModeButtonVisibility();
-  // Fix 267/268: signaal-vlaggetjes zichtbaar tijdens opsporingsmodus ÉN potfocus
-  _updateFlagsGroupVisibility();
+  _updateSearchCircleGroupVisibility();
 }
 // Fix 266/267: 'Eenvoudige modus'-knoppen verbergen tijdens opsporing (opsporingsmodus of
 // opsporing-bij-één-potje) — geen afleiding tijdens het actief zoeken naar een nest. Twee
@@ -3278,12 +3393,7 @@ function _setPotFocus(potId){
   refreshZoomVisibility();
   _updatePotFocusBanner();
   _updateSimpleModeButtonVisibility();
-  _updateFlagsGroupVisibility();
-}
-// Fix 268: signaal-vlaggetjes-laag zichtbaar tijdens opsporingsmodus ÉN potfocus (beide
-// gebruiken dezelfde 'alleen focus op de zoektaak'-context).
-function _updateFlagsGroupVisibility(){
-  if(_trackingMode || _potFocusId) flagsGroup.addTo(map); else map.removeLayer(flagsGroup);
+  _updateSearchCircleGroupVisibility();
 }
 function _updatePotFocusBanner(){
   let banner = document.getElementById('pot-focus-banner');
@@ -3318,9 +3428,10 @@ function applyFilters(){
   allMarkers.forEach(m=>{
     const meta=m._meta||{};
     let show;
-    if(meta.type==='vpin'){
-      // Fix 274: vrijwilliger-pin (opstelplek) is een uitzondering — die is juist ALLEEN
-      // zichtbaar tijdens opsporingsmodus/potfocus, omgekeerd aan alle andere iconen.
+    if(meta.type==='vpin' || meta.type==='vlag'){
+      // Fix 274/275: vrijwilliger-pin en signaal-vlaggetje zijn een uitzondering — die
+      // zijn juist ALLEEN zichtbaar tijdens opsporingsmodus/potfocus, omgekeerd aan alle
+      // andere iconen.
       show = !!(_trackingMode || _potFocusId);
     } else {
       show=!!f[meta.type];
@@ -3464,6 +3575,7 @@ function upsertMarkerFromCloud(doc){
       valtype: doc.valtype||null, koninginnen: doc.koninginnen!=null ? doc.koninginnen : null,
       photoUrl: doc.photoUrl||null, photoPath: doc.photoPath||null,
       nummer: doc.nummer!=null ? doc.nummer : null,
+      colorKey: doc.colorKey||null,
       demo: doc.demo === true,
       // Bron metadata
       source: doc.source||null, externalId: doc.externalId||null,
@@ -3523,6 +3635,7 @@ function upsertMarkerFromCloud(doc){
     m._meta.photoUrl = doc.photoUrl||null;
     m._meta.photoPath = doc.photoPath||null;
     m._meta.nummer = doc.nummer!=null ? doc.nummer : null;
+    m._meta.colorKey = doc.colorKey||null;
     m._meta.demo = doc.demo === true;
     m._meta.source = doc.source||null;
     m._meta.externalId = doc.externalId||null;
@@ -3784,7 +3897,9 @@ function activateScope(year, group, reload=false){
     onSectorUpdate: upsertSectorFromCloud,
     onSectorDelete: deleteSectorFromCloudLocal,
     onPolygonUpdate: upsertPolygonFromCloud,
-    onPolygonDelete: deletePolygonFromCloudLocal
+    onPolygonDelete: deletePolygonFromCloudLocal,
+    onSearchCircleUpdate: upsertSearchCircleFromCloud,
+    onSearchCircleDelete: deleteSearchCircleFromCloudLocal
   });
   if(reload){
     // Eerst polygon labels verwijderen (zijn losse tooltips op de map)
@@ -3792,6 +3907,7 @@ function activateScope(year, group, reload=false){
       if(layer._labelTooltip){ try{ map.removeLayer(layer._labelTooltip); }catch{} layer._labelTooltip = null; }
     });
     markersGroup.clearLayers(); linesGroup.clearLayers(); circlesGroup.clearLayers(); handlesGroup.clearLayers(); polygonsGroup.clearLayers();
+    searchCircleGroup.clearLayers(); allSearchCircles=[]; // Fix 275
     allLines.forEach(l=>{ if(l._distLabel){ try{map.removeLayer(l._distLabel);}catch{} } });
     if(_potFocusId){ _potFocusId=null; document.getElementById('pot-focus-banner')?.remove(); _updateSimpleModeButtonVisibility(); } // Fix 264: focus is gebonden aan dit gebied/jaar
   allMarkers=[]; allLines=[]; allSectors=[];

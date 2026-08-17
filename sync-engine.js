@@ -1,4 +1,4 @@
-// sync-engine.js — Fix 38
+// sync-engine.js — Fix 275
 // Firestore sync voor HornetApp
 // Wijziging t.o.v. Fix 12: zoneId wordt nu automatisch meegegeven
 // aan alle saveDoc-aanroepen, zodat Firestore rules canWriteZone() correct
@@ -49,7 +49,8 @@ export function listenToCloudChanges({
   onMarkerUpdate,  onMarkerDelete,
   onLineUpdate,    onLineDelete,
   onSectorUpdate,  onSectorDelete,
-  onPolygonUpdate, onPolygonDelete
+  onPolygonUpdate, onPolygonDelete,
+  onSearchCircleUpdate, onSearchCircleDelete
 }) {
   _unsubscribers.forEach(fn => { try { fn(); } catch {} });
   _unsubscribers = [];
@@ -75,6 +76,7 @@ export function listenToCloudChanges({
   listen('lines',    onLineUpdate,    onLineDelete);
   listen('sectors',  onSectorUpdate,  onSectorDelete);
   listen('polygons', onPolygonUpdate, onPolygonDelete);
+  listen('searchcircles', onSearchCircleUpdate, onSearchCircleDelete);
 }
 
 // ======================= Schrijf helpers =======================
@@ -118,3 +120,10 @@ export function savePolygonToCloud(data) {
   return saveDoc('polygons', data.id, { ...data, zoneId: data.zoneId || _group });
 }
 export function deletePolygonFromCloud(id) { return deleteDocument('polygons', id); }
+
+// ======================= Zoekcirkels (Fix 275) =======================
+// Gedeelde, aanpasbare cirkel om het huidige zoekgebied tijdens opsporing aan te geven.
+export function saveSearchCircleToCloud(data) {
+  return saveDoc('searchcircles', data.id, { ...data, zoneId: data.zoneId || _group });
+}
+export function deleteSearchCircleFromCloud(id) { return deleteDocument('searchcircles', id); }
