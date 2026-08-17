@@ -1,4 +1,4 @@
-// app-core.js — Fix 271
+// app-core.js — Fix 272
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -811,13 +811,19 @@ function refreshZoomVisibility(){
   // Fix 250: zichtlijnen + balletje + label + sector via allLines i.p.v. ruwe groepsleden.
   // linesGroup bevat naast de lijn zelf ook het startballetje — die los itereren zorgde
   // ervoor dat het balletje nooit correct herkend/verborgen werd bij deze schaal-check.
+  // Fix 272: balletje-zichtbaarheid gebruikt nu dezelfde _computeVisiblePotIds()-regel
+  // als applyFilters() (fix 271) — anders verscheen het bij elke zoom weer boven op een
+  // zichtbaar potje-icoon, ook al had applyFilters() het net correct verborgen.
+  const visiblePotIds = _computeVisiblePotIds();
   allLines.forEach(line => {
     if(!linesGroup.hasLayer(line)) return; // al om andere reden verborgen (potje/hidden/opsporingsmodus) — hier niet aankomen
     line.setStyle({ opacity: showLines ? 1 : 0 });
     if(line._startBall){
+      const potIconVisible = visiblePotIds.has(line._meta?.potId);
+      const wantBall = showLines && !potIconVisible;
       const inB = linesGroup.hasLayer(line._startBall);
-      if(showLines && !inB) linesGroup.addLayer(line._startBall);
-      if(!showLines && inB) linesGroup.removeLayer(line._startBall);
+      if(wantBall && !inB) linesGroup.addLayer(line._startBall);
+      if(!wantBall && inB) linesGroup.removeLayer(line._startBall);
     }
     if(line._distLabel){
       const onMap = map.hasLayer(line._distLabel);
@@ -3181,6 +3187,16 @@ function _updatePotFocusBanner(){
   }
 }
 
+// Fix 272: gedeeld door applyFilters() en refreshZoomVisibility() — voorheen had
+// refreshZoomVisibility() zijn eigen, oudere balletje-logica die geen rekening hield met
+// icoon-zichtbaarheid (fix 271), waardoor het balletje bij elke zoom-actie weer boven op
+// een zichtbaar potje-icoon kon verschijnen.
+function _computeVisiblePotIds(){
+  const ids = new Set();
+  allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) ids.add(meta.potId); });
+  return ids;
+}
+
 function applyFilters(){
   const f=getActiveFilters();
   allMarkers.forEach(m=>{
@@ -3201,8 +3217,7 @@ function applyFilters(){
     }
     if(show) markersGroup.addLayer(m); else markersGroup.removeLayer(m);
   });
-  const visiblePotIds=new Set();
-  allMarkers.forEach(m=>{ const meta=m._meta||{}; if(meta.type==='lokpot' && markersGroup.hasLayer(m)) visiblePotIds.add(meta.potId); });
+  const visiblePotIds=_computeVisiblePotIds();
   // Polygoon omtrek-only + Fix 251: aparte 'polygonen tonen'-filter
   const outlineOnly = !!$('f_poly_outline')?.checked;
   const showPolygonsFilter = !!$('f_show_polygons')?.checked;
