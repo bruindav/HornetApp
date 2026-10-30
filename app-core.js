@@ -1,4 +1,4 @@
-// app-core.js — Fix 279
+// app-core.js — Fix 280
 // app.js — Hornet Mapper NL v6.1.0 (hybride realtime + veilige UI binding)
 // ----------------------------------------------------------------------------
 // Vereist (door index.html alléén app.js te laden):
@@ -686,6 +686,14 @@ function initUIBindings(){
   document.getElementById('help-close-btn')?.addEventListener('click', helpClose);
   helpOverlay?.addEventListener('click', e => { if(e.target === helpOverlay) helpClose(); });
   document.addEventListener('keydown', e => { if(e.key === 'Escape' && helpOverlay?.classList.contains('open')) helpClose(); });
+  // Fix 280: help direct openen met #help achter het adres (bijv. vanuit DigidaveStore)
+  const _helpFromHash = () => {
+    if (location.hash !== '#help') return;
+    history.replaceState(history.state, '', location.pathname + location.search);
+    helpOpen();
+  };
+  _helpFromHash();
+  window.addEventListener('hashchange', _helpFromHash);
   // Tab wisselen
   helpOverlay?.querySelectorAll('.help-tab').forEach(btn => {
     btn.addEventListener('click', () => {
