@@ -1,4 +1,4 @@
-// main.js — Fix 63
+// main.js — Fix 281
 // Auth-gated bootstrap met email/wachtwoord + Google login
 import { auth } from './firebase.js';
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -140,14 +140,29 @@ function firebaseErrorNL(code) {
   return map[code] || `Fout: ${code}`;
 }
 
+// Fix 281: demo direct proberen met #demo achter het adres (bijv. vanuit DigidaveStore)
+const DEMO_LOGIN = { email: 'demo@hoornaarzoeken.nl', pass: 'Demo2026' };
+let _demoPending = location.hash === '#demo';
+if (_demoPending) history.replaceState(history.state, '', location.pathname + location.search);
+
 // Auth state gate
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    _demoPending = false;   // al ingelogd: niets overschrijven
     showApp();
     renderHeader(user);
     startAppOnce();
   } else {
     showLogin();
+    if (_demoPending) {
+      _demoPending = false;
+      const em = document.getElementById('login-email'), pw = document.getElementById('login-pass');
+      if (em) em.value = DEMO_LOGIN.email;
+      if (pw) pw.value = DEMO_LOGIN.pass;
+      import('./firebase.js')
+        .then(({ loginWithEmail }) => loginWithEmail(DEMO_LOGIN.email, DEMO_LOGIN.pass))
+        .catch(e => showError(firebaseErrorNL(e.code)));
+    }
     // Niet resetten — bij opnieuw inloggen herladen we de pagina via logoutBtn
   }
 });
